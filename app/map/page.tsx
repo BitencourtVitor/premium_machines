@@ -40,6 +40,7 @@ export default function MapPage() {
   const lastAnimatedSpiderfyRef = useRef<string | null>(null) // Rastrear qual grupo já foi animado
   const originalGroupsRef = useRef<Map<string, { center: { lng: number; lat: number }; sites: Site[]; id: string }>>(new Map()) // Armazenar grupos originais
   const previousSitesIdsRef = useRef<string>('') // Rastrear IDs dos sites para detectar mudanças
+  const updateMarkersRef = useRef<(() => void) | null>(null) // Ref para updateMarkers para uso nos listeners
   const [spiderfiedGroup, setSpiderfiedGroup] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [mapLoaded, setMapLoaded] = useState(false)
@@ -162,7 +163,7 @@ export default function MapPage() {
           // Usar requestAnimationFrame para garantir que o mapa esteja renderizado
           requestAnimationFrame(() => {
             if (map.current && map.current.isStyleLoaded()) {
-              updateMarkers()
+              updateMarkersRef.current?.()
             }
           })
         }
@@ -197,7 +198,7 @@ export default function MapPage() {
           // Aguardar um frame adicional para garantir que as projeções estejam prontas
           requestAnimationFrame(() => {
             if (map.current && map.current.isStyleLoaded()) {
-              updateMarkers()
+              updateMarkersRef.current?.()
               
               // No mobile, atualizar os sites automaticamente após o zoom
               if (isMobileDevice) {
@@ -227,7 +228,7 @@ export default function MapPage() {
             zoomUpdateTimeout = null
           }
           if (map.current && map.current.isStyleLoaded()) {
-            updateMarkers()
+            updateMarkersRef.current?.()
           }
         }
       }
@@ -264,7 +265,7 @@ export default function MapPage() {
     
     // Armazenar handlers para cleanup
     resizeHandlersRef.current.push(handleResize, handleOrientationChange)
-  }, [mapStyle, loadSites, updateMarkers])
+  }, [mapStyle, loadSites])
 
   // Função para obter cores adaptadas ao tema
   const getThemeColors = (colorType: 'neutral' | 'blue' | 'red' | 'green' | 'yellow' | 'orange' | 'purple', isDark: boolean) => {
@@ -881,6 +882,11 @@ export default function MapPage() {
     })
 
   }, [sites, spiderfiedGroup, selectedSite, groupNearbySites, clearSpiderLines, createLocationMarker, createSpiderfyMarker, getGeoDistance])
+
+  // Atualizar ref de updateMarkers sempre que a função mudar
+  useEffect(() => {
+    updateMarkersRef.current = updateMarkers
+  }, [updateMarkers])
 
   // Detectar tema escuro e ajustar mapa automaticamente (apenas quando estilo for 'map')
   useEffect(() => {
