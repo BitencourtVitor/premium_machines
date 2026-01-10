@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
         *,
         machine:machines(id, unit_number),
         site:sites(id, title),
+        supplier:suppliers(id, nome, supplier_type),
         created_by_user:users!allocation_events_created_by_fkey(id, nome),
         approved_by_user:users!allocation_events_approved_by_fkey(id, nome)
       `)
@@ -41,6 +42,7 @@ export async function POST(request: NextRequest) {
         event_date: body.event_date,
         downtime_reason: body.downtime_reason || null,
         downtime_description: body.downtime_description || null,
+        supplier_id: body.supplier_id || null,
         notas: body.notas || null,
         created_by: body.created_by,
         status: 'pending',

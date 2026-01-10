@@ -271,14 +271,17 @@ export default function MapPage() {
   }, [])
 
   // Criar marcador com ícone map-pin do Phosphor Icons para obras individuais
-  const createLocationMarker = useCallback((site: Site, currentIsDark: boolean, onClick: (e?: Event) => void) => {
-    const colors = getThemeColors(site.machines_count > 0 ? 'blue' : 'neutral', currentIsDark)
+  const createLocationMarker = useCallback((site: Site, currentIsDark: boolean, onClick: (e?: Event) => void, isSelected: boolean = false) => {
+    // Cor diferente quando selecionado (verde/amarelo para destacar)
+    const baseColorType = site.machines_count > 0 ? 'blue' : 'neutral'
+    const colorType = isSelected ? 'green' : baseColorType
+    const colors = getThemeColors(colorType, currentIsDark)
     const el = document.createElement('div')
     el.className = 'marker-container'
     el.style.cursor = 'pointer'
     el.style.width = '32px'
     el.style.height = '40px'
-    el.style.zIndex = '1000'
+    el.style.zIndex = isSelected ? '1002' : '1000'
     el.innerHTML = `
       <div class="relative w-full h-full flex items-center justify-center">
         <svg class="w-8 h-10" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
@@ -377,10 +380,11 @@ export default function MapPage() {
       if (group.sites.length === 1) {
         // Site individual - marcador com ícone de location
         const site = group.sites[0]
+        const isSelected = selectedSite?.id === site.id
         const el = createLocationMarker(site, currentIsDark, () => {
           setSpiderfiedGroup(null)
           setSelectedSite(site)
-        })
+        }, isSelected)
 
         const marker = new mapboxgl.Marker(el)
           .setLngLat([Number(site.longitude), Number(site.latitude)])
@@ -557,11 +561,11 @@ export default function MapPage() {
                   const markerPos = getSpiderPosition()
 
                   // Criar elemento do marcador
+                  const isSelected = selectedSite?.id === site.id
                   markerEl = createLocationMarker(site, currentIsDark, (e) => {
                     if (e) e.stopPropagation()
                     setSelectedSite(site)
-                  })
-                  markerEl.style.zIndex = '1001'
+                  }, isSelected)
                   
                   // IMPORTANTE: Não aplicar transform no elemento root!
                   // O Mapbox usa transform para posicionar o marcador.
@@ -630,7 +634,7 @@ export default function MapPage() {
       }
     })
 
-  }, [sites, isDarkMode, spiderfiedGroup, groupNearbySites, clearSpiderLines, createLocationMarker])
+  }, [sites, isDarkMode, spiderfiedGroup, selectedSite, groupNearbySites, clearSpiderLines, createLocationMarker])
 
   // Detectar tema escuro e ajustar mapa automaticamente (apenas quando estilo for 'map')
   useEffect(() => {
@@ -828,7 +832,7 @@ export default function MapPage() {
 
             {/* Selected Site Panel */}
             {selectedSite && (
-              <div className={`absolute bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 rounded-lg shadow-lg p-4 z-10 ${
+              <div className={`absolute bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 rounded-lg shadow-lg p-4 z-[10000] ${
                 selectedSite.is_headquarters 
                   ? 'bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600' 
                   : 'bg-white dark:bg-gray-800'

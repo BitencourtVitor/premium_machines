@@ -86,6 +86,7 @@ export const DOWNTIME_REASON_LABELS: Record<string, string> = {
   weather: 'Condições Climáticas',
   lack_of_operator: 'Falta de Operador',
   holiday: 'Feriado',
+  maintenance: 'Manutenção',
   other: 'Outro',
 }
 

@@ -35,6 +35,7 @@ export interface Supplier {
   telefone?: string
   endereco?: string
   contato_nome?: string
+  supplier_type: 'rental' | 'maintenance' | 'both'
   ativo: boolean
   created_at: string
   updated_at: string
@@ -121,8 +122,9 @@ export interface AllocationEvent {
   extension_id?: string
   event_date: string
   end_date?: string
-  downtime_reason?: 'defect' | 'lack_of_supplies' | 'weather' | 'lack_of_operator' | 'holiday' | 'other'
+  downtime_reason?: 'defect' | 'lack_of_supplies' | 'weather' | 'lack_of_operator' | 'holiday' | 'maintenance' | 'other'
   downtime_description?: string
+  supplier_id?: string
   status: 'pending' | 'approved' | 'rejected'
   approved_by?: string
   approved_at?: string
@@ -136,6 +138,7 @@ export interface AllocationEvent {
   // Joined fields
   machine?: Machine
   site?: Site
+  supplier?: Supplier
   created_by_user?: User
   approved_by_user?: User
 }

@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
     telefone VARCHAR(20),
     endereco TEXT,
     contato_nome VARCHAR(255),
+    supplier_type VARCHAR(20) DEFAULT 'rental' CHECK (supplier_type IN ('rental', 'maintenance', 'both')),
     ativo BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -203,6 +204,7 @@ CREATE TABLE IF NOT EXISTS allocation_events (
     machine_id UUID NOT NULL REFERENCES machines(id) ON DELETE RESTRICT,
     site_id UUID REFERENCES sites(id) ON DELETE RESTRICT,
     extension_id UUID REFERENCES machine_extensions(id) ON DELETE SET NULL,
+    supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,
     -- Dados temporais
     event_date TIMESTAMP WITH TIME ZONE NOT NULL,
     end_date TIMESTAMP WITH TIME ZONE,
@@ -213,6 +215,7 @@ CREATE TABLE IF NOT EXISTS allocation_events (
         'weather',
         'lack_of_operator',
         'holiday',
+        'maintenance',
         'other'
     )),
     downtime_description TEXT,
@@ -235,6 +238,7 @@ CREATE TABLE IF NOT EXISTS allocation_events (
 CREATE INDEX IF NOT EXISTS idx_events_type ON allocation_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_events_machine ON allocation_events(machine_id);
 CREATE INDEX IF NOT EXISTS idx_events_site ON allocation_events(site_id);
+CREATE INDEX IF NOT EXISTS idx_events_supplier ON allocation_events(supplier_id);
 CREATE INDEX IF NOT EXISTS idx_events_date ON allocation_events(event_date DESC);
 CREATE INDEX IF NOT EXISTS idx_events_status ON allocation_events(status);
 CREATE INDEX IF NOT EXISTS idx_events_created_by ON allocation_events(created_by);
@@ -411,7 +415,9 @@ ORDER BY ae.created_at DESC;
 -- 14. COMENTÁRIOS NAS TABELAS
 -- ============================================
 COMMENT ON TABLE users IS 'Usuários do sistema com suas permissões e roles';
-COMMENT ON TABLE suppliers IS 'Fornecedores de máquinas alugadas';
+COMMENT ON TABLE suppliers IS 'Fornecedores de máquinas alugadas e/ou prestadores de manutenção';
+COMMENT ON COLUMN suppliers.supplier_type IS 'Tipo de fornecedor: rental (aluguel), maintenance (manutenção), both (ambos)';
+COMMENT ON COLUMN allocation_events.supplier_id IS 'Referência ao fornecedor/mecânico responsável (usado principalmente para manutenção de máquinas próprias)';
 COMMENT ON TABLE sites IS 'Obras/endereços onde máquinas operam (geocodificados)';
 COMMENT ON TABLE machine_types IS 'Tipos de máquinas disponíveis';
 COMMENT ON TABLE machines IS 'Máquinas físicas únicas identificadas por unit_number';
