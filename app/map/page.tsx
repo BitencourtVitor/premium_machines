@@ -1076,43 +1076,61 @@ export default function MapPage() {
     if (!panelRef.current) return
 
     setIsDragging(true)
+    // Coordenadas relativas ao container (sempre position: absolute)
+    const containerRect = mapContainerRef.current.getBoundingClientRect()
+    const isMobile = 'touches' in e
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    const clientY = 'touches' in e ? e.touches[0].pageY : e.clientY
 
-    // Salvar posição inicial do mouse
-    setDragStart({ x: clientX, y: clientY })
+    // Salvar posição inicial do ponteiro relativa ao container
+    setDragStart({
+      x: clientX - containerRect.left,
+      y: clientY - containerRect.top
+    })
 
-    // Salvar posição inicial do painel
+    // Salvar posição inicial do painel relativa ao container
     const rect = panelRef.current.getBoundingClientRect()
-    const currentPos = panelPosition || { x: rect.left, y: rect.top }
-    setPanelStart(currentPos)
+    const containerRect = mapContainerRef.current.getBoundingClientRect()
+    setPanelStart({
+      x: rect.left - containerRect.left, // Posição relativa ao container
+      y: rect.top - containerRect.top
+    })
 
-    // Prevenir seleção de texto durante o arraste
-    e.preventDefault()
-  }, [panelPosition])
+    // Prevenir seleção de texto durante o arraste (apenas para mouse)
+    if ('clientX' in e) {
+      e.preventDefault()
+    }
+  }, [])
 
   const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (!isDragging || !panelRef.current || !mapContainerRef.current) return
 
+    // Coordenadas relativas ao container
+    const containerRect = mapContainerRef.current.getBoundingClientRect()
+    const isMobile = 'touches' in e
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    const clientY = 'touches' in e ? e.touches[0].pageY : e.clientY
 
-    // Calcular diferença do movimento
-    const deltaX = clientX - dragStart.x
-    const deltaY = clientY - dragStart.y
+    // Converter para coordenadas relativas ao container
+    const relativeX = clientX - containerRect.left
+    const relativeY = clientY - containerRect.top
 
-    // Nova posição = posição inicial do painel + diferença do movimento
+    // Lógica simples e consistente: nova posição = posição inicial + movimento
+    const deltaX = relativeX - dragStart.x
+    const deltaY = relativeY - dragStart.y
+
     const newX = panelStart.x + deltaX
     const newY = panelStart.y + deltaY
 
-    // Controlar limites do container do mapa
-    const mapRect = mapContainerRef.current.getBoundingClientRect()
+    // Controlar limites do container do mapa (sempre position: absolute)
+    const containerRect = mapContainerRef.current.getBoundingClientRect()
     const panel = panelRef.current
 
-    const minX = mapRect.left
-    const maxX = mapRect.right - panel.offsetWidth
-    const minY = mapRect.top
-    const maxY = mapRect.bottom - panel.offsetHeight
+    // Limites baseados no container, não na viewport
+    const minX = 16 // left-4 = 16px
+    const maxX = containerRect.width - panel.offsetWidth - 16 // right-4 = 16px
+    const minY = 16 // top padding mínimo
+    const maxY = containerRect.height - panel.offsetHeight - 16 // bottom padding mínimo
 
     const clampedX = Math.max(minX, Math.min(newX, maxX))
     const clampedY = Math.max(minY, Math.min(newY, maxY))
@@ -1130,7 +1148,10 @@ export default function MapPage() {
   useEffect(() => {
     if (isDragging) {
       const handleMouseMove = (e: MouseEvent) => handleDragMove(e)
-      const handleTouchMove = (e: TouchEvent) => handleDragMove(e)
+      const handleTouchMove = (e: TouchEvent) => {
+        e.preventDefault() // Bloquear scroll da página durante drag no mobile
+        handleDragMove(e)
+      }
       const handleMouseUp = () => handleDragEnd()
       const handleTouchEnd = () => handleDragEnd()
 
@@ -1146,14 +1167,14 @@ export default function MapPage() {
         document.removeEventListener('touchend', handleTouchEnd)
       }
     }
-  }, [isDragging, handleDragMove, handleDragEnd, panelStart])
+  }, [isDragging, handleDragMove, handleDragEnd])
 
   return (
     <div className="min-h-screen md:h-screen md:max-h-screen bg-gray-50 dark:bg-gray-900 md:flex md:flex-col md:overflow-hidden">
       <Header title="Mapa" />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
-        <main ref={mapContainerRef} className={`flex-1 p-4 md:p-6 transition-all duration-250 ease-in-out md:flex md:flex-col md:overflow-hidden ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`} style={{ minHeight: 'calc(100vh - 200px)' }}>
+        <main ref={mapContainerRef} className={`relative flex-1 p-4 md:p-6 transition-all duration-250 ease-in-out md:flex md:flex-col md:overflow-hidden ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`} style={{ minHeight: 'calc(100vh - 200px)' }}>
           <div className="relative w-full h-full rounded-lg overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700" style={{ minHeight: '400px' }}>
             {/* Map Container */}
             <div ref={mapContainer} className="map-container w-full h-full" />
@@ -1204,25 +1225,23 @@ export default function MapPage() {
             {selectedSite && (
               <div
                 ref={panelRef}
-                className="absolute bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-[10000]"
+                className="absolute left-4 right-4 md:left-auto md:right-4 md:w-96 z-[10000]"
                 style={panelPosition ? {
-                  position: 'fixed',
                   left: `${panelPosition.x}px`,
                   top: `${panelPosition.y}px`,
                   width: '384px',
                   maxWidth: 'calc(100vw - 2rem)',
                   height: 'auto'
-                } : undefined}
+                } : {
+                  bottom: '80px' // Posição inicial: 20px (padding) + 60px (altura estimada)
+                }}
                 onMouseDown={handleDragStart}
                 onTouchStart={handleDragStart}
               >
                 {/* Drag Handle - Barra Superior */}
                 <div
-                  className={`w-24 h-12 mx-auto cursor-move touch-none flex items-center justify-center rounded-t-lg ${
-                    selectedSite.is_headquarters
-                      ? 'bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 border-b-0'
-                      : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-b-0'
-                  }`}
+                  className={`w-24 h-12 mx-auto cursor-move touch-none flex items-center justify-center rounded-t-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-b-0`}
+                  style={{ touchAction: 'none' }}
                   onMouseDown={handleDragStart}
                   onTouchStart={handleDragStart}
                 >
@@ -1235,11 +1254,7 @@ export default function MapPage() {
 
                 {/* Panel Content - Com suas próprias bordas e padding */}
                 <div
-                  className={`rounded-t-lg rounded-b-lg shadow-lg p-4 ${
-                    selectedSite.is_headquarters
-                      ? 'bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600'
-                      : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
-                  } ${isDragging ? 'select-none' : ''}`}
+                  className={`rounded-t-lg rounded-b-lg shadow-lg p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 ${isDragging ? 'select-none' : ''}`}
                 >
                   <div className="flex items-center justify-between mb-2 mt-1">
                   <div className="flex items-center gap-2">
