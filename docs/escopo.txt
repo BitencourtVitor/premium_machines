@@ -218,39 +218,23 @@ Campos principais:
 - approved_by
 - created_at
 
-5.5 Maintenance Events (Eventos de Manutenção)
+5.5 Rastreabilidade de Manutenção
 
-Representam o ciclo completo de manutenção de uma máquina, desde a solicitação 
-até a conclusão.
+Quando uma máquina própria está em manutenção (status = 'maintenance'), o 
+sistema precisa rastrear:
+- Para quem foi solicitada a manutenção (supplier_id do mecânico)
+- Quando foi solicitada (através de evento de downtime_start com motivo 
+  'maintenance')
+- Descrição do problema (através do campo downtime_description)
 
-Tipos de eventos de manutenção:
-- maintenance_request (solicitação de manutenção)
-- maintenance_start (início do trabalho)
-- maintenance_complete (conclusão)
-- machine_removal (remoção para manutenção externa)
-- machine_return (retorno após manutenção)
+Observação: A rastreabilidade é feita através dos eventos de alocação 
+existentes (allocation_events), usando:
+- event_type: 'downtime_start' com downtime_reason = 'maintenance'
+- supplier_id: referência ao mecânico/prestador (quando máquina própria)
+- downtime_description: descrição do problema
 
-Campos principais:
-- id
-- machine_id
-- site_id (onde a máquina estava quando quebrou)
-- event_type
-- maintenance_type (breakdown | preventive | scheduled)
-- supplier_id (mecânico/prestador responsável)
-- requested_at (quando foi solicitado)
-- started_at (quando o mecânico chegou/iniciou)
-- completed_at (quando foi concluído)
-- response_time (tempo entre solicitação e início)
-- resolution_time (tempo entre início e conclusão)
-- description (descrição do problema)
-- cost (custo da manutenção, se aplicável)
-- status (pending | in_progress | completed | cancelled)
-- created_by
-- approved_by
-- created_at
-
-Observação: Para máquinas alugadas, o supplier_id referencia a empresa de 
-aluguel. Para máquinas próprias, referencia o mecânico/prestador de serviço.
+Para máquinas alugadas em manutenção, o supplier_id já referencia 
+automaticamente a empresa de aluguel da máquina.
 
 5.6 Suppliers (Fornecedores)
 
@@ -264,26 +248,26 @@ Fornecedores podem ser de dois tipos:
 5.6.2 Maintenance Suppliers (Fornecedores de Manutenção / Mecânicos)
 - Prestadores de serviço que consertam máquinas próprias da empresa
 - Podem ser mecânicos individuais ou empresas especializadas
-- Associados a eventos de manutenção de máquinas próprias
-- Campos adicionais:
-  * service_type (repair | preventive | emergency)
-  * specialties (tipos de máquinas que conserta)
-  * average_response_time (tempo médio de resposta)
-  * contact_info (telefone, email, etc.)
+- Usados quando uma máquina própria precisa de manutenção
 
-Campos principais (comuns a ambos):
+Campos principais:
 - id
 - name
 - supplier_type (rental | maintenance | both)
-- contact_info
+- cnpj (opcional, principalmente para empresas)
+- email
+- telefone
+- endereco
+- contato_nome
+- ativo
 - created_at
 - updated_at
 
 Lógica de responsabilidade:
-- Máquina própria quebra → sistema sugere/permite selecionar fornecedor de 
-  manutenção
-- Máquina alugada quebra → sistema automaticamente referencia o fornecedor de 
-  aluguel da máquina
+- Máquina própria em manutenção → sistema permite selecionar fornecedor de 
+  manutenção ao registrar o evento de downtime
+- Máquina alugada em manutenção → sistema automaticamente referencia o 
+  fornecedor de aluguel da máquina
 
 
 ================================================================================
@@ -293,8 +277,7 @@ Lógica de responsabilidade:
 O sistema não armazena dias calculados diretamente. O tracking diário é 
 derivado a partir de:
 - eventos de alocação
-- eventos de parada
-- eventos de manutenção
+- eventos de parada (incluindo manutenção)
 - eventos de correção
 
 A linha do tempo de uma máquina é reconstruída dinamicamente quando necessário.
@@ -328,11 +311,9 @@ Isso permite:
 7.3 Custos de manutenção
 
 - manutenções de máquinas próprias geram custos diretos (cobrança do mecânico)
-- manutenções de máquinas alugadas podem gerar:
-  * dedução de dias de aluguel (se a manutenção é responsabilidade do fornecedor)
-  * custos adicionais (se a manutenção é cobrada separadamente)
-- tempo de resposta e resolução são rastreados para análise de performance
-- custos de manutenção são registrados nos eventos e consolidados nos relatórios
+- manutenções de máquinas alugadas podem gerar dedução de dias de aluguel 
+  (se a manutenção é responsabilidade do fornecedor)
+- custos podem ser registrados nos eventos de downtime quando aplicável
 
 Nenhum valor financeiro é ajustado manualmente.
 
@@ -359,10 +340,8 @@ Campos típicos:
 - period_end
 - total_days
 - downtime_days
-- maintenance_days (dias em manutenção)
 - billable_days
 - estimated_cost
-- maintenance_cost (custos de manutenção no período)
 - calculated_at
 
 Snapshots podem ser:
