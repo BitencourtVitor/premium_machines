@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     // Filtrar no código para garantir que a sede sempre apareça
     let sites = allSites || []
-    
+
     if (archived === 'true') {
       // Arquivados: sites inativos OU sede
       sites = sites.filter(s => s.ativo === false || s.is_headquarters === true)
@@ -97,11 +97,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar que latitude e longitude são obrigatórios
-    if (body.latitude === null || body.latitude === undefined || 
+    if (body.latitude === null || body.latitude === undefined ||
         body.longitude === null || body.longitude === undefined) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Coordinates (latitude and longitude) are required. It is necessary to geocode the address before saving.' 
+      return NextResponse.json({
+        success: false,
+        message: 'Coordinates (latitude and longitude) are required. It is necessary to geocode the address before saving.'
       }, { status: 400 })
     }
 
@@ -110,17 +110,17 @@ export async function POST(request: NextRequest) {
     const longitude = Number(body.longitude)
 
     if (isNaN(latitude) || isNaN(longitude)) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Coordenadas inválidas. Latitude e longitude devem ser números válidos.' 
+      return NextResponse.json({
+        success: false,
+        message: 'Coordenadas inválidas. Latitude e longitude devem ser números válidos.'
       }, { status: 400 })
     }
 
     // Validar range de coordenadas
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Coordenadas fora do range válido. Latitude deve estar entre -90 e 90, longitude entre -180 e 180.' 
+      return NextResponse.json({
+        success: false,
+        message: 'Coordenadas fora do range válido. Latitude deve estar entre -90 e 90, longitude entre -180 e 180.'
       }, { status: 400 })
     }
 
@@ -144,8 +144,8 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating site:', error)
-      return NextResponse.json({ 
-        success: false, 
+      return NextResponse.json({
+        success: false,
         message: error.message || 'Error creating jobsite',
         error: error.details || error.hint || error.code
       }, { status: 500 })
@@ -154,9 +154,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, site })
   } catch (error: any) {
     console.error('Error:', error)
-    return NextResponse.json({ 
-      success: false, 
-      message: error.message || 'Erro interno' 
+    return NextResponse.json({
+      success: false,
+      message: error.message || 'Erro interno'
     }, { status: 500 })
   }
 }

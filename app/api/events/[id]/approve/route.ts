@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
-// Note: Server-side can't dispatch client events, but we can return data that triggers client updates
+import { processEventApproval } from '@/lib/eventProcessor'
 
 export async function POST(
   request: NextRequest,
@@ -17,10 +17,17 @@ export async function POST(
       )
     }
 
-    // First get the event to know its type and machine
+    // Verificar se o evento existe e obter informações para a resposta
     const { data: eventData, error: fetchError } = await supabaseServer
       .from('allocation_events')
-      .select('*, machine:machines(id), site:sites(id)')
+      .select(`
+        *,
+        machine:machines(id, unit_number),
+        site:sites(id, title),
+        supplier:suppliers(id, nome, supplier_type),
+        created_by_user:users!allocation_events_created_by_fkey(id, nome),
+        approved_by_user:users!allocation_events_approved_by_fkey(id, nome)
+      `)
       .eq('id', params.id)
       .single()
 
@@ -32,15 +39,34 @@ export async function POST(
       )
     }
 
-    // Update the event to approved status
-    const { data: event, error } = await supabaseServer
+    // Verificar se o evento já foi processado
+    if (eventData.status === 'approved') {
+      return NextResponse.json(
+        { success: false, message: 'Evento já foi aprovado anteriormente' },
+        { status: 400 }
+      )
+    }
+
+    if (eventData.status === 'rejected') {
+      return NextResponse.json(
+        { success: false, message: 'Evento já foi rejeitado e não pode ser aprovado' },
+        { status: 400 }
+      )
+    }
+
+    // Processar aprovação usando a biblioteca de eventos
+    const result = await processEventApproval(params.id, approved_by)
+
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, message: result.message },
+        { status: 400 }
+      )
+    }
+
+    // Buscar o evento atualizado para retornar na resposta
+    const { data: updatedEvent } = await supabaseServer
       .from('allocation_events')
-      .update({
-        status: 'approved',
-        approved_by: approved_by,
-        approved_at: new Date().toISOString()
-      })
-      .eq('id', params.id)
       .select(`
         *,
         machine:machines(id, unit_number),
@@ -49,64 +75,47 @@ export async function POST(
         created_by_user:users!allocation_events_created_by_fkey(id, nome),
         approved_by_user:users!allocation_events_approved_by_fkey(id, nome)
       `)
+      .eq('id', params.id)
       .single()
 
-    if (error) {
-      console.error('Error approving event:', error)
-      return NextResponse.json(
-        { success: false, message: 'Erro ao aprovar evento' },
-        { status: 500 }
-      )
-    }
-
-    if (!event) {
-      return NextResponse.json(
-        { success: false, message: 'Evento não encontrado' },
-        { status: 404 }
-      )
-    }
-
-    // Update machine's current_site_id and status based on event type
-    let machineUpdateError = null
-    if (event.event_type === 'allocation') {
-      // For allocation events, set the machine's current site and status
-      const { error: updateError } = await supabaseServer
-        .from('machines')
-        .update({
-          current_site_id: event.site_id,
-          status: 'allocated'
-        })
-        .eq('id', event.machine_id)
-
-      machineUpdateError = updateError
-    } else if (event.event_type === 'deallocation') {
-      // For deallocation events, clear the machine's current site and set status to available
-      const { error: updateError } = await supabaseServer
-        .from('machines')
-        .update({
-          current_site_id: null,
-          status: 'available'
-        })
-        .eq('id', event.machine_id)
-
-      machineUpdateError = updateError
-    }
-
-    if (machineUpdateError) {
-      console.error('Error updating machine site:', machineUpdateError)
-      // Don't fail the request, just log the error
-      // The event was approved successfully, just the machine site update failed
+    // Gerar mensagem apropriada baseada no tipo de evento
+    let message = 'Evento aprovado com sucesso'
+    if (updatedEvent?.machine?.unit_number) {
+      const eventType = updatedEvent.event_type
+      switch (eventType) {
+        case 'start_allocation':
+          message = `Máquina ${updatedEvent.machine.unit_number} alocada com sucesso`
+          break
+        case 'end_allocation':
+          message = `Alocação da máquina ${updatedEvent.machine.unit_number} finalizada com sucesso`
+          break
+        case 'downtime_start':
+          message = `Downtime iniciado para máquina ${updatedEvent.machine.unit_number}`
+          break
+        case 'downtime_end':
+          message = `Downtime finalizado para máquina ${updatedEvent.machine.unit_number}`
+          break
+        case 'extension_attach':
+          message = `Extensão conectada à máquina ${updatedEvent.machine.unit_number}`
+          break
+        case 'extension_detach':
+          message = `Extensão desconectada da máquina ${updatedEvent.machine.unit_number}`
+          break
+        case 'correction':
+          message = `Correção aplicada para máquina ${updatedEvent.machine.unit_number}`
+          break
+      }
     }
 
     return NextResponse.json({
       success: true,
-      event,
-      message: `Máquina ${event.machine?.unit_number} ${event.event_type === 'allocation' ? 'alocada' : 'desalocada'} com sucesso`
+      event: updatedEvent,
+      message
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error:', error)
     return NextResponse.json(
-      { success: false, message: 'Erro interno' },
+      { success: false, message: error.message || 'Erro interno' },
       { status: 500 }
     )
   }
