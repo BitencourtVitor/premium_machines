@@ -29,11 +29,9 @@ export async function POST(request: NextRequest) {
       .from('suppliers')
       .insert({
         nome: body.nome,
-        cnpj: body.cnpj,
-        email: body.email,
-        telefone: body.telefone,
-        endereco: body.endereco,
-        contato_nome: body.contato_nome,
+        email: body.email || null,
+        telefone: body.telefone || null,
+        supplier_type: body.supplier_type || 'rental',
       })
       .select()
       .single()

@@ -47,11 +47,8 @@ CREATE INDEX IF NOT EXISTS idx_users_supplier_id ON users(supplier_id);
 CREATE TABLE IF NOT EXISTS suppliers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     nome VARCHAR(255) NOT NULL,
-    cnpj VARCHAR(18),
     email VARCHAR(255),
     telefone VARCHAR(20),
-    endereco TEXT,
-    contato_nome VARCHAR(255),
     supplier_type VARCHAR(20) DEFAULT 'rental' CHECK (supplier_type IN ('rental', 'maintenance', 'both')),
     ativo BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

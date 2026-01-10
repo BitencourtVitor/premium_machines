@@ -52,11 +52,16 @@ export default function UsuariosPage() {
   const { user, loading: sessionLoading } = useSession()
   const { isExpanded } = useSidebar()
   const [users, setUsers] = useState<any[]>([])
+  const [suppliers, setSuppliers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false)
   const [activeTab, setActiveTab] = useState<'users' | 'suppliers'>('users')
   const [showModal, setShowModal] = useState(false)
+  const [showSupplierModal, setShowSupplierModal] = useState(false)
   const [editingUser, setEditingUser] = useState<any>(null)
+  const [editingSupplier, setEditingSupplier] = useState<any>(null)
+  const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null)
   const [showOnlyPending, setShowOnlyPending] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
@@ -78,7 +83,14 @@ export default function UsuariosPage() {
     validado: true,
   })
   const [saving, setSaving] = useState(false)
+  const [savingSupplier, setSavingSupplier] = useState(false)
   const [error, setError] = useState('')
+  const [supplierFormData, setSupplierFormData] = useState({
+    nome: '',
+    email: '',
+    telefone: '',
+    supplier_type: 'rental' as 'rental' | 'maintenance' | 'both',
+  })
 
   useEffect(() => {
     if (sessionLoading) return
@@ -94,8 +106,11 @@ export default function UsuariosPage() {
     }
 
     loadUsers()
+    if (activeTab === 'suppliers') {
+      loadSuppliers()
+    }
     setLoading(false)
-  }, [user, sessionLoading, router])
+  }, [user, sessionLoading, router, activeTab])
 
   // Close search dropdown when clicking outside
   useEffect(() => {
@@ -133,6 +148,24 @@ export default function UsuariosPage() {
     }
   }
 
+  const loadSuppliers = async () => {
+    setLoadingSuppliers(true)
+    try {
+      const response = await fetch(`/api/suppliers?t=${Date.now()}`, {
+        cache: 'no-store',
+      })
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setSuppliers(data.suppliers || [])
+      }
+    } catch (error) {
+      console.error('Erro ao carregar fornecedores:', error)
+    } finally {
+      setLoadingSuppliers(false)
+    }
+  }
+
   const handleOpenModal = (userToEdit?: any) => {
     if (userToEdit) {
       setEditingUser(userToEdit)
@@ -153,13 +186,14 @@ export default function UsuariosPage() {
         can_view_logs: userToEdit.can_view_logs,
         validado: userToEdit.validado,
       })
+      setSelectedSupplier(userToEdit.supplier_id || null)
     } else {
       setEditingUser(null)
       setFormData({
         nome: '',
         email: '',
         pin: '',
-        role: 'operador',
+        role: selectedSupplier ? 'fornecedor' : 'operador',
         can_view_dashboard: false,
         can_view_map: false,
         can_manage_sites: false,
@@ -189,6 +223,8 @@ export default function UsuariosPage() {
       
       const body: any = {
         ...formData,
+        role: selectedSupplier ? 'fornecedor' : formData.role,
+        supplier_id: selectedSupplier || (formData.role === 'fornecedor' && editingUser?.supplier_id) || null,
         currentUserId: user?.id,
         currentUserRole: user?.role,
       }
@@ -213,7 +249,13 @@ export default function UsuariosPage() {
 
       if (response.ok && data.success) {
         setShowModal(false)
+        if (!editingUser) {
+          setSelectedSupplier(null)
+        }
         loadUsers()
+        if (activeTab === 'suppliers') {
+          loadSuppliers()
+        }
       } else {
         setError(data.error || 'Erro ao salvar usuário')
       }
@@ -222,6 +264,71 @@ export default function UsuariosPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSaveSupplier = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingSupplier(true)
+    setError('')
+
+    try {
+      const url = editingSupplier 
+        ? `/api/suppliers/${editingSupplier.id}` 
+        : '/api/suppliers'
+      
+      const body: any = {
+        ...supplierFormData,
+        currentUserId: user?.id,
+      }
+
+      const response = await fetch(url, {
+        method: editingSupplier ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setShowSupplierModal(false)
+        setEditingSupplier(null)
+        setSupplierFormData({
+          nome: '',
+          email: '',
+          telefone: '',
+          supplier_type: 'rental',
+        })
+        loadSuppliers()
+        loadUsers()
+      } else {
+        setError(data.error || 'Erro ao salvar fornecedor')
+      }
+    } catch (err) {
+      setError('Erro ao conectar com o servidor')
+    } finally {
+      setSavingSupplier(false)
+    }
+  }
+
+  const handleOpenSupplierModal = (supplierToEdit?: any) => {
+    if (supplierToEdit) {
+      setEditingSupplier(supplierToEdit)
+      setSupplierFormData({
+        nome: supplierToEdit.nome,
+        email: supplierToEdit.email || '',
+        telefone: supplierToEdit.telefone || '',
+        supplier_type: supplierToEdit.supplier_type || 'rental',
+      })
+    } else {
+      setEditingSupplier(null)
+      setSupplierFormData({
+        nome: '',
+        email: '',
+        telefone: '',
+        supplier_type: 'rental',
+      })
+    }
+    setShowSupplierModal(true)
   }
 
   const handleValidate = async (userToValidate: any) => {
@@ -287,7 +394,10 @@ export default function UsuariosPage() {
                   Users
                 </button>
                 <button
-                  onClick={() => setActiveTab('suppliers')}
+                  onClick={() => {
+                    setActiveTab('suppliers')
+                    loadSuppliers()
+                  }}
                   className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
                     activeTab === 'suppliers'
                       ? 'text-blue-600 dark:text-gray-300 border-b-2 border-blue-600 dark:border-gray-400'
@@ -458,58 +568,28 @@ export default function UsuariosPage() {
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Suppliers ({supplierUsers.length})
+                    Suppliers ({suppliers.length})
                   </h2>
                   <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowSearchDropdown(!showSearchDropdown)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          searchQuery.trim()
-                            ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30'
-                            : showSearchDropdown
-                            ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-gray-700'
-                            : 'text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
-                        }`}
-                        title="Buscar"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                      </button>
-                      {showSearchDropdown && (
-                        <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 z-10">
-                          <div className="relative">
-                            <input
-                              type="text"
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              placeholder="Buscar supplier..."
-                              className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                              autoFocus
-                            />
-                            {searchQuery && (
-                              <button
-                                onClick={() => setSearchQuery('')}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                                title="Limpar busca"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
                     <button
-                      onClick={loadUsers}
+                      onClick={() => handleOpenSupplierModal()}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Nova Empresa
+                    </button>
+                    <button
+                      onClick={() => {
+                        loadSuppliers()
+                        loadUsers()
+                      }}
                       className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                      disabled={loadingUsers}
+                      disabled={loadingSuppliers}
                       title="Atualizar"
                     >
-                      {loadingUsers ? (
+                      {loadingSuppliers ? (
                         <svg className="w-5 h-5 animate-spin-reverse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
@@ -522,60 +602,126 @@ export default function UsuariosPage() {
                   </div>
                 </div>
 
-                {loadingUsers ? (
+                {loadingSuppliers ? (
                   <div className="p-8 text-center">
                     <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 dark:border-gray-400"></div>
                   </div>
-                ) : filteredUsers.length === 0 ? (
+                ) : suppliers.length === 0 ? (
                   <div className="p-8 text-center">
                     <p className="text-gray-500 dark:text-gray-400">
-                      Nenhum supplier encontrado.
+                      Nenhuma empresa fornecedora cadastrada.
                     </p>
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-200 dark:divide-gray-700 md:flex-1 md:overflow-y-auto">
-                    {filteredUsers.map((u) => (
-                      <div key={u.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="text-gray-600 dark:text-gray-400">
-                              {getRoleIcon(u.role)}
+                    {suppliers.map((supplier) => {
+                      const supplierUsers = users.filter(u => u.supplier_id === supplier.id)
+                      return (
+                        <div key={supplier.id} className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
+                                <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                              </div>
+                              <div>
+                                <p className="font-semibold text-gray-900 dark:text-white">{supplier.nome}</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                  {supplier.email && `${supplier.email} • `}
+                                  {supplier.telefone || 'Sem telefone'}
+                                  {supplier.supplier_type && ` • ${supplier.supplier_type === 'rental' ? 'Aluguel' : supplier.supplier_type === 'maintenance' ? 'Manutenção' : 'Ambos'}`}
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-medium text-gray-900 dark:text-white">{u.nome}</p>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">{u.email || 'Sem email'}</p>
-                            </div>
-                            {!u.validado && (
-                              <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">
-                                Pendente
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {!u.validado && (
+                            <div className="flex items-center gap-2">
                               <button
-                                onClick={() => handleValidate(u)}
-                                className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors flex items-center gap-2"
+                                onClick={() => {
+                                  setSelectedSupplier(supplier.id)
+                                  setEditingUser(null)
+                                  setFormData({
+                                    nome: '',
+                                    email: '',
+                                    pin: '',
+                                    role: 'fornecedor',
+                                    can_view_dashboard: false,
+                                    can_view_map: false,
+                                    can_manage_sites: false,
+                                    can_manage_machines: false,
+                                    can_register_events: false,
+                                    can_approve_events: false,
+                                    can_view_financial: false,
+                                    can_manage_suppliers: false,
+                                    can_manage_users: false,
+                                    can_view_logs: false,
+                                    validado: true,
+                                  })
+                                  setShowModal(true)
+                                }}
+                                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors flex items-center gap-1"
+                                title="Adicionar usuário"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                 </svg>
-                                Validar
+                                Usuário
                               </button>
-                            )}
-                            <button
-                              onClick={() => handleOpenModal(u)}
-                              className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                              title="Editar"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
+                              <button
+                                onClick={() => handleOpenSupplierModal(supplier)}
+                                className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                                title="Editar empresa"
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                            </div>
                           </div>
+                          {supplierUsers.length > 0 && (
+                            <div className="ml-13 mt-3 space-y-2">
+                              {supplierUsers.map((u) => (
+                                <div key={u.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                  <div className="flex items-center gap-2">
+                                    {getRoleIcon(u.role)}
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-900 dark:text-white">{u.nome}</p>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400">{u.email || 'Sem email'}</p>
+                                    </div>
+                                    {!u.validado && (
+                                      <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">
+                                        Pendente
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    {!u.validado && (
+                                      <button
+                                        onClick={() => handleValidate(u)}
+                                        className="p-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                                        title="Validar"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => handleOpenModal(u)}
+                                      className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                      title="Editar"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -585,6 +731,101 @@ export default function UsuariosPage() {
       </div>
 
       <BottomNavigation />
+
+      {/* Supplier Modal */}
+      {showSupplierModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  {editingSupplier ? 'Editar Empresa' : 'Nova Empresa Fornecedora'}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowSupplierModal(false)
+                    setEditingSupplier(null)
+                    setSupplierFormData({
+                      nome: '',
+                      email: '',
+                      telefone: '',
+                      supplier_type: 'rental',
+                    })
+                  }}
+                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveSupplier} className="space-y-4">
+                <CustomInput
+                  label="Nome da Empresa"
+                  value={supplierFormData.nome}
+                  onChange={(e) => setSupplierFormData({ ...supplierFormData, nome: e.target.value })}
+                  required
+                />
+                <CustomInput
+                  label="Email"
+                  type="email"
+                  value={supplierFormData.email}
+                  onChange={(e) => setSupplierFormData({ ...supplierFormData, email: e.target.value })}
+                />
+                <CustomInput
+                  label="Telefone"
+                  type="tel"
+                  value={supplierFormData.telefone}
+                  onChange={(e) => setSupplierFormData({ ...supplierFormData, telefone: e.target.value })}
+                />
+                <CustomDropdown
+                  label="Tipo de Fornecedor"
+                  value={supplierFormData.supplier_type}
+                  onChange={(value) => setSupplierFormData({ ...supplierFormData, supplier_type: value as 'rental' | 'maintenance' | 'both' })}
+                  options={[
+                    { value: 'rental', label: 'Aluguel de Máquinas' },
+                    { value: 'maintenance', label: 'Manutenção/Mecânico' },
+                    { value: 'both', label: 'Ambos' },
+                  ]}
+                />
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSupplierModal(false)
+                      setEditingSupplier(null)
+                      setSupplierFormData({
+                        nome: '',
+                        email: '',
+                        telefone: '',
+                        supplier_type: 'rental',
+                      })
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingSupplier}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {savingSupplier ? 'Salvando...' : editingSupplier ? 'Salvar Alterações' : 'Criar Empresa'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {showModal && (
@@ -627,6 +868,13 @@ export default function UsuariosPage() {
                   placeholder="••••••"
                   required={!editingUser}
                 />
+                {selectedSupplier && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <span className="font-medium">Empresa:</span> {suppliers.find(s => s.id === selectedSupplier)?.nome || 'Selecionada'}
+                    </p>
+                  </div>
+                )}
                 <CustomDropdown
                   label="Perfil"
                   value={formData.role}
@@ -636,7 +884,13 @@ export default function UsuariosPage() {
                     { value: 'admin', label: 'Administrador' },
                     { value: 'fornecedor', label: 'Fornecedor' },
                   ]}
+                  disabled={!!selectedSupplier}
                 />
+                {selectedSupplier && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Usuários de empresas fornecedoras sempre têm perfil "Fornecedor"
+                  </p>
+                )}
 
                 {/* Permissões */}
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">

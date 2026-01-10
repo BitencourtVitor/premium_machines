@@ -30,11 +30,8 @@ export interface User {
 export interface Supplier {
   id: string
   nome: string
-  cnpj?: string
   email?: string
   telefone?: string
-  endereco?: string
-  contato_nome?: string
   supplier_type: 'rental' | 'maintenance' | 'both'
   ativo: boolean
   created_at: string

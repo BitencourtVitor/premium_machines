@@ -35,11 +35,9 @@ export async function PUT(
     const body = await request.json()
     const { 
       nome, 
-      cnpj, 
       email, 
-      telefone, 
-      endereco, 
-      contato_nome,
+      telefone,
+      supplier_type,
       ativo,
       currentUserId,
     } = body
@@ -53,11 +51,9 @@ export async function PUT(
 
     const updateData = {
       nome,
-      cnpj: cnpj || null,
       email: email || null,
       telefone: telefone || null,
-      endereco: endereco || null,
-      contato_nome: contato_nome || null,
+      supplier_type: supplier_type || 'rental',
       ativo: ativo !== undefined ? ativo : true,
       updated_at: new Date().toISOString(),
     }
