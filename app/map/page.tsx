@@ -575,7 +575,7 @@ export default function MapPage() {
       }
     })
 
-  }, [sites, isDarkMode, spiderfiedGroup, groupNearbySites, clearSpiderLines])
+  }, [sites, isDarkMode, spiderfiedGroup, groupNearbySites, clearSpiderLines, createLocationMarker])
 
   // Detectar tema escuro e ajustar mapa automaticamente (apenas quando estilo for 'map')
   useEffect(() => {
