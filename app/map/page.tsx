@@ -1185,39 +1185,57 @@ export default function MapPage() {
               </p>
             </div>
 
+            {/* Drag Handle - Barra Superior */}
+            {selectedSite && (
+              <div
+                className={`absolute bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 h-12 cursor-move touch-none flex items-center justify-center rounded-t-lg shadow-lg z-[10001] ${
+                  selectedSite.is_headquarters
+                    ? 'bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 border-b-0'
+                    : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-b-0'
+                }`}
+                style={panelPosition ? {
+                  position: 'fixed',
+                  left: `${panelPosition.x + 144}px`, // Centralizado: (384px - 96px) / 2 = 144px
+                  top: `${panelPosition.y}px`,
+                  width: '96px' // 25% de 384px
+                } : {
+                  position: 'absolute',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '96px' // 25% da largura padrão
+                }}
+                onMouseDown={handleDragStart}
+                onTouchStart={handleDragStart}
+              >
+                <div className="flex space-x-1">
+                  <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                  <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                  <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                </div>
+              </div>
+            )}
+
             {/* Selected Site Panel */}
             {selectedSite && (
               <div
                 ref={panelRef}
-                className={`absolute bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 rounded-lg shadow-lg p-4 z-[10000] transition-none ${
+                className={`absolute bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 rounded-t-lg rounded-b-lg shadow-lg p-4 z-[10000] transition-none ${
                   selectedSite.is_headquarters
-                    ? 'bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600'
-                    : 'bg-white dark:bg-gray-800'
-                } ${isDragging ? 'cursor-move select-none' : ''}`}
+                    ? 'bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 border-t-0'
+                    : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-t-0'
+                } ${isDragging ? 'select-none' : ''}`}
                 style={panelPosition ? {
                   position: 'fixed',
                   left: `${panelPosition.x}px`,
-                  top: `${panelPosition.y}px`,
+                  top: `${panelPosition.y + 48}px`, // 48px abaixo do handle (h-12)
                   bottom: 'auto',
                   right: 'auto',
                   width: '384px', // md:w-96 = 24rem = 384px
                   maxWidth: 'calc(100vw - 2rem)',
-                  maxHeight: 'calc(100vh - 2rem)'
+                  maxHeight: 'calc(100vh - 5rem)' // ajustado para compensar o handle
                 } : undefined}
               >
-                {/* Drag Handle */}
-                <div
-                  className="absolute top-0 left-0 right-0 h-8 cursor-move touch-none flex items-center justify-center"
-                  onMouseDown={handleDragStart}
-                  onTouchStart={handleDragStart}
-                >
-                  <div className="flex space-x-1">
-                    <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                    <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                    <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between mb-3 mt-10">
+                <div className="flex items-center justify-between mb-2 mt-1">
                   <div className="flex items-center gap-2">
                     {selectedSite.is_headquarters && (
                       <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
