@@ -119,7 +119,7 @@ export default function UsuariosPage() {
     if (activeTab === 'suppliers' && !loading) {
       loadSuppliers()
     }
-  }, [activeTab, loading])
+  }, [activeTab, loading, loadSuppliers])
 
   // Close search dropdown when clicking outside
   useEffect(() => {
@@ -157,7 +157,7 @@ export default function UsuariosPage() {
     }
   }
 
-  const loadSuppliers = async () => {
+  const loadSuppliers = useCallback(async () => {
     setLoadingSuppliers(true)
     try {
       const response = await fetch(`/api/suppliers?t=${Date.now()}`, {
@@ -173,7 +173,7 @@ export default function UsuariosPage() {
     } finally {
       setLoadingSuppliers(false)
     }
-  }
+  }, [])
 
   const handleOpenModal = (userToEdit?: any) => {
     if (userToEdit) {
