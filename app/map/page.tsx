@@ -137,11 +137,85 @@ export default function MapPage() {
     })
 
     // Atualizar marcadores quando o zoom mudar (para recalcular clusters)
+    // Usar debounce para evitar muitas atualizações durante o zoom
+    let zoomUpdateTimeout: NodeJS.Timeout | null = null
+    let lastZoom: number | null = null
+    
+    const handleZoomUpdate = () => {
+      const currentZoom = map.current?.getZoom()
+      if (currentZoom === undefined || !map.current?.isStyleLoaded()) return
+      
+      // Se o zoom realmente mudou significativamente
+      if (lastZoom !== null && Math.abs(currentZoom - lastZoom) < 0.05) {
+        return // Zoom não mudou significativamente (menos de 0.05)
+      }
+      
+      lastZoom = currentZoom
+      
+      if (zoomUpdateTimeout) {
+        clearTimeout(zoomUpdateTimeout)
+      }
+      
+      // Debounce para evitar muitas atualizações durante o zoom
+      zoomUpdateTimeout = setTimeout(() => {
+        if (map.current && map.current.isStyleLoaded()) {
+          // Usar requestAnimationFrame para garantir que o mapa esteja renderizado
+          requestAnimationFrame(() => {
+            if (map.current && map.current.isStyleLoaded()) {
+              updateMarkers()
+            }
+          })
+        }
+      }, 200) // Debounce de 200ms para dar tempo do mapa renderizar
+    }
+
+    // Listener para zoom (dispara durante o zoom, mais confiável no mobile)
+    map.current.on('zoom', handleZoomUpdate)
+    
+    // Listener para zoomend (dispara quando o zoom termina) - mais confiável
+    // Este é o evento principal que deve sempre atualizar os marcadores
     map.current.on('zoomend', () => {
-      // Se não há grupo expandido, recalcular clusters
-      // Se há grupo expandido, manter expandido mas recalcular se necessário
+      const currentZoom = map.current?.getZoom()
+      if (currentZoom !== undefined) {
+        lastZoom = currentZoom
+      }
+      // Limpar timeout anterior e atualizar imediatamente
+      if (zoomUpdateTimeout) {
+        clearTimeout(zoomUpdateTimeout)
+        zoomUpdateTimeout = null
+      }
+      // Sempre atualizar quando o zoom terminar, mesmo que já tenha sido atualizado
       if (map.current && map.current.isStyleLoaded()) {
-        updateMarkers()
+        // Usar requestAnimationFrame + pequeno delay para garantir que o mapa esteja totalmente renderizado
+        requestAnimationFrame(() => {
+          // Aguardar um frame adicional para garantir que as projeções estejam prontas
+          requestAnimationFrame(() => {
+            if (map.current && map.current.isStyleLoaded()) {
+              updateMarkers()
+            }
+          })
+        })
+      }
+    })
+    
+    // Listener para moveend (dispara quando o mapa para de se mover, útil no mobile)
+    // Atualizar se o zoom mudou durante o movimento
+    map.current.on('moveend', () => {
+      const currentZoom = map.current?.getZoom()
+      if (currentZoom !== undefined) {
+        const previousZoom = lastZoom
+        lastZoom = currentZoom
+        
+        // Se o zoom mudou, atualizar marcadores
+        if (previousZoom === null || Math.abs(currentZoom - previousZoom) >= 0.05) {
+          if (zoomUpdateTimeout) {
+            clearTimeout(zoomUpdateTimeout)
+            zoomUpdateTimeout = null
+          }
+          if (map.current && map.current.isStyleLoaded()) {
+            updateMarkers()
+          }
+        }
       }
     })
 
@@ -226,24 +300,22 @@ export default function MapPage() {
     return R * c
   }, [])
 
-  // Função para calcular threshold baseado no zoom
-  // Quanto maior o zoom, menor o threshold (mais preciso)
-  const getClusterThreshold = useCallback((zoom: number) => {
-    // Zoom baixo (visão ampla): threshold maior (até 5km)
-    // Zoom alto (visão próxima): threshold menor (até 500m)
-    if (zoom < 7) return 5000 // 5km para zoom muito baixo
-    if (zoom < 8) return 3000 // 3km para zoom baixo
-    if (zoom < 9) return 2000 // 2km para zoom médio-baixo
-    if (zoom < 10) return 1000 // 1km para zoom médio
-    if (zoom < 11) return 500 // 500m para zoom médio-alto
-    return 250 // 250m para zoom alto (sites muito próximos ainda agrupam)
-  }, [])
-
-  // Função para agrupar sites próximos (usa distância geográfica para consistência)
-  // Threshold dinâmico baseado no zoom do mapa
-  const groupNearbySites = useCallback((sites: Site[], thresholdMeters: number) => {
+  // Função para agrupar sites próximos baseado na distância visual (pixels) na tela
+  // Isso torna o agrupamento dinâmico: obras visualmente próximas são agrupadas,
+  // independente da distância geográfica real
+  const groupNearbySites = useCallback((sites: Site[], mapInstance: mapboxgl.Map, thresholdPixels: number = 80) => {
     const groups: { center: { lng: number; lat: number }; sites: Site[]; id: string }[] = []
     const processed = new Set<string>()
+
+    // Verificar se o mapa está pronto para projeções
+    if (!mapInstance || !mapInstance.isStyleLoaded()) {
+      // Se o mapa não está pronto, retornar cada site como grupo individual
+      return sites.map(site => ({
+        center: { lng: Number(site.longitude), lat: Number(site.latitude) },
+        sites: [site],
+        id: site.id
+      }))
+    }
 
     sites.forEach(site => {
       if (processed.has(site.id)) return
@@ -251,21 +323,56 @@ export default function MapPage() {
       const group: Site[] = [site]
       processed.add(site.id)
 
-      sites.forEach(otherSite => {
-        if (processed.has(otherSite.id)) return
+      try {
+        // Converter coordenadas do site atual para pixels
+        const sitePoint = mapInstance.project([Number(site.longitude), Number(site.latitude)])
         
-        // Usar distância geográfica (em metros) para agrupamento consistente
-        const distance = getGeoDistance(
-          Number(site.longitude), Number(site.latitude),
-          Number(otherSite.longitude), Number(otherSite.latitude)
-        )
-
-        // Sites dentro do threshold serão agrupados
-        if (distance < thresholdMeters) {
-          group.push(otherSite)
-          processed.add(otherSite.id)
+        // Verificar se a projeção é válida (não está fora da tela ou inválida)
+        if (!sitePoint || !isFinite(sitePoint.x) || !isFinite(sitePoint.y)) {
+          // Se a projeção falhou, criar grupo individual
+          const centerLng = Number(site.longitude)
+          const centerLat = Number(site.latitude)
+          groups.push({
+            center: { lng: centerLng, lat: centerLat },
+            sites: group,
+            id: site.id
+          })
+          return
         }
-      })
+
+        sites.forEach(otherSite => {
+          if (processed.has(otherSite.id)) return
+          
+          try {
+            // Converter coordenadas do outro site para pixels
+            const otherSitePoint = mapInstance.project([Number(otherSite.longitude), Number(otherSite.latitude)])
+            
+            // Verificar se a projeção é válida
+            if (!otherSitePoint || !isFinite(otherSitePoint.x) || !isFinite(otherSitePoint.y)) {
+              return // Pular este site se a projeção falhou
+            }
+            
+            // Calcular distância em pixels na tela
+            const dx = otherSitePoint.x - sitePoint.x
+            const dy = otherSitePoint.y - sitePoint.y
+            const pixelDistance = Math.sqrt(dx * dx + dy * dy)
+
+            // Sites dentro do threshold em pixels serão agrupados
+            // Isso significa que obras visualmente próximas na tela são agrupadas,
+            // independente da distância geográfica real
+            if (pixelDistance < thresholdPixels) {
+              group.push(otherSite)
+              processed.add(otherSite.id)
+            }
+          } catch (error) {
+            // Se houver erro na projeção, pular este site
+            console.warn('Erro ao projetar coordenadas do site:', otherSite.id, error)
+          }
+        })
+      } catch (error) {
+        // Se houver erro na projeção do site principal, criar grupo individual
+        console.warn('Erro ao projetar coordenadas do site:', site.id, error)
+      }
 
       // Calcular centro do grupo
       const centerLng = group.reduce((sum, s) => sum + Number(s.longitude), 0) / group.length
@@ -279,7 +386,7 @@ export default function MapPage() {
     })
 
     return groups
-  }, [getGeoDistance])
+  }, [])
 
   // Limpar linhas do spider e event handlers
   const clearSpiderLines = useCallback(() => {
@@ -438,12 +545,36 @@ export default function MapPage() {
         .addTo(mapInstance)
     }
 
-    // Obter zoom atual e calcular threshold dinâmico
-    const currentZoom = mapInstance.getZoom()
-    const thresholdMeters = getClusterThreshold(currentZoom)
+    // Verificar se há sites para processar
+    if (regularSites.length === 0) {
+      return // Não há sites para processar
+    }
 
-    // Agrupar sites próximos com threshold baseado no zoom
-    const groups = groupNearbySites(regularSites, thresholdMeters)
+    // Agrupar sites próximos baseado na distância visual (pixels) na tela
+    // Threshold de 80 pixels: obras que estão visualmente próximas na tela serão agrupadas
+    // Isso torna o agrupamento dinâmico conforme o zoom
+    // Verificar novamente se o mapa está pronto antes de agrupar
+    let groups: { center: { lng: number; lat: number }; sites: Site[]; id: string }[] = []
+    try {
+      if (mapInstance && mapInstance.isStyleLoaded()) {
+        groups = groupNearbySites(regularSites, mapInstance, 80)
+      } else {
+        // Se o mapa não está pronto, criar grupos individuais como fallback
+        groups = regularSites.map(site => ({
+          center: { lng: Number(site.longitude), lat: Number(site.latitude) },
+          sites: [site],
+          id: site.id
+        }))
+      }
+    } catch (error) {
+      // Em caso de erro, criar grupos individuais como fallback
+      console.warn('Erro ao agrupar sites:', error)
+      groups = regularSites.map(site => ({
+        center: { lng: Number(site.longitude), lat: Number(site.latitude) },
+        sites: [site],
+        id: site.id
+      }))
+    }
 
     // Se há um grupo expandido, verificar se ele ainda existe nos grupos recalculados
     // Se não existir mais (sites não estão mais próximos o suficiente), desagrupar
@@ -735,7 +866,7 @@ export default function MapPage() {
       }
     })
 
-  }, [sites, spiderfiedGroup, selectedSite, groupNearbySites, clearSpiderLines, createLocationMarker, createSpiderfyMarker, getClusterThreshold, getGeoDistance])
+  }, [sites, spiderfiedGroup, selectedSite, groupNearbySites, clearSpiderLines, createLocationMarker, createSpiderfyMarker, getGeoDistance])
 
   // Detectar tema escuro e ajustar mapa automaticamente (apenas quando estilo for 'map')
   useEffect(() => {
