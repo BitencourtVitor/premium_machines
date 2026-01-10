@@ -124,7 +124,7 @@ export default function Sidebar() {
     },
     {
       href: '/sites',
-      label: 'Obras',
+      label: 'Jobsites',
       requiredPermission: 'can_manage_sites' as keyof UserPermissions,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

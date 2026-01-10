@@ -223,7 +223,7 @@ export default function DashboardPage() {
                       <span className="font-semibold text-yellow-600 dark:text-yellow-400">{stats.maintenanceMachines}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <span className="text-gray-600 dark:text-gray-300">Obras Ativas</span>
+                      <span className="text-gray-600 dark:text-gray-300">Jobsites Ativos</span>
                       <span className="font-semibold text-gray-900 dark:text-white">{stats.activeSites}</span>
                     </div>
                   </div>
@@ -320,7 +320,7 @@ export default function DashboardPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span className="text-sm font-medium">Obras</span>
+                <span className="text-sm font-medium">Jobsites</span>
               </button>
             </div>
           </div>

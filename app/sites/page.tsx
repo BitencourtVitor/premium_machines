@@ -169,7 +169,7 @@ export default function SitesPage() {
       if (data.success) {
         loadSites()
       } else {
-        alert(data.message || 'Erro ao arquivar obra')
+        alert(data.message || 'Erro ao arquivar jobsite')
       }
     } catch (error) {
       console.error('Error archiving site:', error)
@@ -259,7 +259,7 @@ export default function SitesPage() {
 
   const handleCreateSite = async () => {
     if (!newSite.title) {
-      alert('Por favor, informe o nome da obra')
+      alert('Por favor, informe o nome do jobsite')
       return
     }
 
@@ -285,7 +285,7 @@ export default function SitesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newSite.title,
-          address: geocodingResult?.formatted_address || newSite.address,
+          address: newSite.address, // Sempre usar o endereço digitado pelo usuário
           latitude: mapCoordinates.lat,
           longitude: mapCoordinates.lng,
           geocoding_confidence: geocodingResult?.confidence || 0,
@@ -312,7 +312,7 @@ export default function SitesPage() {
         }
         loadSites()
       } else {
-        alert(data.message || 'Erro ao criar obra')
+        alert(data.message || 'Erro ao criar jobsite')
       }
     } catch (error: any) {
       console.error('Error creating site:', error)
@@ -324,10 +324,14 @@ export default function SitesPage() {
 
   // Inicializar mapa no modal
   useEffect(() => {
-    if (!showCreateModal || !mapCoordinates || !mapModalContainer.current) return
-
-    // Se o mapa já existe, não criar novamente
-    if (mapModal.current) return
+    if (!showCreateModal || !mapCoordinates || !mapModalContainer.current) {
+      // Se o modal fechou, limpar o mapa
+      if (!showCreateModal && mapModal.current) {
+        mapModal.current.remove()
+        mapModal.current = null
+      }
+      return
+    }
 
     mapboxgl.accessToken = MAPBOX_TOKEN
 
@@ -336,8 +340,27 @@ export default function SitesPage() {
       return
     }
 
-    // Pequeno delay para garantir que o container está renderizado
-    const timer = setTimeout(() => {
+    // Se o mapa já existe, apenas redimensionar e atualizar posição
+    if (mapModal.current) {
+      setTimeout(() => {
+        if (mapModal.current) {
+          mapModal.current.resize()
+          if (markerRef.current && mapCoordinates) {
+            markerRef.current.setLngLat([mapCoordinates.lng, mapCoordinates.lat])
+            mapModal.current.flyTo({
+              center: [mapCoordinates.lng, mapCoordinates.lat],
+              zoom: 15,
+            })
+          }
+        }
+      }, 200)
+      return
+    }
+
+    // Pequeno delay para garantir que o container está renderizado e tem dimensões
+    let timer: NodeJS.Timeout | null = null
+    
+    const createMapInModal = () => {
       if (!mapModalContainer.current || mapModal.current) return
 
       // Detectar tema atual para o mapa
@@ -360,7 +383,25 @@ export default function SitesPage() {
       // Adicionar controles
       mapModal.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
 
-      // Cores adaptativas ao tema (azul para nova obra)
+      // Garantir que o mapa redimensione corretamente após carregar
+      mapModal.current.once('load', () => {
+        if (mapModal.current) {
+          // Múltiplos resize para garantir que funcione
+          setTimeout(() => {
+            if (mapModal.current) {
+              mapModal.current.resize()
+              // Segundo resize após um pequeno delay adicional
+              setTimeout(() => {
+                if (mapModal.current) {
+                  mapModal.current.resize()
+                }
+              }, 50)
+            }
+          }, 150)
+        }
+      })
+
+      // Cores adaptativas ao tema (azul para novo jobsite)
       const pinColor = currentIsDark ? '#60A5FA' : '#2563EB' // blue-400 : blue-600
       
       // Criar marcador arrastável - estilo agulha com bola (bola maior para melhor visibilidade)
@@ -422,10 +463,31 @@ export default function SitesPage() {
         const lngLat = markerRef.current!.getLngLat()
         setMapCoordinates({ lat: lngLat.lat, lng: lngLat.lng })
       })
-    }, 100)
+    }
+    
+    timer = setTimeout(() => {
+      if (!mapModalContainer.current || mapModal.current) return
+      
+      // Verificar se o container tem dimensões válidas
+      const rect = mapModalContainer.current.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) {
+        // Tentar novamente após um delay maior
+        setTimeout(() => {
+          if (mapModalContainer.current && !mapModal.current) {
+            const retryRect = mapModalContainer.current.getBoundingClientRect()
+            if (retryRect.width > 0 && retryRect.height > 0) {
+              createMapInModal()
+            }
+          }
+        }, 300)
+        return
+      }
+      
+      createMapInModal()
+    }, 200)
 
     return () => {
-      clearTimeout(timer)
+      if (timer) clearTimeout(timer)
       if (themeObserverRef.current) {
         themeObserverRef.current.disconnect()
         themeObserverRef.current = null
@@ -456,6 +518,24 @@ export default function SitesPage() {
     }
   }, [mapCoordinates])
 
+  // Garantir que o mapa redimensione quando o modal abrir
+  useEffect(() => {
+    if (showCreateModal && mapModal.current && mapModalContainer.current) {
+      // Aguardar um pouco para garantir que o modal está totalmente renderizado
+      const resizeTimer = setTimeout(() => {
+        if (mapModal.current && mapModalContainer.current) {
+          // Verificar se o container tem dimensões válidas
+          const rect = mapModalContainer.current.getBoundingClientRect()
+          if (rect.width > 0 && rect.height > 0) {
+            mapModal.current.resize()
+          }
+        }
+      }, 200)
+
+      return () => clearTimeout(resizeTimer)
+    }
+  }, [showCreateModal])
+
   const filteredSites = sites.filter(site => {
     // Excluir sede da lista de obras
     if (site.is_headquarters) {
@@ -484,7 +564,7 @@ export default function SitesPage() {
 
   return (
     <div className="min-h-screen md:h-screen md:max-h-screen bg-gray-50 dark:bg-gray-900 pb-safe-content md:pb-0 md:flex md:flex-col md:overflow-hidden overflow-x-hidden">
-      <Header title="Obras" />
+      <Header title="Jobsites" />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
         <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-250 ease-in-out ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'} min-w-0 max-w-full overflow-x-hidden`}>
@@ -495,7 +575,7 @@ export default function SitesPage() {
                 <div className="p-3 md:p-4">
                   <div className="flex items-center justify-between gap-2 min-w-0">
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">Obras Ativas</p>
+                      <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">Jobsites Ativos</p>
                       <p className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mt-1">
                         {loadingMetrics ? '...' : metrics.totalActiveSites}
                       </p>
@@ -565,12 +645,12 @@ export default function SitesPage() {
               </div>
             </div>
 
-            {/* Lista de Obras */}
+            {/* Lista de Jobsites */}
             {(
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden min-w-0">
                 <div className="p-3 md:p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2 min-w-0">
                   <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white truncate min-w-0 flex-1">
-                    {showArchivedSites ? 'Obras Arquivadas' : 'Obras'} ({filteredSites.length})
+                    {showArchivedSites ? 'Jobsites Arquivados' : 'Jobsites'} ({filteredSites.length})
                   </h2>
                   <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                     <div className="relative">
@@ -596,7 +676,7 @@ export default function SitesPage() {
                               type="text"
                               value={searchQuery}
                               onChange={(e) => setSearchQuery(e.target.value)}
-                              placeholder="Buscar obras..."
+                              placeholder="Buscar jobsites..."
                               className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                               autoFocus
                             />
@@ -648,7 +728,7 @@ export default function SitesPage() {
                       <button 
                         onClick={() => handleOpenModal()}
                         className="p-1.5 md:p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0"
-                        title="Nova Obra"
+                        title="Novo Jobsite"
                       >
                         <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -665,7 +745,7 @@ export default function SitesPage() {
               ) : filteredSites.length === 0 ? (
                 <div className="p-8 text-center">
                   <p className="text-gray-500 dark:text-gray-400">
-                    {searchQuery ? 'Nenhuma obra encontrada' : 'Nenhuma obra cadastrada'}
+                    {searchQuery ? 'Nenhum jobsite encontrado' : 'Nenhum jobsite cadastrado'}
                   </p>
                 </div>
               ) : (
@@ -677,8 +757,7 @@ export default function SitesPage() {
                     >
                       <div className="flex items-center justify-between gap-2 min-w-0">
                         <div 
-                          className="flex-1 min-w-0 cursor-pointer"
-                          onClick={() => router.push(`/sites/${site.id}`)}
+                          className="flex-1 min-w-0"
                         >
                           <p className="font-medium text-gray-900 dark:text-white truncate">{site.title}</p>
                           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">
@@ -753,7 +832,7 @@ export default function SitesPage() {
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl my-4 md:my-8 min-w-0 max-w-[calc(100vw-1.5rem)] md:max-w-2xl">
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {editingSite ? 'Editar Obra' : 'Nova Obra'}
+                {editingSite ? 'Editar Jobsite' : 'Novo Jobsite'}
               </h2>
               <button
                 onClick={handleCloseModal}
@@ -768,14 +847,14 @@ export default function SitesPage() {
             <div className="p-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Nome da Obra
+                  Nome do Jobsite
                 </label>
                 <input
                   type="text"
                   value={newSite.title}
                   onChange={(e) => setNewSite({ ...newSite, title: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="Ex: Obra Residencial Alpha"
+                  placeholder="Ex: Jobsite Residencial Alpha"
                 />
               </div>
 
@@ -851,6 +930,7 @@ export default function SitesPage() {
                   <div 
                     ref={mapModalContainer}
                     className="w-full h-64 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600"
+                    style={{ minHeight: '256px' }}
                   />
                 </div>
               )}
@@ -869,7 +949,7 @@ export default function SitesPage() {
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 title={!mapCoordinates ? 'É necessário geocodificar o endereço e confirmar a localização no mapa antes de salvar' : ''}
               >
-                {creating ? (editingSite ? 'Salvando...' : 'Criando...') : (editingSite ? 'Salvar Alterações' : 'Criar Obra')}
+                {creating ? (editingSite ? 'Salvando...' : 'Criando...') : (editingSite ? 'Salvar Alterações' : 'Criar Jobsite')}
               </button>
             </div>
           </div>

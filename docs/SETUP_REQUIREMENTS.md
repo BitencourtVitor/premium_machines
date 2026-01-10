@@ -10,7 +10,7 @@ Este documento lista **tudo que precisa ser cadastrado e configurado** no sistem
 2. [Tipos de Máquinas](#2-tipos-de-máquinas)
 3. [Fornecedores](#3-fornecedores)
 4. [Usuários Fornecedores](#4-usuários-fornecedores)
-5. [Obras (Sites)](#5-obras-sites)
+5. [Jobsites (Sites)](#5-jobsites-sites)
 6. [Máquinas](#6-máquinas)
 7. [Tipos de Extensões](#7-tipos-de-extensões-opcional)
 8. [Extensões de Máquinas](#8-extensões-de-máquinas-opcional)
@@ -160,7 +160,7 @@ Este documento lista **tudo que precisa ser cadastrado e configurado** no sistem
 
 ---
 
-## 5. Obras (Sites)
+## 5. Jobsites (Sites)
 
 **Prioridade: ALTA** 🔴  
 **Dependências: Nenhuma**  
@@ -168,9 +168,9 @@ Este documento lista **tudo que precisa ser cadastrado e configurado** no sistem
 
 ### O que é necessário:
 
-- **Todas as obras/endereços onde máquinas serão alocadas**
-  - Obras ativas em andamento
-  - Obras futuras planejadas (podem ser cadastradas e arquivadas)
+- **Todos os jobsites/endereços onde máquinas serão alocadas**
+  - Jobsites ativos em andamento
+  - Jobsites futuros planejados (podem ser cadastrados e arquivados)
 
 ### O que cadastrar:
 
@@ -182,15 +182,15 @@ Este documento lista **tudo que precisa ser cadastrado e configurado** no sistem
 
 ### Onde cadastrar:
 
-- Página: **Obras** (`/sites`)
-- Botão: **"Nova Obra"** (ícone +)
+- Página: **Jobsites** (`/sites`)
+- Botão: **"Novo Jobsite"** (ícone +)
 
 ### Observações:
 
-- **Geocodificação é obrigatória** - sem coordenadas, a obra não pode ser salva
-- Obras podem ser arquivadas quando finalizadas
-- Obras são necessárias para registrar alocações de máquinas
-- Recomenda-se cadastrar todas as obras ativas antes de começar a alocar máquinas
+- **Geocodificação é obrigatória** - sem coordenadas, o jobsite não pode ser salvo
+- Jobsites podem ser arquivados quando finalizados
+- Jobsites são necessários para registrar alocações de máquinas
+- Recomenda-se cadastrar todos os jobsites ativos antes de começar a alocar máquinas
 
 ---
 
@@ -321,8 +321,8 @@ Este documento lista **tudo que precisa ser cadastrado e configurado** no sistem
 | Permissão | Descrição | Recomendado para |
 |-----------|-----------|------------------|
 | `can_view_dashboard` | Ver dashboard | Todos |
-| `can_view_map` | Ver mapa de obras | Operadores, Admin |
-| `can_manage_sites` | Gerenciar obras | Admin, Operadores |
+| `can_view_map` | Ver mapa de jobsites | Operadores, Admin |
+| `can_manage_sites` | Gerenciar jobsites | Admin, Operadores |
 | `can_manage_machines` | Gerenciar máquinas | Admin |
 | `can_register_events` | Registrar alocações | Operadores, Admin |
 | `can_approve_events` | Aprovar alocações | Admin, Supervisores |
@@ -352,7 +352,7 @@ Antes de colocar o sistema em produção, verifique:
 ### ✅ Configuração Básica
 - [ ] Pelo menos 1 usuário admin/dev cadastrado
 - [ ] Todos os tipos de máquinas cadastrados
-- [ ] Pelo menos 1 obra cadastrada (se for alocar máquinas)
+- [ ] Pelo menos 1 jobsite cadastrado (se for alocar máquinas)
 - [ ] Pelo menos 1 máquina cadastrada (se for registrar alocações)
 
 ### ✅ Se utiliza máquinas alugadas:
@@ -374,7 +374,7 @@ Antes de colocar o sistema em produção, verifique:
 
 ### ✅ Dados de Teste:
 - [ ] Remover dados de teste/desenvolvimento
-- [ ] Validar que todas as obras têm coordenadas corretas
+- [ ] Validar que todos os jobsites têm coordenadas corretas
 - [ ] Validar que todas as máquinas têm tipos corretos
 
 ---
@@ -386,18 +386,18 @@ Antes de colocar o sistema em produção, verifique:
 1. **Usuários Internos** (admin/dev) - PRIMEIRO
 2. **Tipos de Máquinas** - ANTES de cadastrar máquinas
 3. **Fornecedores** - ANTES de cadastrar máquinas alugadas ou usuários fornecedores
-4. **Obras** - ANTES de alocar máquinas
+4. **Jobsites** - ANTES de alocar máquinas
 5. **Máquinas** - DEPOIS de tipos e fornecedores
 6. **Usuários Fornecedores** - DEPOIS de fornecedores
 7. **Extensões** - OPCIONAL, quando necessário
 
 ### O que NÃO é obrigatório inicialmente:
 
-- ❌ Todas as obras futuras (podem ser cadastradas conforme necessário)
+- ❌ Todos os jobsites futuros (podem ser cadastrados conforme necessário)
 - ❌ Todas as máquinas de todos os fornecedores (apenas as que serão utilizadas)
 - ❌ Todos os funcionários fornecedores (apenas os que precisam acessar)
 - ❌ Extensões (opcional)
-- ❌ Obras arquivadas (podem ser arquivadas depois)
+- ❌ Jobsites arquivados (podem ser arquivados depois)
 
 ### O que é MÍNIMO para começar:
 
@@ -415,7 +415,7 @@ Com isso, já é possível começar a registrar alocações e usar o sistema bá
 Após completar a configuração inicial:
 
 1. **Testar o fluxo completo:**
-   - Criar uma alocação de máquina para uma obra
+   - Criar uma alocação de máquina para um jobsite
    - Aprovar a alocação
    - Verificar no mapa
    - Verificar métricas

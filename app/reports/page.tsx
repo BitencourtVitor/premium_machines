@@ -193,7 +193,7 @@ export default function ReportsPage() {
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                   }`}
                 >
-                  Por Obra
+                  Por Jobsite
                   {reportType === 'site' && (
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
                   )}
@@ -235,7 +235,7 @@ export default function ReportsPage() {
                     value={selectedSite}
                     onChange={setSelectedSite}
                     options={[
-                      { value: 'all', label: 'Todas as Obras' },
+                      { value: 'all', label: 'Todos os Jobsites' },
                       ...sites.map(s => ({ value: s.id, label: s.title }))
                     ]}
                   />
@@ -333,7 +333,7 @@ export default function ReportsPage() {
                             {snapshot.machine?.unit_number || 'Máquina'}
                           </p>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {snapshot.site?.title || 'Obra'} • {snapshot.supplier?.nome || 'Fornecedor'}
+                            {snapshot.site?.title || 'Jobsite'} • {snapshot.supplier?.nome || 'Fornecedor'}
                           </p>
                           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                             {new Date(snapshot.period_start).toLocaleDateString('pt-BR')} - {new Date(snapshot.period_end).toLocaleDateString('pt-BR')}

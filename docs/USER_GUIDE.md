@@ -11,7 +11,7 @@ Este documento fornece instruções detalhadas sobre como usar o sistema Premium
 3. [Login no Sistema](#3-login-no-sistema)
 4. [Dashboard](#4-dashboard)
 5. [Mapa de Máquinas](#5-mapa-de-máquinas)
-6. [Gestão de Obras (Sites)](#6-gestão-de-obras-sites)
+6. [Gestão de Jobsites (Sites)](#6-gestão-de-jobsites-sites)
 7. [Gestão de Máquinas](#7-gestão-de-máquinas)
 8. [Eventos de Alocação](#8-eventos-de-alocação)
 9. [Gestão de Fornecedores](#9-gestão-de-fornecedores)
@@ -27,7 +27,7 @@ Este documento fornece instruções detalhadas sobre como usar o sistema Premium
 
 O **Premium Machines** é um sistema web de gestão de máquinas desenvolvido para:
 
-- **Rastrear localização** de máquinas em obras
+- **Rastrear localização** de máquinas em jobsites
 - **Controlar alocações** e movimentações
 - **Registrar eventos operacionais** (paradas, manutenções, etc.)
 - **Calcular custos** de máquinas alugadas
@@ -100,7 +100,7 @@ O Dashboard é a página inicial após o login, oferecendo uma visão geral do s
 ### Informações Exibidas
 
 - **Total de Máquinas**: Quantidade total cadastrada
-- **Máquinas Alocadas**: Quantas estão em obras
+- **Máquinas Alocadas**: Quantas estão em jobsites
 - **Máquinas Disponíveis**: Quantas estão livres
 - **Máquinas em Manutenção**: Quantas estão paradas
 - **Eventos Pendentes**: Aguardando aprovação
@@ -121,9 +121,9 @@ O mapa exibe a localização geográfica de todas as máquinas alocadas.
 
 ### Funcionalidades
 
-- **Visualização por Obra**: Cada ponto representa uma obra
-- **Cluster de Máquinas**: Obras com múltiplas máquinas mostram contador
-- **Detalhes ao Clicar**: Informações da máquina e obra
+- **Visualização por Jobsite**: Cada ponto representa um jobsite
+- **Cluster de Máquinas**: Jobsites com múltiplas máquinas mostram contador
+- **Detalhes ao Clicar**: Informações da máquina e jobsite
 - **Filtros**: Por tipo de máquina, fornecedor, status
 
 ### Legenda de Cores
@@ -138,30 +138,30 @@ O mapa exibe a localização geográfica de todas as máquinas alocadas.
 
 1. **Zoom**: Use scroll do mouse ou botões +/-
 2. **Arrastar**: Clique e arraste para mover
-3. **Clicar em Ponto**: Ver detalhes da obra/máquina
+3. **Clicar em Ponto**: Ver detalhes do jobsite/máquina
 4. **Buscar Endereço**: Use a barra de busca
 
 ---
 
-## 6. Gestão de Obras (Sites)
+## 6. Gestão de Jobsites (Sites)
 
-Obras são os locais físicos onde as máquinas operam.
+Jobsites são os locais físicos (bairros) onde as máquinas operam.
 
-### Cadastrar Nova Obra
+### Cadastrar Novo Jobsite
 
-1. Acesse **Obras** no menu lateral
-2. Clique em **+ Nova Obra**
+1. Acesse **Jobsites** no menu lateral
+2. Clique em **+ Novo Jobsite**
 3. Preencha os campos:
-   - **Nome/Título**: Identificação da obra
+   - **Nome/Título**: Identificação do jobsite (bairro)
    - **Endereço**: Endereço completo
    - **Notas**: Observações adicionais
 4. O sistema geocodifica automaticamente o endereço
 5. Confira a localização no mapa preview
 6. Clique em **Salvar**
 
-### Editar Obra
+### Editar Jobsite
 
-1. Clique na obra desejada na lista
+1. Clique no jobsite desejado na lista
 2. Edite os campos necessários
 3. Clique em **Salvar**
 
@@ -169,11 +169,11 @@ Obras são os locais físicos onde as máquinas operam.
 
 | Campo | Descrição |
 |-------|-----------|
-| Título | Nome identificador da obra |
+| Título | Nome identificador do jobsite (bairro) |
 | Endereço | Endereço físico completo |
 | Latitude/Longitude | Coordenadas (preenchidas automaticamente) |
 | Cidade/Estado | Extraídos do endereço |
-| Ativo | Se a obra está em operação |
+| Ativo | Se o jobsite está em operação |
 | Notas | Observações livres |
 
 ---
@@ -201,7 +201,7 @@ Obras são os locais físicos onde as máquinas operam.
 | Status | Descrição |
 |--------|-----------|
 | Disponível | Pronta para alocação |
-| Alocada | Em operação em uma obra |
+| Alocada | Em operação em um jobsite |
 | Manutenção | Parada para reparo |
 | Inativa | Fora de operação |
 
@@ -209,7 +209,7 @@ Obras são os locais físicos onde as máquinas operam.
 
 1. Selecione a máquina na lista
 2. Clique em **Alocar**
-3. Selecione a obra de destino
+3. Selecione o jobsite de destino
 4. Informe a data de início
 5. Adicione observações se necessário
 6. Clique em **Confirmar**
@@ -232,7 +232,7 @@ Eventos registram tudo que acontece com as máquinas.
 
 | Evento | Descrição |
 |--------|-----------|
-| start_allocation | Início de alocação em obra |
+| start_allocation | Início de alocação em jobsite |
 | end_allocation | Fim de alocação |
 | downtime_start | Início de parada |
 | downtime_end | Fim de parada |
@@ -307,8 +307,8 @@ Relatórios consolidam informações de custos.
    - Selecione data inicial e final
    - Veja custos totais no período
 
-2. **Por Obra**
-   - Custos detalhados por obra
+2. **Por Jobsite**
+   - Custos detalhados por jobsite
    - Máquinas alocadas e tempo de operação
 
 3. **Por Fornecedor**
@@ -352,7 +352,7 @@ Relatórios consolidam informações de custos.
 4. Configure as permissões:
    - Visualizar Dashboard
    - Visualizar Mapa
-   - Gerenciar Obras
+   - Gerenciar Jobsites
    - Gerenciar Máquinas
    - Registrar Eventos
    - Aprovar Eventos
@@ -414,7 +414,7 @@ O sistema registra todas as ações para auditoria.
 ### Operador
 
 - Registra eventos operacionais
-- Visualiza máquinas e obras
+- Visualiza máquinas e jobsites
 - **NÃO** acessa valores financeiros consolidados
 - **NÃO** aprova eventos
 
@@ -422,7 +422,7 @@ O sistema registra todas as ações para auditoria.
 
 - Visualiza apenas suas máquinas
 - Visualiza solicitações relacionadas
-- **NÃO** vê outras obras ou máquinas
+- **NÃO** vê outros jobsites ou máquinas
 - **NÃO** vê valores consolidados globais
 
 ### Developer (Dev)
@@ -446,7 +446,7 @@ O sistema registra todas as ações para auditoria.
 
 - ✅ Registre eventos o mais rápido possível
 - ✅ Adicione descrições detalhadas
-- ✅ Confira a localização no mapa após cadastrar obras
+- ✅ Confira a localização no mapa após cadastrar jobsites
 - ✅ Verifique eventos pendentes regularmente (admins)
 
 ### Relatórios
@@ -460,7 +460,7 @@ O sistema registra todas as ações para auditoria.
 | Problema | Solução |
 |----------|---------|
 | Endereço não encontrado | Digite o endereço completo com cidade e estado |
-| Máquina não aparece no mapa | Verifique se está alocada em uma obra |
+| Máquina não aparece no mapa | Verifique se está alocada em um jobsite |
 | Evento não foi aprovado | Aguarde revisão do administrador |
 | Valor incorreto | Verifique se eventos de parada foram aprovados |
 

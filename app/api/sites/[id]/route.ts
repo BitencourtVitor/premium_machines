@@ -14,7 +14,7 @@ export async function GET(
 
     if (error) {
       console.error('Error fetching site:', error)
-      return NextResponse.json({ success: false, message: 'Obra não encontrada' }, { status: 404 })
+      return NextResponse.json({ success: false, message: 'Jobsite não encontrado' }, { status: 404 })
     }
 
     return NextResponse.json({ success: true, site })
@@ -86,7 +86,7 @@ export async function DELETE(
       console.error('Error deleting site:', error)
       return NextResponse.json({ 
         success: false, 
-        message: error.message || 'Erro ao deletar obra' 
+        message: error.message || 'Erro ao deletar jobsite' 
       }, { status: 500 })
     }
 

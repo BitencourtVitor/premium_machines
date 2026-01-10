@@ -67,7 +67,7 @@ ALTER TABLE users ADD CONSTRAINT fk_users_supplier
     FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL;
 
 -- ============================================
--- 3. TABELA: sites (Obras / Endereços)
+-- 3. TABELA: sites (Jobsites / Endereços)
 -- ============================================
 CREATE TABLE IF NOT EXISTS sites (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -98,14 +98,16 @@ CREATE INDEX IF NOT EXISTS idx_sites_city ON sites(city);
 CREATE TABLE IF NOT EXISTS machine_types (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     nome VARCHAR(255) NOT NULL,
-    descricao TEXT,
     icon VARCHAR(50),
+    is_attachment BOOLEAN DEFAULT false NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(nome)
 );
 
 -- Índices para machine_types
 CREATE INDEX IF NOT EXISTS idx_machine_types_nome ON machine_types(nome);
+CREATE INDEX IF NOT EXISTS idx_machine_types_is_attachment ON machine_types(is_attachment);
 
 -- ============================================
 -- 5. TABELA: machines (Máquinas)
@@ -204,6 +206,9 @@ CREATE TABLE IF NOT EXISTS allocation_events (
     site_id UUID REFERENCES sites(id) ON DELETE RESTRICT,
     extension_id UUID REFERENCES machine_extensions(id) ON DELETE SET NULL,
     supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,
+    -- Localização específica dentro do site
+    construction_type VARCHAR(20) CHECK (construction_type IN ('lot', 'building')),
+    lot_building_number VARCHAR(50),
     -- Dados temporais
     event_date TIMESTAMP WITH TIME ZONE NOT NULL,
     end_date TIMESTAMP WITH TIME ZONE,
@@ -238,6 +243,8 @@ CREATE INDEX IF NOT EXISTS idx_events_type ON allocation_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_events_machine ON allocation_events(machine_id);
 CREATE INDEX IF NOT EXISTS idx_events_site ON allocation_events(site_id);
 CREATE INDEX IF NOT EXISTS idx_events_supplier ON allocation_events(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_events_construction_type ON allocation_events(construction_type);
+CREATE INDEX IF NOT EXISTS idx_events_lot_building_number ON allocation_events(lot_building_number);
 CREATE INDEX IF NOT EXISTS idx_events_date ON allocation_events(event_date DESC);
 CREATE INDEX IF NOT EXISTS idx_events_status ON allocation_events(status);
 CREATE INDEX IF NOT EXISTS idx_events_created_by ON allocation_events(created_by);
@@ -337,6 +344,11 @@ CREATE TRIGGER update_sites_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_machine_types_updated_at
+    BEFORE UPDATE ON machine_types
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 CREATE TRIGGER update_machines_updated_at
     BEFORE UPDATE ON machines
     FOR EACH ROW
@@ -376,7 +388,7 @@ LEFT JOIN suppliers s ON m.supplier_id = s.id
 LEFT JOIN sites site ON m.current_site_id = site.id
 WHERE m.ativo = true;
 
--- View: Resumo de alocações por obra
+-- View: Resumo de alocações por jobsite
 CREATE OR REPLACE VIEW vw_site_allocations AS
 SELECT 
     s.id AS site_id,
@@ -417,8 +429,12 @@ COMMENT ON TABLE users IS 'Usuários do sistema com suas permissões e roles';
 COMMENT ON TABLE suppliers IS 'Fornecedores de máquinas alugadas e/ou prestadores de manutenção';
 COMMENT ON COLUMN suppliers.supplier_type IS 'Tipo de fornecedor: rental (aluguel), maintenance (manutenção), both (ambos)';
 COMMENT ON COLUMN allocation_events.supplier_id IS 'Referência ao fornecedor/mecânico responsável (usado principalmente para manutenção de máquinas próprias)';
-COMMENT ON TABLE sites IS 'Obras/endereços onde máquinas operam (geocodificados)';
-COMMENT ON TABLE machine_types IS 'Tipos de máquinas disponíveis';
+COMMENT ON COLUMN allocation_events.construction_type IS 'Tipo de construção: "lot" (Lote) ou "building" (Prédio/Edifício). Indica a localização específica dentro do site.';
+COMMENT ON COLUMN allocation_events.lot_building_number IS 'Número do lote ou prédio onde a máquina está alocada. Especifica a localização exata dentro do site.';
+COMMENT ON COLUMN allocation_events.site_id IS 'Referência ao site (jobsite) que indica a área geral/redondeza. A localização específica é definida por construction_type e lot_building_number.';
+COMMENT ON TABLE sites IS 'Jobsites/endereços onde máquinas operam (geocodificados). O campo address é o identificador único do endereço. O title representa o bairro/jobsite e pode ser usado para agrupar múltiplos endereços.';
+COMMENT ON TABLE machine_types IS 'Tipos de máquinas e attachments/extensions disponíveis no sistema';
+COMMENT ON COLUMN machine_types.is_attachment IS 'Indica se o tipo é um Attachment/Extension (true) ou uma máquina principal (false)';
 COMMENT ON TABLE machines IS 'Máquinas físicas únicas identificadas por unit_number';
 COMMENT ON TABLE extension_types IS 'Tipos de extensões/acessórios para máquinas';
 COMMENT ON TABLE machine_extensions IS 'Extensões físicas para máquinas';

@@ -1,0 +1,21 @@
+Primeira linha:
+Cliente	Job Site
+Type
+Lote / Bld
+Address
+
+Exemplo de dado:
+Pulte Homes
+Emerald Run
+Building
+6
+7 Green Street, Shrewsbury , MA 01545
+
+Guardaremos no banco de dados:
+title
+address
+
+A obra exemplificada já está lá!
+Segue seu formato para as duas colunas guardadas no banco:
+Pulte Homes - Emerald Run - Building 6
+7 Green Street, Shrewsbury, MA 01545

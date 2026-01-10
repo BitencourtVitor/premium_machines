@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
         event_type: body.event_type,
         machine_id: body.machine_id,
         site_id: body.site_id || null,
+        construction_type: body.construction_type || null,
+        lot_building_number: body.lot_building_number || null,
         event_date: body.event_date,
         downtime_reason: body.downtime_reason || null,
         downtime_description: body.downtime_description || null,

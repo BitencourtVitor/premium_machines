@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching sites:', error)
-      return NextResponse.json({ success: false, message: 'Erro ao buscar obras' }, { status: 500 })
+      return NextResponse.json({ success: false, message: 'Erro ao buscar jobsites' }, { status: 500 })
     }
 
     // Filtrar no código para garantir que a sede sempre apareça
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       console.error('Error creating site:', error)
       return NextResponse.json({ 
         success: false, 
-        message: error.message || 'Erro ao criar obra',
+        message: error.message || 'Erro ao criar jobsite',
         error: error.details || error.hint || error.code
       }, { status: 500 })
     }

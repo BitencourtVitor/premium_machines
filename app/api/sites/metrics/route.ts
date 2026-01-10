@@ -3,7 +3,7 @@ import { supabaseServer } from '@/lib/supabase-server'
 
 export async function GET() {
   try {
-    // Total de obras ativas (excluindo sede)
+    // Total de jobsites ativos (excluindo sede)
     const { count: totalActiveSites } = await supabaseServer
       .from('sites')
       .select('id', { count: 'exact', head: true })
@@ -36,7 +36,7 @@ export async function GET() {
       .eq('ativo', true)
       .in('status', ['maintenance', 'broken', 'downtime'])
 
-    // Obras arquivadas
+    // Jobsites arquivados
     const { count: archivedSites } = await supabaseServer
       .from('sites')
       .select('id', { count: 'exact', head: true })

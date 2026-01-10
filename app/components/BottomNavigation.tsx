@@ -116,7 +116,7 @@ export default function BottomNavigation() {
   const moreNavItems: NavItem[] = [
     {
       href: '/sites',
-      label: 'Obras',
+      label: 'Jobsites',
       requiredPermission: 'can_manage_sites' as keyof UserPermissions,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -225,7 +225,7 @@ export default function BottomNavigation() {
             <span className="text-xs font-medium">Mais</span>
           </button>
           
-          {/* Dropdown para cima - Obras, Pessoas, Máquinas, Relatórios */}
+          {/* Dropdown para cima - Jobsites, Pessoas, Máquinas, Relatórios */}
           {showMoreMenu && moreItems.length > 0 && (
             <div className="absolute bottom-full right-1/2 mb-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden whitespace-nowrap z-[60] animate-slide-up">
               <div className="py-1">

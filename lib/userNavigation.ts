@@ -36,7 +36,7 @@ export function getHomePageForUser(user: SessionUser | null): string {
   }
   
   // 3. Outras telas (terceira prioridade em diante)
-  // Sites (Obras)
+  // Sites (Jobsites)
   if (user.can_manage_sites) {
     return '/sites'
   }

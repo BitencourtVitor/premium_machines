@@ -1448,7 +1448,7 @@ export default function UsuariosPage() {
                       {[
                         { key: 'can_view_dashboard', label: 'Dashboard' },
                         { key: 'can_view_map', label: 'Mapa' },
-                        { key: 'can_manage_sites', label: 'Obras' },
+                        { key: 'can_manage_sites', label: 'Jobsites' },
                         { key: 'can_manage_machines', label: 'Máquinas' },
                         { key: 'can_register_events', label: 'Registrar Eventos' },
                         { key: 'can_approve_events', label: 'Aprovar Eventos' },
