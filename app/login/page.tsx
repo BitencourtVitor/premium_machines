@@ -110,27 +110,41 @@ export default function LoginPage() {
 
   const loadUsers = async () => {
     setLoadingUsers(true)
+    setError('')
     try {
-      const response = await fetch(`/api/auth/users?t=${Date.now()}`, {
+      // Usar timestamp único e headers de cache para garantir dados frescos
+      const timestamp = Date.now()
+      const response = await fetch(`/api/auth/users?t=${timestamp}&_=${Math.random()}`, {
         cache: 'no-store',
+        method: 'GET',
         headers: {
-          'Cache-Control': 'no-cache',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
         },
       })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
       const data = await response.json()
       
-      if (response.ok && data.success) {
-        const usersList = (data.users || []).filter((user: any) => 
+      if (data.success && Array.isArray(data.users)) {
+        const usersList = data.users.filter((user: any) => 
           user && user.id && user.nome && user.role
         )
         setUsers(usersList)
+        if (usersList.length === 0) {
+          setError('Nenhum usuário validado encontrado')
+        }
       } else {
         console.error('[Login] Error loading users:', data)
-        setError(data.error || 'Erro ao carregar usuários')
+        setError(data.error || data.message || 'Erro ao carregar usuários')
       }
     } catch (err) {
       console.error('Error loading users:', err)
-      setError('Erro ao conectar com o servidor')
+      setError('Erro ao conectar com o servidor. Tente novamente.')
     } finally {
       setLoadingUsers(false)
     }
@@ -310,8 +324,33 @@ export default function LoginPage() {
             <>
               {!selectedUserId ? (
                 // Lista de usuários
-                <div className="max-h-80 overflow-y-auto pr-2">
-                  <div className="space-y-2">
+                <div>
+                  {/* Botão de refresh */}
+                  <div className="mb-3 flex justify-end">
+                    <button
+                      onClick={loadUsers}
+                      disabled={loadingUsers}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Recarregar lista de usuários"
+                    >
+                      <svg
+                        className={`w-4 h-4 ${loadingUsers ? 'animate-spin' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
+                      </svg>
+                      <span className="text-xs">Atualizar</span>
+                    </button>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto pr-2">
+                    <div className="space-y-2">
                     {loadingUsers ? (
                       <div className="text-center py-8">
                         <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 dark:border-gray-400"></div>
@@ -345,6 +384,7 @@ export default function LoginPage() {
                           </button>
                       ))
                     )}
+                    </div>
                   </div>
                 </div>
               ) : (
