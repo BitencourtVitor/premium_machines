@@ -75,6 +75,56 @@ function getRoleIcon(role: string) {
   }
 }
 
+function getSupplierIcon(supplierType: string) {
+  switch (supplierType) {
+    case 'rental':
+      // Ícone de prédio (alocação) - azul
+      return {
+        icon: (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+        ),
+        bgColor: 'bg-blue-100 dark:bg-blue-900/50',
+        textColor: 'text-blue-600 dark:text-blue-400'
+      }
+    case 'maintenance':
+      // Ícone de engrenagem (manutenção) - verde
+      return {
+        icon: (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        ),
+        bgColor: 'bg-green-100 dark:bg-green-900/50',
+        textColor: 'text-green-600 dark:text-green-400'
+      }
+    case 'both':
+      // Ícone de prédio (alocação e manutenção) - azul (mesmo que rental)
+      return {
+        icon: (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+        ),
+        bgColor: 'bg-blue-100 dark:bg-blue-900/50',
+        textColor: 'text-blue-600 dark:text-blue-400'
+      }
+    default:
+      // Default: prédio azul
+      return {
+        icon: (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+        ),
+        bgColor: 'bg-blue-100 dark:bg-blue-900/50',
+        textColor: 'text-blue-600 dark:text-blue-400'
+      }
+  }
+}
+
 export default function UsuariosPage() {
   const router = useRouter()
   const { user, loading: sessionLoading } = useSession()
@@ -609,7 +659,7 @@ export default function UsuariosPage() {
             {/* Users Tab */}
             {activeTab === 'users' && (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                     {showOnlyPending ? 'Usuários Pendentes' : 'Lista de Usuários'}
                   </h2>
@@ -776,11 +826,11 @@ export default function UsuariosPage() {
             {/* Suppliers Tab */}
             {activeTab === 'suppliers' && (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate min-w-0 flex-1">
                     {showArchivedSuppliers ? 'Fornecedores Arquivados' : 'Fornecedores'} ({suppliers.length})
                   </h2>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       onClick={() => {
                         const newShowArchived = !showArchivedSuppliers
@@ -857,23 +907,154 @@ export default function UsuariosPage() {
                       })
                       return (
                         <div key={supplier.id} className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
-                                <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                </svg>
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-2">
+                            {/* Mobile: Todo o bloco de informações com botões ao lado */}
+                            <div className="flex items-start justify-between gap-3 md:hidden">
+                              <div className="flex items-start gap-3 flex-1 min-w-0">
+                                {(() => {
+                                  const supplierIcon = getSupplierIcon(supplier.supplier_type || 'rental')
+                                  return (
+                                    <div className={`w-10 h-10 rounded-lg ${supplierIcon.bgColor} flex items-center justify-center flex-shrink-0 ${supplierIcon.textColor}`}>
+                                      {supplierIcon.icon}
+                                    </div>
+                                  )
+                                })()}
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-semibold text-gray-900 dark:text-white truncate">{supplier.nome}</p>
+                                  {/* Informações detalhadas (email, telefone, tipo) */}
+                                  <div className="space-y-1 mt-1">
+                                    {supplier.email && (
+                                      <p className="text-sm text-gray-500 dark:text-gray-400 break-words">{supplier.email}</p>
+                                    )}
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 break-words">
+                                      {supplier.telefone || 'Sem telefone'}
+                                    </p>
+                                    {supplier.supplier_type && (
+                                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                                        {supplier.supplier_type === 'rental' ? 'Aluguel de Máquinas' : supplier.supplier_type === 'maintenance' ? 'Manutenção' : 'Alocação e Manutenção'}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                              <div>
-                                <p className="font-semibold text-gray-900 dark:text-white">{supplier.nome}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {/* Botões editar e arquivar empilhados verticalmente */}
+                              <div className="flex flex-col gap-2 flex-shrink-0">
+                                <button
+                                  onClick={() => handleOpenSupplierModal(supplier)}
+                                  className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                                  title="Editar empresa"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                {showArchivedSuppliers ? (
+                                  <button
+                                    onClick={() => handleUnarchiveSupplier(supplier.id)}
+                                    className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+                                    title="Desarquivar empresa"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleArchiveSupplier(supplier.id)}
+                                    className="p-2 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded-lg transition-colors"
+                                    title="Arquivar empresa"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                    </svg>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Desktop: Informações do fornecedor */}
+                            <div className="hidden md:flex items-center gap-3 flex-1 min-w-0">
+                              {(() => {
+                                const supplierIcon = getSupplierIcon(supplier.supplier_type || 'rental')
+                                return (
+                                  <div className={`w-10 h-10 rounded-lg ${supplierIcon.bgColor} flex items-center justify-center flex-shrink-0 ${supplierIcon.textColor}`}>
+                                    {supplierIcon.icon}
+                                  </div>
+                                )
+                              })()}
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-gray-900 dark:text-white truncate">{supplier.nome}</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 break-words">
                                   {supplier.email && `${supplier.email} • `}
                                   {supplier.telefone || 'Sem telefone'}
-                                  {supplier.supplier_type && ` • ${supplier.supplier_type === 'rental' ? 'Aluguel' : supplier.supplier_type === 'maintenance' ? 'Manutenção' : 'Ambos'}`}
+                                  {supplier.supplier_type && ` • ${supplier.supplier_type === 'rental' ? 'Aluguel' : supplier.supplier_type === 'maintenance' ? 'Manutenção' : 'Alocação e Manutenção'}`}
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
+
+                            {/* Mobile: Container de usuários abaixo */}
+                            <div className="md:hidden">
+                              <div className="flex items-center justify-evenly px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                {/* Bonequinho com número de usuários */}
+                                <div className="flex items-center gap-1.5">
+                                  <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                  </svg>
+                                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    {supplierUsers.length}
+                                  </span>
+                                </div>
+                                {/* Botão de adicionar usuário */}
+                                <button
+                                  onClick={() => {
+                                    setSelectedSupplier(supplier.id)
+                                    setEditingUser(null)
+                                    setFormData({
+                                      nome: '',
+                                      email: '',
+                                      pin: '',
+                                      role: 'fornecedor',
+                                      can_view_dashboard: false,
+                                      can_view_map: false,
+                                      can_manage_sites: false,
+                                      can_manage_machines: false,
+                                      can_register_events: false,
+                                      can_approve_events: false,
+                                      can_view_financial: false,
+                                      can_manage_suppliers: false,
+                                      can_manage_users: false,
+                                      can_view_logs: false,
+                                      validado: true,
+                                    })
+                                    setShowModal(true)
+                                  }}
+                                  className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded transition-colors"
+                                  title="Adicionar usuário"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                  </svg>
+                                </button>
+                                {/* Botão de expandir/colapsar */}
+                                <button
+                                  onClick={() => toggleSupplierExpansion(supplier.id)}
+                                  className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                  title={expandedSuppliers.has(supplier.id) ? 'Ocultar usuários' : 'Mostrar usuários'}
+                                >
+                                  <svg 
+                                    className={`w-5 h-5 transition-transform ${expandedSuppliers.has(supplier.id) ? 'rotate-180' : ''}`}
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Desktop: Botões de ação */}
+                            <div className="hidden md:flex items-center gap-2 flex-shrink-0">
                               {/* Container compacto de usuários */}
                               <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg">
                                 {/* Bonequinho com número de usuários */}
@@ -968,13 +1149,13 @@ export default function UsuariosPage() {
                           {expandedSuppliers.has(supplier.id) && supplierUsers.length > 0 && (
                             <div className="mt-3 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-3">
                               {supplierUsers.map((u) => (
-                                <div key={u.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                  <div className="flex items-center gap-3">
-                                    <div className="text-gray-600 dark:text-gray-400">
+                                <div key={u.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg gap-2">
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="text-gray-600 dark:text-gray-400 flex-shrink-0">
                                       {getRoleIcon(u.role)}
                                     </div>
-                                    <div>
-                                      <p className="text-sm font-medium text-gray-900 dark:text-white">{u.nome}</p>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{u.nome}</p>
                                       {!u.validado && (
                                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                           <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">
@@ -984,7 +1165,7 @@ export default function UsuariosPage() {
                                       )}
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-shrink-0">
                                     {!u.validado && (
                                       <button
                                         onClick={() => handleValidate(u)}
@@ -1105,8 +1286,8 @@ export default function UsuariosPage() {
                   onChange={(value) => setSupplierFormData({ ...supplierFormData, supplier_type: value as 'rental' | 'maintenance' | 'both' })}
                   options={[
                     { value: 'rental', label: 'Aluguel de Máquinas' },
-                    { value: 'maintenance', label: 'Manutenção/Mecânico' },
-                    { value: 'both', label: 'Ambos' },
+                    { value: 'maintenance', label: 'Manutenção' },
+                    { value: 'both', label: 'Alocação e Manutenção' },
                   ]}
                 />
 

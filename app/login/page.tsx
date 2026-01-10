@@ -660,7 +660,7 @@ export default function LoginPage() {
                                           <p className="font-semibold text-gray-900 dark:text-white text-sm">{supplier.nome}</p>
                                           <p className="text-xs text-gray-500 dark:text-gray-400">
                                             {supplier.supplier_type === 'both' 
-                                              ? 'Fornecedor de máquinas e manutenção' 
+                                              ? 'Alocação e Manutenção' 
                                               : 'Fornecedor de máquinas'}
                                           </p>
                                         </div>
