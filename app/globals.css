@@ -245,6 +245,46 @@ html.dark .mapboxgl-popup-close-button,
   color: #ffffff !important;
 }
 
+/* Map container fixes for mobile (iOS and Android) */
+.map-container {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 400px;
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .map-container {
+    min-height: calc(100vh - 200px);
+    height: calc(100vh - 200px) !important;
+  }
+}
+
+/* Fix for iOS Safari viewport issues */
+@supports (-webkit-touch-callout: none) {
+  .map-container {
+    height: -webkit-fill-available !important;
+  }
+}
+
+/* Ensure mapbox container has proper dimensions */
+.mapboxgl-map {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.mapboxgl-canvas-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.mapboxgl-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  touch-action: pan-x pan-y;
+}
+
 /* Machine status colors */
 .status-available {
   @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;

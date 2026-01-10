@@ -35,6 +35,7 @@ export default function MapPage() {
   const spiderMoveHandlersRef = useRef<(() => void)[]>([])
   const headquartersMarkerRef = useRef<mapboxgl.Marker | null>(null)
   const userSelectedStyle = useRef<'map' | 'satellite' | null>(null)
+  const resizeHandlersRef = useRef<(() => void)[]>([])
   const [spiderfiedGroup, setSpiderfiedGroup] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [mapLoaded, setMapLoaded] = useState(false)
@@ -66,6 +67,16 @@ export default function MapPage() {
   const initializeMap = useCallback(() => {
     if (!mapContainer.current || map.current) return
 
+    // Garantir que o container tenha dimensões antes de inicializar
+    const container = mapContainer.current
+    const rect = container.getBoundingClientRect()
+    
+    // Se o container não tem dimensões, aguardar um pouco e tentar novamente
+    if (rect.width === 0 || rect.height === 0) {
+      setTimeout(() => initializeMap(), 100)
+      return
+    }
+
     mapboxgl.accessToken = MAPBOX_TOKEN
 
     // Determinar estilo: satélite ou mapa (claro/escuro baseado no tema)
@@ -85,10 +96,19 @@ export default function MapPage() {
     }
 
     map.current = new mapboxgl.Map({
-      container: mapContainer.current,
+      container: container,
       style: styleUrl,
       center: [-71.5412, 42.1301], // Hopedale, MA - Sede da empresa
       zoom: 7.5, // Zoom reduzido para mostrar área maior (praticamente todo o estado de MA)
+      // Configurações específicas para mobile
+      touchZoomRotate: true,
+      touchPitch: true,
+      doubleClickZoom: true,
+      dragRotate: false, // Desabilitar rotação por arraste em mobile
+      pitchWithRotate: false,
+      // Melhorar performance em mobile
+      antialias: false,
+      preserveDrawingBuffer: false,
     })
 
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
@@ -97,6 +117,10 @@ export default function MapPage() {
     map.current.on('load', () => {
       setLoading(false)
       setMapLoaded(true)
+      // Forçar resize após carregar para garantir que o mapa renderize corretamente
+      if (map.current) {
+        map.current.resize()
+      }
     })
 
     // Fechar spiderfy ao clicar no mapa (fora dos marcadores)
@@ -107,6 +131,28 @@ export default function MapPage() {
         setSpiderfiedGroup(null)
       }
     })
+
+    // Resize handler para ajustar o mapa quando a janela mudar de tamanho
+    const handleResize = () => {
+      if (map.current) {
+        map.current.resize()
+      }
+    }
+
+    const handleOrientationChange = () => {
+      // Aguardar um pouco após mudança de orientação para garantir que o layout foi atualizado
+      setTimeout(() => {
+        if (map.current) {
+          map.current.resize()
+        }
+      }, 100)
+    }
+
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('orientationchange', handleOrientationChange)
+    
+    // Armazenar handlers para cleanup
+    resizeHandlersRef.current.push(handleResize, handleOrientationChange)
   }, [mapStyle])
 
   // Função para obter cores adaptadas ao tema
@@ -653,6 +699,14 @@ export default function MapPage() {
     initializeMap()
 
     return () => {
+      // Remover event listeners de resize
+      const handlers = resizeHandlersRef.current
+      if (handlers.length >= 2) {
+        window.removeEventListener('resize', handlers[0] as () => void)
+        window.removeEventListener('orientationchange', handlers[1] as () => void)
+      }
+      resizeHandlersRef.current = []
+      
       if (map.current) {
         map.current.remove()
         map.current = null
@@ -716,10 +770,10 @@ export default function MapPage() {
       <Header title="Mapa" />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
-        <main className={`flex-1 p-4 md:p-6 transition-all duration-250 ease-in-out md:flex md:flex-col md:overflow-hidden ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`}>
-          <div className="relative w-full h-full rounded-lg overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700">
+        <main className={`flex-1 p-4 md:p-6 transition-all duration-250 ease-in-out md:flex md:flex-col md:overflow-hidden ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`} style={{ minHeight: 'calc(100vh - 200px)' }}>
+          <div className="relative w-full h-full rounded-lg overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700" style={{ minHeight: '400px' }}>
             {/* Map Container */}
-            <div ref={mapContainer} className="w-full h-full" />
+            <div ref={mapContainer} className="map-container w-full h-full" />
 
             {/* Loading Overlay */}
             {loading && (
