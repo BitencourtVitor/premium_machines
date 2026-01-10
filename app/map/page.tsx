@@ -503,7 +503,7 @@ export default function MapPage() {
 
                   // Criar elemento do marcador
                   markerEl = createLocationMarker(site, currentIsDark, (e) => {
-                    e.stopPropagation()
+                    if (e) e.stopPropagation()
                     setSelectedSite(site)
                   })
                   markerEl.style.zIndex = '1001'
