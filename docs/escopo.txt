@@ -1,195 +1,161 @@
 Sistema de Gestão de Máquinas com Geolocalização e Controle de Alocação
-1. Visão Geral do Sistema
 
-Este sistema tem como objetivo gerenciar a alocação, o uso e a cobrança de máquinas utilizadas em obras, integrando geolocalização, mapeamento, controle de eventos operacionais e relatórios financeiros consolidados.
+================================================================================
+1. VISÃO GERAL DO SISTEMA
+================================================================================
 
-O problema central que o sistema resolve é a falta de visibilidade e controle sobre:
+Este sistema tem como objetivo gerenciar a alocação, o uso e a cobrança de 
+máquinas utilizadas em obras, integrando geolocalização, mapeamento, controle 
+de eventos operacionais e relatórios financeiros consolidados.
 
-onde as máquinas estão alocadas,
+O problema central que o sistema resolve é a falta de visibilidade e controle 
+sobre:
+- onde as máquinas estão alocadas
+- por quanto tempo estão em operação
+- quando ficaram paradas
+- qual o impacto financeiro real dessas paradas
+- quais máquinas pertencem à empresa e quais são alugadas
+- e qual fornecedor é responsável por cada máquina alugada
 
-por quanto tempo estão em operação,
+IMPORTANTE: O mapa não é o núcleo do sistema. Ele é apenas uma camada de 
+visualização. O núcleo do sistema é orientado a eventos, com forte separação 
+entre:
+- operação
+- cálculo
+- e análise
 
-quando ficaram paradas,
 
-qual o impacto financeiro real dessas paradas,
+================================================================================
+2. PRINCÍPIOS ARQUITETURAIS
+================================================================================
 
-quais máquinas pertencem à empresa e quais são alugadas,
-
-e qual fornecedor é responsável por cada máquina alugada.
-
-O mapa não é o núcleo do sistema. Ele é apenas uma camada de visualização.
-O núcleo do sistema é orientado a eventos, com forte separação entre:
-
-operação,
-
-cálculo,
-
-e análise.
-
-2. Princípios Arquiteturais
 2.1 Endereço como fonte da verdade espacial
 
-O endereço (obra) é o elemento central do sistema.
-Toda máquina sempre está associada a um endereço, direta ou indiretamente.
+O endereço (obra) é o elemento central do sistema. Toda máquina sempre está 
+associada a um endereço, direta ou indiretamente.
 
 Cada endereço possui:
+- latitude
+- longitude
+- metadados
+- histórico de máquinas alocadas
 
-latitude
-
-longitude
-
-metadados
-
-histórico de máquinas alocadas
-
-A geocodificação ocorre no momento do cadastro ou realocação, e o resultado é persistido no banco.
+A geocodificação ocorre no momento do cadastro ou realocação, e o resultado 
+é persistido no banco.
 
 2.2 Arquitetura orientada a eventos
 
-O sistema não trabalha com estados mutáveis diretos.
-
-Tudo que acontece é registrado como evento:
-
-início de alocação
-
-fim de alocação
-
-parada por defeito
-
-parada por falta de insumo
-
-correção de evento
-
-aprovação ou rejeição de evento
+O sistema não trabalha com estados mutáveis diretos. Tudo que acontece é 
+registrado como evento:
+- início de alocação
+- fim de alocação
+- parada por defeito
+- parada por falta de insumo
+- correção de evento
+- aprovação ou rejeição de evento
 
 Eventos são:
+- imutáveis
+- versionáveis
+- auditáveis
 
-imutáveis
-
-versionáveis
-
-auditáveis
-
-Correções não alteram eventos passados, apenas geram novos eventos que ajustam o histórico.
+Correções não alteram eventos passados, apenas geram novos eventos que ajustam 
+o histórico.
 
 2.3 Separação clara de responsabilidades
 
-Frontend: lógica de interação, visualização, simulação e confirmação
+- Frontend: lógica de interação, visualização, simulação e confirmação
+- Backend: persistência, segurança, integridade e auditoria
+- Banco: registro de fatos e snapshots analíticos
+- Mapa: visualização, nunca decisão de negócio
 
-Backend: persistência, segurança, integridade e auditoria
 
-Banco: registro de fatos e snapshots analíticos
+================================================================================
+3. STACK TECNOLÓGICA
+================================================================================
 
-Mapa: visualização, nunca decisão de negócio
-
-3. Stack Tecnológica
 3.1 Frontend
 
-React
-
-Biblioteca de mapas: Mapbox (apenas renderização)
-
-Controle de estado para simulações temporárias
-
-Interface baseada em roles
+- React
+- Biblioteca de mapas: Mapbox (apenas renderização)
+- Controle de estado para simulações temporárias
+- Interface baseada em roles
 
 Responsabilidades do frontend:
-
-acionar geocodificação
-
-renderizar mapas
-
-permitir ajuste manual de ponto no mapa
-
-registrar eventos
-
-simular impactos financeiros antes da aprovação
-
-exibir relatórios consolidados
+- acionar geocodificação
+- renderizar mapas
+- permitir ajuste manual de ponto no mapa
+- registrar eventos
+- simular impactos financeiros antes da aprovação
+- exibir relatórios consolidados
 
 3.2 Geocodificação
 
-API: Geoapify
+- API: Geoapify
 
 Uso:
+- conversão de endereço em latitude/longitude
+- obtenção de nível de confiança do endereço
+- classificação do tipo de local
 
-conversão de endereço em latitude/longitude
-
-obtenção de nível de confiança do endereço
-
-classificação do tipo de local
-
-O sistema não depende do Mapbox para geocodificação.
-A geocodificação é independente e ocorre antes da renderização no mapa.
+O sistema não depende do Mapbox para geocodificação. A geocodificação é 
+independente e ocorre antes da renderização no mapa.
 
 3.3 Backend / Infraestrutura
 
-Supabase
+- Supabase
+  - Auth (controle de usuários e roles)
+  - Database (PostgreSQL)
+  - Edge Functions (recalcular snapshots, automações futuras)
 
-Auth (controle de usuários e roles)
 
-Database (PostgreSQL)
+================================================================================
+4. MODELO DE USUÁRIOS E PERMISSÕES
+================================================================================
 
-Edge Functions (recalcular snapshots, automações futuras)
-
-4. Modelo de Usuários e Permissões
 4.1 Roles principais
 
-Admin
+Admin:
+- aprova eventos
+- visualiza dados financeiros
+- gerencia fornecedores
 
-aprova eventos
+Operador:
+- registra eventos operacionais
+- não acessa valores financeiros consolidados
 
-visualiza dados financeiros
+Fornecedor:
+- visualiza apenas suas máquinas
+- visualiza solicitações relacionadas a elas
 
-gerencia fornecedores
-
-Operador
-
-registra eventos operacionais
-
-não acessa valores financeiros consolidados
-
-Fornecedor
-
-visualiza apenas suas máquinas
-
-visualiza solicitações relacionadas a elas
-
-Developer
-
-acesso total
+Developer:
+- acesso total
 
 4.2 Isolamento de dados
 
 Fornecedores nunca veem:
+- obras que não envolvam suas máquinas
+- máquinas de outros fornecedores
+- valores consolidados globais
 
-obras que não envolvam suas máquinas
 
-máquinas de outros fornecedores
+================================================================================
+5. ENTIDADES DO SISTEMA
+================================================================================
 
-valores consolidados globais
-
-5. Entidades do Sistema
 5.1 Sites (Obras / Endereços)
 
 Representam o local físico onde máquinas operam.
 
 Campos principais:
+- id
+- title
+- latitude
+- longitude
+- created_at
+- updated_at
 
-id
-
-title
-
-latitude
-
-longitude
-
-created_at
-
-updated_at
-
-Observação:
-O endereço textual serve apenas para cadastro e exibição.
+Observação: O endereço textual serve apenas para cadastro e exibição. 
 Latitude e longitude são os dados operacionais reais.
 
 5.2 Machines (Máquinas)
@@ -197,207 +163,154 @@ Latitude e longitude são os dados operacionais reais.
 Representam unidades físicas únicas.
 
 Campos principais:
-
-unit_number (chave única)
-
-machine_type
-
-ownership_type (owned | rented)
-
-supplier_id (quando alugada)
-
-created_at
-
-updated_at
+- unit_number (chave única)
+- machine_type
+- ownership_type (owned | rented)
+- supplier_id (quando alugada)
+- created_at
+- updated_at
 
 O unit_number é considerado único e imutável.
 
 5.3 Machine Extensions (Extensões)
 
-Acessórios ou recursos adicionais compatíveis com tipos específicos de máquinas.
+Acessórios ou recursos adicionais compatíveis com tipos específicos de 
+máquinas.
 
 Campos principais:
-
-id
-
-extension_type
-
-compatible_machine_type
-
-created_at
-
-updated_at
+- id
+- extension_type
+- compatible_machine_type
+- created_at
+- updated_at
 
 Extensões são entidades independentes, com cobrança separada quando aplicável.
 
 5.4 Allocation Events (Eventos de Alocação)
 
-Coração do sistema.
-
-Cada evento representa um fato ocorrido no tempo.
+Coração do sistema. Cada evento representa um fato ocorrido no tempo.
 
 Exemplos:
-
-start_allocation
-
-end_allocation
-
-downtime_start
-
-downtime_end
-
-correction
-
-approval
+- start_allocation
+- end_allocation
+- downtime_start
+- downtime_end
+- correction
+- approval
 
 Campos principais:
+- id
+- machine_id
+- site_id
+- event_type
+- start_date
+- end_date
+- status (pending | approved | rejected)
+- created_by
+- approved_by
+- created_at
 
-id
 
-machine_id
+================================================================================
+6. MODELO TEMPORAL E TRACKING DIÁRIO
+================================================================================
 
-site_id
-
-event_type
-
-start_date
-
-end_date
-
-status (pending | approved | rejected)
-
-created_by
-
-approved_by
-
-created_at
-
-6. Modelo Temporal e Tracking Diário
-
-O sistema não armazena dias calculados diretamente.
-
-O tracking diário é derivado a partir:
-
-eventos de alocação
-
-eventos de parada
-
-eventos de correção
+O sistema não armazena dias calculados diretamente. O tracking diário é 
+derivado a partir de:
+- eventos de alocação
+- eventos de parada
+- eventos de correção
 
 A linha do tempo de uma máquina é reconstruída dinamicamente quando necessário.
 
 Isso permite:
+- correções retroativas
+- auditoria
+- reprocessamento completo
 
-correções retroativas
 
-auditoria
+================================================================================
+7. MODELO DE COBRANÇA
+================================================================================
 
-reprocessamento completo
-
-7. Modelo de Cobrança
 7.1 Regras gerais
 
-cobrança só se aplica a máquinas alugadas
-
-cobrança pode ser:
-
-diária
-
-semanal
-
-mensal
-
-quanto maior o período, menor o valor diário efetivo
+- cobrança só se aplica a máquinas alugadas
+- cobrança pode ser:
+  * diária
+  * semanal
+  * mensal
+- quanto maior o período, menor o valor diário efetivo
 
 7.2 Impacto de paradas
 
-dias parados aprovados são deduzidos da cobrança
-
-operador registra
-
-administrador aprova
-
-sistema recalcula automaticamente
+- dias parados aprovados são deduzidos da cobrança
+- operador registra
+- administrador aprova
+- sistema recalcula automaticamente
 
 Nenhum valor financeiro é ajustado manualmente.
 
-8. Relatórios Consolidados
+
+================================================================================
+8. RELATÓRIOS CONSOLIDADOS
+================================================================================
+
 8.1 Camadas de cálculo
 
-Eventos → fonte da verdade
-
-Cálculo operacional → on-the-fly
-
-Snapshots financeiros → leitura rápida
+- Eventos → fonte da verdade
+- Cálculo operacional → on-the-fly
+- Snapshots financeiros → leitura rápida
 
 8.2 Financial Snapshots
 
 Tabela derivada, não editável manualmente.
 
 Campos típicos:
-
-site_id
-
-machine_id
-
-supplier_id
-
-period_start
-
-period_end
-
-total_days
-
-downtime_days
-
-billable_days
-
-estimated_cost
-
-calculated_at
+- site_id
+- machine_id
+- supplier_id
+- period_start
+- period_end
+- total_days
+- downtime_days
+- billable_days
+- estimated_cost
+- calculated_at
 
 Snapshots podem ser:
-
-apagados
-
-regenerados
-
-recalculados
+- apagados
+- regenerados
+- recalculados
 
 Nunca editados.
 
-9. Automação e Integrações Futuras
+
+================================================================================
+9. AUTOMAÇÃO E INTEGRAÇÕES FUTURAS
+================================================================================
 
 O sistema é preparado para:
-
-envio automático de e-mails para fornecedores
-
-notificações via serviços externos
-
-geração automática de solicitações de máquinas
-
-integrações futuras com WhatsApp ou ERPs
+- envio automático de e-mails para fornecedores
+- notificações via serviços externos
+- geração automática de solicitações de máquinas
+- integrações futuras com WhatsApp ou ERPs
 
 Essas automações partem sempre de eventos.
 
-10. Considerações Finais de Arquitetura
+
+================================================================================
+10. CONSIDERAÇÕES FINAIS DE ARQUITETURA
+================================================================================
 
 O sistema não é um CRUD.
-
 O mapa não é a fonte da verdade.
-
-O banco não guarda “valores finais”, guarda fatos.
-
+O banco não guarda "valores finais", guarda fatos.
 Correções não sobrescrevem história.
-
 Relatórios são derivados, não absolutos.
 
 Essa arquitetura permite:
-
-escalabilidade conceitual
-
-auditoria
-
-confiabilidade financeira
-
-evolução futura sem refatoração estrutural
+- escalabilidade conceitual
+- auditoria
+- confiabilidade financeira
+- evolução futura sem refatoração estrutural
