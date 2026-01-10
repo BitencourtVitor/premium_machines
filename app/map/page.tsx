@@ -57,6 +57,23 @@ export default function MapPage() {
   const panelRef = useRef<HTMLDivElement>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
 
+  // Inicializar panelPosition baseado na posição inicial do layout
+  useEffect(() => {
+    if (panelRef.current && mapContainerRef.current && !panelPosition) {
+      const container = mapContainerRef.current
+      const containerStyle = getComputedStyle(container)
+
+      const paddingLeft = parseFloat(containerStyle.paddingLeft)
+      const paddingBottom = parseFloat(containerStyle.paddingBottom)
+
+      // Posição inicial: canto inferior esquerdo com margem
+      setPanelPosition({
+        x: paddingLeft,
+        y: container.offsetHeight - paddingBottom - 80 // 80px acima do bottom
+      })
+    }
+  }, [panelPosition])
+
   // Refs para drag imperativo (sem state durante movimento)
   const dragStateRef = useRef<{
     startX: number
@@ -1083,7 +1100,8 @@ export default function MapPage() {
 
   // Drag imperativo - manipula DOM diretamente durante movimento
   const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    if (!panelRef.current || !mapContainerRef.current) return
+    // Só permite drag se panelPosition já foi inicializado
+    if (!panelRef.current || !mapContainerRef.current || !panelPosition) return
 
     const container = mapContainerRef.current
     const containerStyle = getComputedStyle(container)
@@ -1108,12 +1126,12 @@ export default function MapPage() {
     const minY = paddingTop
     const maxY = containerRect.height - paddingBottom - panelHeight
 
-    // Estado lógico como fonte da verdade (não DOM)
+    // Estado lógico como fonte da verdade - SEM FALLBACK
     dragStateRef.current = {
       startX: clientX,
       startY: clientY,
-      panelStartX: panelPosition?.x || paddingLeft,
-      panelStartY: panelPosition?.y || (containerRect.height - paddingBottom - panelHeight - 80),
+      panelStartX: panelPosition.x,  // ← Estado real, não fallback
+      panelStartY: panelPosition.y,  // ← Estado real, não fallback
       minX,
       maxX,
       minY,
@@ -1251,9 +1269,8 @@ export default function MapPage() {
                 ref={panelRef}
                 className="absolute z-[10000]"
                 style={{
-                  left: panelPosition ? `${panelPosition.x}px` : '1rem',
-                  top: panelPosition ? `${panelPosition.y}px` : 'auto',
-                  bottom: panelPosition ? 'auto' : '80px',
+                  left: `${panelPosition?.x || 0}px`,
+                  top: `${panelPosition?.y || 0}px`,
                   width: '384px',
                   maxWidth: 'calc(100vw - 2rem)',
                   height: 'auto',
