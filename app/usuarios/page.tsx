@@ -56,7 +56,13 @@ export default function UsuariosPage() {
   const [loading, setLoading] = useState(true)
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [loadingSuppliers, setLoadingSuppliers] = useState(false)
-  const [activeTab, setActiveTab] = useState<'users' | 'suppliers'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'suppliers'>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      return params.get('tab') === 'suppliers' ? 'suppliers' : 'users'
+    }
+    return 'users'
+  })
   const [showModal, setShowModal] = useState(false)
   const [showSupplierModal, setShowSupplierModal] = useState(false)
   const [editingUser, setEditingUser] = useState<any>(null)
