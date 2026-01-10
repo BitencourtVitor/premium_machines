@@ -895,7 +895,7 @@ export default function UsuariosPage() {
                 />
                 {selectedSupplier && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Usuários de empresas fornecedoras sempre têm perfil "Fornecedor"
+                    Usuários de empresas fornecedoras sempre têm perfil &quot;Fornecedor&quot;
                   </p>
                 )}
 
