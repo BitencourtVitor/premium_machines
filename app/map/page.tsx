@@ -1086,32 +1086,34 @@ export default function MapPage() {
     if (!panelRef.current || !mapContainerRef.current) return
 
     const container = mapContainerRef.current
-    const panel = panelRef.current
-    const containerRect = container.getBoundingClientRect()
-    const panelRect = panel.getBoundingClientRect()
     const containerStyle = getComputedStyle(container)
 
     const isMobile = 'touches' in e
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
     const clientY = 'touches' in e ? e.touches[0].pageY : e.clientY
 
-    // Calcular limites uma vez (congelados durante drag)
+    // Calcular limites baseados no layout atual
     const paddingLeft = parseFloat(containerStyle.paddingLeft)
     const paddingRight = parseFloat(containerStyle.paddingRight)
     const paddingTop = parseFloat(containerStyle.paddingTop)
     const paddingBottom = parseFloat(containerStyle.paddingBottom)
 
-    const minX = paddingLeft
-    const maxX = containerRect.width - paddingRight - panelRect.width
-    const minY = paddingTop
-    const maxY = containerRect.height - paddingBottom - panelRect.height
+    // Usar dimensões fixas do painel (384px x auto) - não ler do DOM
+    const panelWidth = 384
+    const panelHeight = panelRef.current.offsetHeight
 
-    // Salvar estado inicial em ref (não state - evita re-renders)
+    const containerRect = container.getBoundingClientRect()
+    const minX = paddingLeft
+    const maxX = containerRect.width - paddingRight - panelWidth
+    const minY = paddingTop
+    const maxY = containerRect.height - paddingBottom - panelHeight
+
+    // Estado lógico como fonte da verdade (não DOM)
     dragStateRef.current = {
-      startX: clientX - containerRect.left,
-      startY: clientY - containerRect.top,
-      panelStartX: panelRect.left - containerRect.left,
-      panelStartY: panelRect.top - containerRect.top,
+      startX: clientX,
+      startY: clientY,
+      panelStartX: panelPosition?.x || paddingLeft,
+      panelStartY: panelPosition?.y || (containerRect.height - paddingBottom - panelHeight - 80),
       minX,
       maxX,
       minY,
@@ -1124,25 +1126,21 @@ export default function MapPage() {
     if ('clientX' in e) {
       e.preventDefault()
     }
-  }, [])
+  }, [panelPosition])
 
   const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
-    if (!isDragging || !panelRef.current || !dragStateRef.current || !mapContainerRef.current) return
+    if (!isDragging || !panelRef.current || !dragStateRef.current) return
 
-    const containerRect = mapContainerRef.current.getBoundingClientRect()
     const isMobile = 'touches' in e
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
     const clientY = 'touches' in e ? e.touches[0].pageY : e.clientY
 
-    // Calcular movimento relativo ao container
-    const relativeX = clientX - containerRect.left
-    const relativeY = clientY - containerRect.top
-
     const state = dragStateRef.current
-    const deltaX = relativeX - state.startX
-    const deltaY = relativeY - state.startY
 
-    // Calcular posição final com limites
+    // Cálculo puro baseado no estado lógico (sem DOM)
+    const deltaX = clientX - state.startX
+    const deltaY = clientY - state.startY
+
     const newX = Math.max(state.minX, Math.min(state.panelStartX + deltaX, state.maxX))
     const newY = Math.max(state.minY, Math.min(state.panelStartY + deltaY, state.maxY))
 
