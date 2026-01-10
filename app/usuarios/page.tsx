@@ -388,30 +388,36 @@ export default function UsuariosPage() {
         <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-250 ease-in-out ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`}>
           <div className="max-w-7xl mx-auto md:flex md:flex-col md:flex-1 md:overflow-hidden md:w-full">
             {/* Tabs */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 flex-shrink-0">
-              <div className="flex border-b border-gray-200 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 flex-shrink-0 overflow-hidden">
+              <div className="flex">
                 <button
                   onClick={() => setActiveTab('users')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
                     activeTab === 'users'
-                      ? 'text-blue-600 dark:text-gray-300 border-b-2 border-blue-600 dark:border-gray-400'
+                      ? 'text-blue-600 dark:text-gray-300'
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                   }`}
                 >
                   Users
+                  {activeTab === 'users' && (
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
+                  )}
                 </button>
                 <button
                   onClick={() => {
                     setActiveTab('suppliers')
                     loadSuppliers()
                   }}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
                     activeTab === 'suppliers'
-                      ? 'text-blue-600 dark:text-gray-300 border-b-2 border-blue-600 dark:border-gray-400'
+                      ? 'text-blue-600 dark:text-gray-300'
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                   }`}
                 >
                   Suppliers
+                  {activeTab === 'suppliers' && (
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
+                  )}
                 </button>
               </div>
             </div>
