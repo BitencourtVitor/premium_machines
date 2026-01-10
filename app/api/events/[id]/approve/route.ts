@@ -16,6 +16,21 @@ export async function POST(
       )
     }
 
+    // First get the event to know its type and machine
+    const { data: eventData, error: fetchError } = await supabaseServer
+      .from('allocation_events')
+      .select('*, machine:machines(id), site:sites(id)')
+      .eq('id', params.id)
+      .single()
+
+    if (fetchError || !eventData) {
+      console.error('Error fetching event:', fetchError)
+      return NextResponse.json(
+        { success: false, message: 'Evento não encontrado' },
+        { status: 404 }
+      )
+    }
+
     // Update the event to approved status
     const { data: event, error } = await supabaseServer
       .from('allocation_events')
@@ -48,6 +63,38 @@ export async function POST(
         { success: false, message: 'Evento não encontrado' },
         { status: 404 }
       )
+    }
+
+    // Update machine's current_site_id and status based on event type
+    let machineUpdateError = null
+    if (event.event_type === 'allocation') {
+      // For allocation events, set the machine's current site and status
+      const { error: updateError } = await supabaseServer
+        .from('machines')
+        .update({
+          current_site_id: event.site_id,
+          status: 'allocated'
+        })
+        .eq('id', event.machine_id)
+
+      machineUpdateError = updateError
+    } else if (event.event_type === 'deallocation') {
+      // For deallocation events, clear the machine's current site and set status to available
+      const { error: updateError } = await supabaseServer
+        .from('machines')
+        .update({
+          current_site_id: null,
+          status: 'available'
+        })
+        .eq('id', event.machine_id)
+
+      machineUpdateError = updateError
+    }
+
+    if (machineUpdateError) {
+      console.error('Error updating machine site:', machineUpdateError)
+      // Don't fail the request, just log the error
+      // The event was approved successfully, just the machine site update failed
     }
 
     return NextResponse.json({ success: true, event })
