@@ -445,7 +445,7 @@ export default function EventsPage() {
                   <CustomDropdown
                     label="Tipo de Construção"
                     value={newEvent.construction_type || ''}
-                    onChange={(value) => setNewEvent({ ...newEvent, construction_type: value || undefined })}
+                    onChange={(value) => setNewEvent({ ...newEvent, construction_type: value || '' })}
                     options={[
                       { value: '', label: 'Selecione...' },
                       { value: 'lot', label: 'Lote' },
@@ -491,7 +491,7 @@ export default function EventsPage() {
                     </label>
                     <CustomDropdown
                       value={newEvent.downtime_reason || ''}
-                      onChange={(value) => setNewEvent({ ...newEvent, downtime_reason: value || undefined })}
+                      onChange={(value) => setNewEvent({ ...newEvent, downtime_reason: value || '' })}
                       options={[
                         { value: '', label: 'Selecione...' },
                         ...Object.entries(DOWNTIME_REASON_LABELS).map(([value, label]) => ({

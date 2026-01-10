@@ -25,6 +25,10 @@ interface Machine {
   current_site?: { id: string; title: string }
   status: string
   ativo: boolean
+  billing_type?: 'daily' | 'weekly' | 'monthly'
+  daily_rate?: string
+  weekly_rate?: string
+  monthly_rate?: string
 }
 
 interface MachineType {
