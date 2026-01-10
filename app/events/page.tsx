@@ -228,7 +228,7 @@ export default function EventsPage() {
 
   return (
     <div className="min-h-screen md:h-screen md:max-h-screen bg-gray-50 dark:bg-gray-900 pb-safe-content md:pb-0 md:flex md:flex-col md:overflow-hidden">
-      <Header title="Eventos" />
+      <Header title="Alocações" />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
         <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-250 ease-in-out ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`}>
@@ -261,12 +261,12 @@ export default function EventsPage() {
                 {(user?.can_register_events || user?.role === 'admin' || user?.role === 'dev') && (
                   <button
                     onClick={() => setShowCreateModal(true)}
-                    className="px-4 py-2 bg-blue-600 dark:bg-gray-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
+                    className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    title="Nova Alocação"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    <span className="hidden md:inline">Novo Evento</span>
                   </button>
                 )}
               </div>
@@ -276,7 +276,7 @@ export default function EventsPage() {
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
               <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Eventos de Alocação ({filteredEvents.length})
+                  Alocações ({filteredEvents.length})
                 </h2>
                 <button
                   onClick={loadEvents}
@@ -296,7 +296,7 @@ export default function EventsPage() {
                 </div>
               ) : filteredEvents.length === 0 ? (
                 <div className="p-8 text-center">
-                  <p className="text-gray-500 dark:text-gray-400">Nenhum evento encontrado</p>
+                  <p className="text-gray-500 dark:text-gray-400">Nenhuma alocação encontrada</p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-200 dark:divide-gray-700 md:flex-1 md:overflow-y-auto">

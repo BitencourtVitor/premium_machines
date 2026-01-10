@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import PinInput from '../components/PinInput'
 import CountdownTimer from '../components/CountdownTimer'
+import { getHomePageForUser } from '@/lib/userNavigation'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -20,44 +21,45 @@ export default function LoginPage() {
   const [blocked, setBlocked] = useState(false)
   const [blockedUntil, setBlockedUntil] = useState<Date | null>(null)
   
-  // Função helper para verificar tema inicial
-  const getInitialTheme = () => {
-    if (typeof window === 'undefined') return false
+  // Estado de montagem do cliente para evitar hydration mismatch
+  const [mounted, setMounted] = useState(false)
+  const [isDark, setIsDark] = useState(false)
+
+  // Marcar como montado no cliente (evita hydration mismatch)
+  useEffect(() => {
+    setMounted(true)
+    
+    // Verificar tema inicial
     const htmlElement = document.documentElement
     const hasDarkClass = htmlElement.classList.contains('dark')
     const savedTheme = localStorage.getItem('theme')
-    return hasDarkClass || savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  }
-  
-  // Função helper para obter logo inicial do localStorage ou baseado no tema
-  const getInitialLogo = () => {
-    if (typeof window === 'undefined') return '/premium_logo_vetorizado.png'
-    const savedLogo = localStorage.getItem('logoSrc')
-    if (savedLogo) return savedLogo
-    const isDark = getInitialTheme()
-    return isDark ? '/premium_logo_vetorizado_white.png' : '/premium_logo_vetorizado.png'
-  }
-  
-  const [isDark, setIsDark] = useState(() => getInitialTheme())
-  const [logoSrc, setLogoSrc] = useState<string>(() => getInitialLogo())
+    const prefersDark = hasDarkClass || savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    setIsDark(prefersDark)
+  }, [])
 
+  // Verificar se já está logado - redirecionar para página correta
   useEffect(() => {
-    // Verificar se já está logado
+    if (!mounted) return
+    
     const checkSession = async () => {
       try {
         const { getSessionUser } = await import('@/lib/session')
         const sessionUser = getSessionUser()
         if (sessionUser) {
-          router.push('/dashboard')
-          return
+          const homePage = getHomePageForUser(sessionUser)
+          router.push(homePage)
         }
       } catch (e) {
         // Continuar para login
       }
     }
     checkSession()
+  }, [mounted, router])
 
-    // Verificar preferência de dark mode
+  // Observar mudanças no tema
+  useEffect(() => {
+    if (!mounted) return
+    
     const checkTheme = () => {
       const htmlElement = document.documentElement
       const hasDarkClass = htmlElement.classList.contains('dark')
@@ -66,25 +68,16 @@ export default function LoginPage() {
       setIsDark(prefersDark)
     }
     
-    checkTheme()
-    
     // Observar mudanças no tema via MutationObserver
-    const observer = new MutationObserver(() => {
-      checkTheme()
-    })
-    
+    const observer = new MutationObserver(checkTheme)
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class']
     })
     
-    // Observar mudanças no tema
+    // Observar mudanças no tema do sistema
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleThemeChange = () => {
-      checkTheme()
-    }
-    
-    mediaQuery.addEventListener('change', handleThemeChange)
+    mediaQuery.addEventListener('change', checkTheme)
     
     // Observar mudanças no localStorage
     const handleStorageChange = (e: StorageEvent) => {
@@ -92,22 +85,14 @@ export default function LoginPage() {
         checkTheme()
       }
     }
-    
     window.addEventListener('storage', handleStorageChange)
     
     return () => {
       observer.disconnect()
-      mediaQuery.removeEventListener('change', handleThemeChange)
+      mediaQuery.removeEventListener('change', checkTheme)
       window.removeEventListener('storage', handleStorageChange)
     }
-  }, [router])
-
-  // Atualizar logo quando o tema mudar e salvar no localStorage
-  useEffect(() => {
-    const newLogoSrc = isDark ? '/premium_logo_vetorizado_white.png' : '/premium_logo_vetorizado.png'
-    setLogoSrc(newLogoSrc)
-    localStorage.setItem('logoSrc', newLogoSrc)
-  }, [isDark])
+  }, [mounted])
 
   const loadUsers = async () => {
     setLoadingUsers(true)
@@ -210,8 +195,14 @@ export default function LoginPage() {
       
       if (data.success && Array.isArray(data.users)) {
         // Filtrar apenas usuários do fornecedor selecionado
+        // Converter ambos para string para garantir comparação correta
         const usersList = data.users.filter((user: any) => 
-          user && user.id && user.nome && user.role === 'fornecedor' && user.supplier_id === supplierId
+          user && 
+          user.id && 
+          user.nome && 
+          user.role === 'fornecedor' && 
+          user.supplier_id && 
+          String(user.supplier_id) === String(supplierId)
         )
         setUsers(usersList)
         if (usersList.length === 0) {
@@ -332,11 +323,12 @@ export default function LoginPage() {
         return
       }
 
-      // Login bem-sucedido
+      // Login bem-sucedido - redirecionar para página correta
       if (data.success && data.user) {
         const { setSessionUser } = await import('@/lib/session')
         setSessionUser(data.user)
-        router.push('/dashboard')
+        const homePage = getHomePageForUser(data.user)
+        router.push(homePage)
       }
     } catch (err: any) {
       setError('Erro ao conectar com o servidor')
@@ -404,18 +396,20 @@ export default function LoginPage() {
           {/* Logo/Título */}
           <div className="text-center mb-8 relative z-10">
             <div className="flex items-center justify-center gap-3 mb-2">
-              <Image
-                src={logoSrc}
-                alt="Premium Logo"
-                width={28}
-                height={28}
-                className="object-contain flex-shrink-0"
-                style={{ display: 'block', visibility: 'visible', minWidth: '28px', minHeight: '28px' }}
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.src = isDark ? '/premium_logo_vetorizado_white.png' : '/premium_logo_vetorizado.png'
-                }}
-              />
+              {/* Logo com renderização condicional para evitar hydration mismatch */}
+              {mounted ? (
+                <Image
+                  src={isDark ? '/premium_logo_vetorizado_white.png' : '/premium_logo_vetorizado.png'}
+                  alt="Premium Logo"
+                  width={28}
+                  height={28}
+                  className="object-contain flex-shrink-0"
+                  priority
+                />
+              ) : (
+                // Placeholder durante SSR para evitar hydration mismatch
+                <div className="w-7 h-7 flex-shrink-0" />
+              )}
               <div className="h-8 w-px bg-gray-300 dark:bg-gray-600" />
               <span className="text-3xl text-gray-900 dark:text-white">Machines</span>
             </div>
@@ -664,7 +658,11 @@ export default function LoginPage() {
                                         </div>
                                         <div>
                                           <p className="font-semibold text-gray-900 dark:text-white text-sm">{supplier.nome}</p>
-                                          <p className="text-xs text-gray-500 dark:text-gray-400">Fornecedor de máquinas</p>
+                                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            {supplier.supplier_type === 'both' 
+                                              ? 'Fornecedor de máquinas e manutenção' 
+                                              : 'Fornecedor de máquinas'}
+                                          </p>
                                         </div>
                                       </div>
                                       <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -678,12 +676,13 @@ export default function LoginPage() {
                         )}
 
                         {/* Mecânicos */}
-                        {suppliers.filter((s: any) => s.supplier_type === 'maintenance' || s.supplier_type === 'both').length > 0 && (
+                        {/* Empresas com 'both' aparecem apenas em 'Fornecedores de Máquinas', não aqui */}
+                        {suppliers.filter((s: any) => s.supplier_type === 'maintenance').length > 0 && (
                           <div>
                             <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2 px-1">Mecânicos</h3>
                             <div className="space-y-2">
                               {suppliers
-                                .filter((s: any) => s.supplier_type === 'maintenance' || s.supplier_type === 'both')
+                                .filter((s: any) => s.supplier_type === 'maintenance')
                                 .map((supplier: any) => (
                                   <button
                                     key={supplier.id}

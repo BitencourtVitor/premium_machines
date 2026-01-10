@@ -59,14 +59,23 @@ export default function DashboardPage() {
       return
     }
 
+    // Admin e dev sempre têm acesso ao dashboard
+    if (user.role === 'admin' || user.role === 'dev') {
+      loadStats()
+      setLoading(false)
+      return
+    }
+
+    // Se não tem permissão de dashboard, redirecionar para mapa (não para login!)
     if (!user.can_view_dashboard) {
-      router.push('/login')
+      router.push('/map')
       return
     }
 
     loadStats()
     setLoading(false)
-  }, [user, sessionLoading, router, loadStats])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, sessionLoading])
 
   if (loading) {
     return (

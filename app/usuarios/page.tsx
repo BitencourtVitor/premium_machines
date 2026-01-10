@@ -11,6 +11,34 @@ import PinInput from '../components/PinInput'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
 
+// Função para formatar telefone americano: +1 (XXX) XXX-XXXX ou (XXX) XXX-XXXX
+function formatUSPhone(value: string): string {
+  // Remove tudo que não é número
+  const numbers = value.replace(/\D/g, '')
+  
+  // Verifica se começa com 1 (código do país)
+  const hasCountryCode = numbers.startsWith('1') && numbers.length > 10
+  const phoneNumbers = hasCountryCode ? numbers.slice(1) : numbers
+  
+  // Limita a 10 dígitos (sem o código do país)
+  const limited = phoneNumbers.slice(0, 10)
+  
+  // Aplica a máscara
+  if (limited.length === 0) {
+    return hasCountryCode ? '+1 ' : ''
+  } else if (limited.length <= 3) {
+    return hasCountryCode ? `+1 (${limited}` : `(${limited}`
+  } else if (limited.length <= 6) {
+    return hasCountryCode 
+      ? `+1 (${limited.slice(0, 3)}) ${limited.slice(3)}`
+      : `(${limited.slice(0, 3)}) ${limited.slice(3)}`
+  } else {
+    return hasCountryCode
+      ? `+1 (${limited.slice(0, 3)}) ${limited.slice(3, 6)}-${limited.slice(6)}`
+      : `(${limited.slice(0, 3)}) ${limited.slice(3, 6)}-${limited.slice(6)}`
+  }
+}
+
 function getRoleIcon(role: string) {
   switch (role) {
     case 'dev':
@@ -35,7 +63,7 @@ function getRoleIcon(role: string) {
     case 'fornecedor':
       return (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
       )
     default:
@@ -91,6 +119,11 @@ export default function UsuariosPage() {
   const [saving, setSaving] = useState(false)
   const [savingSupplier, setSavingSupplier] = useState(false)
   const [error, setError] = useState('')
+  const [userToDelete, setUserToDelete] = useState<any>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [expandedSuppliers, setExpandedSuppliers] = useState<Set<string>>(new Set())
+  const [showArchivedSuppliers, setShowArchivedSuppliers] = useState(false)
   const [supplierFormData, setSupplierFormData] = useState({
     nome: '',
     email: '',
@@ -118,8 +151,14 @@ export default function UsuariosPage() {
   const loadUsers = async () => {
     setLoadingUsers(true)
     try {
-      const response = await fetch(`/api/users?t=${Date.now()}`, {
+      const response = await fetch(`/api/users?_=${Date.now()}&refresh=${Math.random()}`, {
+        method: 'GET',
         cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       })
       const data = await response.json()
 
@@ -133,11 +172,20 @@ export default function UsuariosPage() {
     }
   }
 
-  const loadSuppliers = useCallback(async () => {
+  const loadSuppliers = useCallback(async (showArchived = false) => {
     setLoadingSuppliers(true)
     try {
-      const response = await fetch(`/api/suppliers?t=${Date.now()}`, {
+      const url = showArchived 
+        ? `/api/suppliers?archived=true&_=${Date.now()}&refresh=${Math.random()}`
+        : `/api/suppliers?_=${Date.now()}&refresh=${Math.random()}`
+      const response = await fetch(url, {
+        method: 'GET',
         cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
       })
       const data = await response.json()
 
@@ -153,9 +201,9 @@ export default function UsuariosPage() {
 
   useEffect(() => {
     if (activeTab === 'suppliers' && !loading) {
-      loadSuppliers()
+      loadSuppliers(showArchivedSuppliers)
     }
-  }, [activeTab, loading, loadSuppliers])
+  }, [activeTab, loading, loadSuppliers, showArchivedSuppliers])
 
   // Close search dropdown when clicking outside
   useEffect(() => {
@@ -176,23 +224,29 @@ export default function UsuariosPage() {
   }, [showSearchDropdown])
 
   const handleOpenModal = (userToEdit?: any) => {
+    // Carregar fornecedores se ainda não foram carregados
+    if (suppliers.length === 0) {
+      loadSuppliers()
+    }
+    
     if (userToEdit) {
       setEditingUser(userToEdit)
+      const isSupplier = userToEdit.role === 'fornecedor'
       setFormData({
         nome: userToEdit.nome,
         email: userToEdit.email || '',
         pin: '',
         role: userToEdit.role,
-        can_view_dashboard: userToEdit.can_view_dashboard,
-        can_view_map: userToEdit.can_view_map,
-        can_manage_sites: userToEdit.can_manage_sites,
-        can_manage_machines: userToEdit.can_manage_machines,
-        can_register_events: userToEdit.can_register_events,
-        can_approve_events: userToEdit.can_approve_events,
-        can_view_financial: userToEdit.can_view_financial,
-        can_manage_suppliers: userToEdit.can_manage_suppliers,
-        can_manage_users: userToEdit.can_manage_users,
-        can_view_logs: userToEdit.can_view_logs,
+        can_view_dashboard: isSupplier ? false : userToEdit.can_view_dashboard,
+        can_view_map: isSupplier ? true : userToEdit.can_view_map,
+        can_manage_sites: isSupplier ? false : userToEdit.can_manage_sites,
+        can_manage_machines: isSupplier ? false : userToEdit.can_manage_machines,
+        can_register_events: isSupplier ? true : userToEdit.can_register_events,
+        can_approve_events: isSupplier ? true : userToEdit.can_approve_events,
+        can_view_financial: isSupplier ? false : userToEdit.can_view_financial,
+        can_manage_suppliers: isSupplier ? false : userToEdit.can_manage_suppliers,
+        can_manage_users: isSupplier ? false : userToEdit.can_manage_users,
+        can_view_logs: isSupplier ? false : userToEdit.can_view_logs,
         validado: userToEdit.validado,
       })
       setSelectedSupplier(userToEdit.supplier_id || null)
@@ -204,11 +258,11 @@ export default function UsuariosPage() {
         pin: '',
         role: selectedSupplier ? 'fornecedor' : 'operador',
         can_view_dashboard: false,
-        can_view_map: false,
+        can_view_map: selectedSupplier ? true : false,
         can_manage_sites: false,
         can_manage_machines: false,
-        can_register_events: false,
-        can_approve_events: false,
+        can_register_events: selectedSupplier ? true : false,
+        can_approve_events: selectedSupplier ? true : false,
         can_view_financial: false,
         can_manage_suppliers: false,
         can_manage_users: false,
@@ -230,10 +284,19 @@ export default function UsuariosPage() {
         ? `/api/users/${editingUser.id}` 
         : '/api/users/create'
       
+      // Validar se fornecedor foi selecionado quando role é fornecedor
+      if (formData.role === 'fornecedor' && !selectedSupplier) {
+        setError('É necessário selecionar uma empresa fornecedora para usuários com perfil Fornecedor')
+        setSaving(false)
+        return
+      }
+
       const body: any = {
         ...formData,
-        role: selectedSupplier ? 'fornecedor' : formData.role,
-        supplier_id: selectedSupplier || (formData.role === 'fornecedor' && editingUser?.supplier_id) || null,
+        role: formData.role,
+        supplier_id: formData.role === 'fornecedor' ? selectedSupplier : null,
+        // Remover email se for fornecedor (usa email da empresa)
+        email: formData.role === 'fornecedor' ? null : formData.email,
         currentUserId: user?.id,
         currentUserRole: user?.role,
       }
@@ -258,10 +321,26 @@ export default function UsuariosPage() {
 
       if (response.ok && data.success) {
         setShowModal(false)
-        if (!editingUser) {
-          setSelectedSupplier(null)
-        }
-        loadUsers()
+        setSelectedSupplier(null)
+        setFormData({
+          nome: '',
+          email: '',
+          pin: '',
+          role: 'operador',
+          can_view_dashboard: false,
+          can_view_map: false,
+          can_manage_sites: false,
+          can_manage_machines: false,
+          can_register_events: false,
+          can_approve_events: false,
+          can_view_financial: false,
+          can_manage_suppliers: false,
+          can_manage_users: false,
+          can_view_logs: false,
+          validado: true,
+        })
+        setEditingUser(null)
+        await loadUsers()
         if (activeTab === 'suppliers') {
           loadSuppliers()
         }
@@ -340,6 +419,64 @@ export default function UsuariosPage() {
     setShowSupplierModal(true)
   }
 
+  const handleArchiveSupplier = async (supplierId: string) => {
+    if (!confirm('Tem certeza que deseja arquivar esta empresa? Ela não será deletada, mas ficará oculta da lista.')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/suppliers/${supplierId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          archived: true,
+          currentUserId: user?.id,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        await loadSuppliers(showArchivedSuppliers)
+        await loadUsers()
+      } else {
+        setError(data.error || 'Erro ao arquivar fornecedor')
+      }
+    } catch (err) {
+      console.error('Erro ao arquivar fornecedor:', err)
+      setError('Erro ao conectar com o servidor')
+    }
+  }
+
+  const handleUnarchiveSupplier = async (supplierId: string) => {
+    if (!confirm('Tem certeza que deseja desarquivar esta empresa?')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/suppliers/${supplierId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          archived: false,
+          currentUserId: user?.id,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        await loadSuppliers(showArchivedSuppliers)
+        await loadUsers()
+      } else {
+        setError(data.error || 'Erro ao desarquivar fornecedor')
+      }
+    } catch (err) {
+      console.error('Erro ao desarquivar fornecedor:', err)
+      setError('Erro ao conectar com o servidor')
+    }
+  }
+
   const handleValidate = async (userToValidate: any) => {
     try {
       const response = await fetch(`/api/users/${userToValidate.id}`, {
@@ -361,9 +498,56 @@ export default function UsuariosPage() {
     }
   }
 
+  const handleDelete = async () => {
+    if (!userToDelete) return
+
+    setDeleting(true)
+    setError('')
+
+    try {
+      const response = await fetch(`/api/users/${userToDelete.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentUserId: user?.id,
+          currentUserRole: user?.role,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setShowDeleteModal(false)
+        setUserToDelete(null)
+        await loadUsers()
+        if (activeTab === 'suppliers') {
+          loadSuppliers()
+        }
+      } else {
+        setError(data.error || 'Erro ao deletar usuário')
+      }
+    } catch (err) {
+      setError('Erro ao conectar com o servidor')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const toggleSupplierExpansion = (supplierId: string) => {
+    setExpandedSuppliers(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(supplierId)) {
+        newSet.delete(supplierId)
+      } else {
+        newSet.add(supplierId)
+      }
+      return newSet
+    })
+  }
+
   const filteredUsers = users.filter(u => {
-    // Na aba users, filtrar apenas usuários internos (não fornecedores)
-    if (activeTab === 'users' && u.role === 'fornecedor') return false
+    // Mostrar apenas usuários internos (sem supplier_id) na aba users
+    if (u.supplier_id && u.supplier_id !== null) return false
     
     if (showOnlyPending && u.validado) return false
     if (searchQuery.trim() && !u.nome.toLowerCase().includes(searchQuery.toLowerCase())) return false
@@ -382,7 +566,7 @@ export default function UsuariosPage() {
 
   return (
     <div className="min-h-screen md:h-screen md:max-h-screen bg-gray-50 dark:bg-gray-900 pb-safe-content md:pb-0 md:flex md:flex-col md:overflow-hidden">
-      <Header title="Usuários" />
+      <Header title="Pessoas" />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
         <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-250 ease-in-out ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`}>
@@ -398,7 +582,7 @@ export default function UsuariosPage() {
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                   }`}
                 >
-                  Users
+                  Funcionários
                   {activeTab === 'users' && (
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
                   )}
@@ -414,7 +598,7 @@ export default function UsuariosPage() {
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                   }`}
                 >
-                  Suppliers
+                  Fornecedores
                   {activeTab === 'suppliers' && (
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
                   )}
@@ -522,7 +706,7 @@ export default function UsuariosPage() {
               ) : filteredUsers.length === 0 ? (
                 <div className="p-8 text-center">
                   <p className="text-gray-500 dark:text-gray-400">
-                    Nenhum usuário encontrado.
+                    Nenhum funcionário encontrado.
                   </p>
                 </div>
               ) : (
@@ -566,6 +750,19 @@ export default function UsuariosPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
                             </button>
+                            <button
+                              onClick={() => {
+                                setUserToDelete(u)
+                                setShowDeleteModal(true)
+                                setError('')
+                              }}
+                              className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                              title="Deletar"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -581,21 +778,30 @@ export default function UsuariosPage() {
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Suppliers ({suppliers.length})
+                    {showArchivedSuppliers ? 'Fornecedores Arquivados' : 'Fornecedores'} ({suppliers.length})
                   </h2>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handleOpenSupplierModal()}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+                      onClick={() => {
+                        const newShowArchived = !showArchivedSuppliers
+                        setShowArchivedSuppliers(newShowArchived)
+                        loadSuppliers(newShowArchived)
+                        loadUsers()
+                      }}
+                      className={`p-2 rounded-lg transition-colors ${
+                        showArchivedSuppliers
+                          ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20'
+                          : 'text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                      title={showArchivedSuppliers ? 'Mostrar ativos' : 'Mostrar arquivados'}
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                       </svg>
-                      Nova Empresa
                     </button>
                     <button
                       onClick={() => {
-                        loadSuppliers()
+                        loadSuppliers(showArchivedSuppliers)
                         loadUsers()
                       }}
                       className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -612,6 +818,17 @@ export default function UsuariosPage() {
                         </svg>
                       )}
                     </button>
+                    {!showArchivedSuppliers && (
+                      <button 
+                        onClick={() => handleOpenSupplierModal()}
+                        className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        title="Nova Empresa"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -628,10 +845,19 @@ export default function UsuariosPage() {
                 ) : (
                   <div className="divide-y divide-gray-200 dark:divide-gray-700 md:flex-1 md:overflow-y-auto">
                     {suppliers.map((supplier) => {
-                      const supplierUsers = users.filter(u => u.supplier_id === supplier.id)
+                      // Filtrar apenas usuários que têm supplier_id não nulo e que corresponde ao fornecedor atual
+                      const supplierUsers = users.filter(u => {
+                        // Ignorar usuários sem supplier_id (funcionários da Premium)
+                        if (!u.supplier_id || u.supplier_id === null) {
+                          return false
+                        }
+                        
+                        // Comparar supplier_id do usuário com o id do fornecedor (convertendo para string)
+                        return String(u.supplier_id).trim() === String(supplier.id).trim()
+                      })
                       return (
                         <div key={supplier.id} className="p-4">
-                          <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
                                 <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -648,37 +874,64 @@ export default function UsuariosPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => {
-                                  setSelectedSupplier(supplier.id)
-                                  setEditingUser(null)
-                                  setFormData({
-                                    nome: '',
-                                    email: '',
-                                    pin: '',
-                                    role: 'fornecedor',
-                                    can_view_dashboard: false,
-                                    can_view_map: false,
-                                    can_manage_sites: false,
-                                    can_manage_machines: false,
-                                    can_register_events: false,
-                                    can_approve_events: false,
-                                    can_view_financial: false,
-                                    can_manage_suppliers: false,
-                                    can_manage_users: false,
-                                    can_view_logs: false,
-                                    validado: true,
-                                  })
-                                  setShowModal(true)
-                                }}
-                                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors flex items-center gap-1"
-                                title="Adicionar usuário"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                                Usuário
-                              </button>
+                              {/* Container compacto de usuários */}
+                              <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                {/* Bonequinho com número de usuários */}
+                                <div className="flex items-center gap-1">
+                                  <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                  </svg>
+                                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    {supplierUsers.length}
+                                  </span>
+                                </div>
+                                {/* Botão de adicionar usuário */}
+                                <button
+                                  onClick={() => {
+                                    setSelectedSupplier(supplier.id)
+                                    setEditingUser(null)
+                                    setFormData({
+                                      nome: '',
+                                      email: '',
+                                      pin: '',
+                                      role: 'fornecedor',
+                                      can_view_dashboard: false,
+                                      can_view_map: false,
+                                      can_manage_sites: false,
+                                      can_manage_machines: false,
+                                      can_register_events: false,
+                                      can_approve_events: false,
+                                      can_view_financial: false,
+                                      can_manage_suppliers: false,
+                                      can_manage_users: false,
+                                      can_view_logs: false,
+                                      validado: true,
+                                    })
+                                    setShowModal(true)
+                                  }}
+                                  className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded transition-colors"
+                                  title="Adicionar usuário"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                  </svg>
+                                </button>
+                                {/* Botão de expandir/colapsar */}
+                                <button
+                                  onClick={() => toggleSupplierExpansion(supplier.id)}
+                                  className="p-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                  title={expandedSuppliers.has(supplier.id) ? 'Ocultar usuários' : 'Mostrar usuários'}
+                                >
+                                  <svg 
+                                    className={`w-4 h-4 transition-transform ${expandedSuppliers.has(supplier.id) ? 'rotate-180' : ''}`}
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                              </div>
                               <button
                                 onClick={() => handleOpenSupplierModal(supplier)}
                                 className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
@@ -688,29 +941,54 @@ export default function UsuariosPage() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                 </svg>
                               </button>
+                              {showArchivedSuppliers ? (
+                                <button
+                                  onClick={() => handleUnarchiveSupplier(supplier.id)}
+                                  className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+                                  title="Desarquivar empresa"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleArchiveSupplier(supplier.id)}
+                                  className="p-2 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30 rounded-lg transition-colors"
+                                  title="Arquivar empresa"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                  </svg>
+                                </button>
+                              )}
                             </div>
                           </div>
-                          {supplierUsers.length > 0 && (
-                            <div className="ml-13 mt-3 space-y-2">
+                          {/* Lista expandida de usuários */}
+                          {expandedSuppliers.has(supplier.id) && supplierUsers.length > 0 && (
+                            <div className="mt-3 space-y-2 border-t border-gray-200 dark:border-gray-700 pt-3">
                               {supplierUsers.map((u) => (
-                                <div key={u.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                  <div className="flex items-center gap-2">
-                                    {getRoleIcon(u.role)}
+                                <div key={u.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                  <div className="flex items-center gap-3">
+                                    <div className="text-gray-600 dark:text-gray-400">
+                                      {getRoleIcon(u.role)}
+                                    </div>
                                     <div>
                                       <p className="text-sm font-medium text-gray-900 dark:text-white">{u.nome}</p>
-                                      <p className="text-xs text-gray-500 dark:text-gray-400">{u.email || 'Sem email'}</p>
+                                      {!u.validado && (
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                          <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">
+                                            Pendente
+                                          </span>
+                                        </p>
+                                      )}
                                     </div>
-                                    {!u.validado && (
-                                      <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">
-                                        Pendente
-                                      </span>
-                                    )}
                                   </div>
-                                  <div className="flex items-center gap-1">
+                                  <div className="flex items-center gap-2">
                                     {!u.validado && (
                                       <button
                                         onClick={() => handleValidate(u)}
-                                        className="p-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                                        className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                                         title="Validar"
                                       >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -720,16 +998,34 @@ export default function UsuariosPage() {
                                     )}
                                     <button
                                       onClick={() => handleOpenModal(u)}
-                                      className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                      className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
                                       title="Editar"
                                     >
                                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                       </svg>
                                     </button>
+                                    <button
+                                      onClick={() => {
+                                        setUserToDelete(u)
+                                        setShowDeleteModal(true)
+                                        setError('')
+                                      }}
+                                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                                      title="Deletar"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
                                   </div>
                                 </div>
                               ))}
+                            </div>
+                          )}
+                          {expandedSuppliers.has(supplier.id) && supplierUsers.length === 0 && (
+                            <div className="mt-3 p-3 text-center text-sm text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-3">
+                              Nenhum usuário cadastrado para esta empresa
                             </div>
                           )}
                         </div>
@@ -748,9 +1044,10 @@ export default function UsuariosPage() {
       {/* Supplier Modal */}
       {showSupplierModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto flex flex-col">
+            {/* Cabeçalho com borda */}
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                   {editingSupplier ? 'Editar Empresa' : 'Nova Empresa Fornecedora'}
                 </h2>
@@ -772,7 +1069,10 @@ export default function UsuariosPage() {
                   </svg>
                 </button>
               </div>
+            </div>
 
+            {/* Conteúdo */}
+            <div className="p-6 flex-1 overflow-y-auto">
               {error && (
                 <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-sm">
                   {error}
@@ -796,7 +1096,8 @@ export default function UsuariosPage() {
                   label="Telefone"
                   type="tel"
                   value={supplierFormData.telefone}
-                  onChange={(e) => setSupplierFormData({ ...supplierFormData, telefone: e.target.value })}
+                  onChange={(e) => setSupplierFormData({ ...supplierFormData, telefone: formatUSPhone(e.target.value) })}
+                  placeholder="+1 (555) 123-4567"
                 />
                 <CustomDropdown
                   label="Tipo de Fornecedor"
@@ -809,32 +1110,36 @@ export default function UsuariosPage() {
                   ]}
                 />
 
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowSupplierModal(false)
-                      setEditingSupplier(null)
-                      setSupplierFormData({
-                        nome: '',
-                        email: '',
-                        telefone: '',
-                        supplier_type: 'rental',
-                      })
-                    }}
-                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingSupplier}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {savingSupplier ? 'Salvando...' : editingSupplier ? 'Salvar Alterações' : 'Criar Empresa'}
-                  </button>
-                </div>
               </form>
+            </div>
+
+            {/* Rodapé com borda */}
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSupplierModal(false)
+                    setEditingSupplier(null)
+                    setSupplierFormData({
+                      nome: '',
+                      email: '',
+                      telefone: '',
+                      supplier_type: 'rental',
+                    })
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSupplier}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingSupplier ? 'Salvando...' : editingSupplier ? 'Salvar Alterações' : 'Criar Empresa'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -843,9 +1148,10 @@ export default function UsuariosPage() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto flex flex-col">
+            {/* Cabeçalho com borda */}
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                   {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
                 </h2>
@@ -858,66 +1164,115 @@ export default function UsuariosPage() {
                   </svg>
                 </button>
               </div>
+            </div>
 
+            {/* Conteúdo */}
+            <div className="p-6 flex-1 overflow-y-auto">
               <form onSubmit={handleSave} className="space-y-4">
                 <CustomInput
-                  label="Nome"
+                  label={formData.role === 'fornecedor' ? 'Primeiro Nome' : 'Nome'}
                   value={formData.nome}
                   onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                   required
                 />
-                <CustomInput
-                  label="Email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-                <CustomInput
-                  label={editingUser ? 'Novo PIN (deixe vazio para manter)' : 'PIN (6 dígitos)'}
-                  type="password"
-                  value={formData.pin}
-                  onChange={(e) => setFormData({ ...formData, pin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                  maxLength={6}
-                  placeholder="••••••"
-                  required={!editingUser}
-                />
-                {selectedSupplier && (
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <p className="text-sm text-blue-700 dark:text-blue-300">
-                      <span className="font-medium">Empresa:</span> {suppliers.find(s => s.id === selectedSupplier)?.nome || 'Selecionada'}
-                    </p>
-                  </div>
+                {formData.role !== 'fornecedor' && (
+                  <CustomInput
+                    label="Email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
                 )}
+                {formData.role === 'fornecedor' && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    O email será o da empresa fornecedora selecionada abaixo.
+                  </p>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    {editingUser ? 'Novo PIN (deixe vazio para manter)' : 'PIN (6 dígitos)'}
+                  </label>
+                  {!editingUser ? (
+                    <PinInput
+                      length={6}
+                      onComplete={(pin) => setFormData({ ...formData, pin })}
+                      disabled={false}
+                    />
+                  ) : (
+                    <div>
+                      <PinInput
+                        length={6}
+                        onComplete={(pin) => setFormData({ ...formData, pin })}
+                        disabled={false}
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        Deixe vazio para manter o PIN atual
+                      </p>
+                    </div>
+                  )}
+                </div>
                 <CustomDropdown
                   label="Perfil"
                   value={formData.role}
-                  onChange={(value) => setFormData({ ...formData, role: value })}
+                  onChange={(value) => {
+                    const isSupplier = value === 'fornecedor'
+                    setFormData({ 
+                      ...formData, 
+                      role: value,
+                      // Ajustar permissões automaticamente para fornecedores
+                      can_view_dashboard: isSupplier ? false : formData.can_view_dashboard,
+                      can_view_map: isSupplier ? true : formData.can_view_map,
+                      can_manage_sites: isSupplier ? false : formData.can_manage_sites,
+                      can_manage_machines: isSupplier ? false : formData.can_manage_machines,
+                      can_register_events: isSupplier ? true : formData.can_register_events,
+                      can_approve_events: isSupplier ? true : formData.can_approve_events,
+                      can_view_financial: isSupplier ? false : formData.can_view_financial,
+                      can_manage_suppliers: isSupplier ? false : formData.can_manage_suppliers,
+                      can_manage_users: isSupplier ? false : formData.can_manage_users,
+                      can_view_logs: isSupplier ? false : formData.can_view_logs,
+                    })
+                    if (!isSupplier) {
+                      setSelectedSupplier(null)
+                    }
+                  }}
                   options={[
                     { value: 'operador', label: 'Operador' },
                     { value: 'admin', label: 'Administrador' },
                     { value: 'fornecedor', label: 'Fornecedor' },
                   ]}
-                  disabled={!!selectedSupplier}
                 />
+                {formData.role === 'fornecedor' && (
+                  <CustomDropdown
+                    label="Empresa Fornecedora"
+                    value={selectedSupplier || ''}
+                    onChange={(value) => setSelectedSupplier(value || null)}
+                    options={[
+                      { value: '', label: 'Selecione uma empresa' },
+                      ...suppliers.map(s => ({ value: s.id, label: s.nome }))
+                    ]}
+                    required={formData.role === 'fornecedor'}
+                  />
+                )}
                 {selectedSupplier && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Usuários de empresas fornecedoras sempre têm perfil &quot;Fornecedor&quot;
+                    Usuários fornecedores têm acesso ao mapa com demandas da empresa e podem registrar/aprovar eventos relacionados à empresa.
                   </p>
                 )}
 
                 {/* Permissões */}
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Permissões</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { key: 'can_view_dashboard', label: 'Dashboard' },
-                      { key: 'can_view_map', label: 'Mapa' },
-                      { key: 'can_manage_sites', label: 'Obras' },
-                      { key: 'can_manage_machines', label: 'Máquinas' },
-                      { key: 'can_register_events', label: 'Registrar Eventos' },
-                      { key: 'can_approve_events', label: 'Aprovar Eventos' },
-                      { key: 'can_view_financial', label: 'Financeiro' },
-                      { key: 'can_manage_suppliers', label: 'Fornecedores' },
+                {formData.role !== 'fornecedor' && (
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Permissões</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { key: 'can_view_dashboard', label: 'Dashboard' },
+                        { key: 'can_view_map', label: 'Mapa' },
+                        { key: 'can_manage_sites', label: 'Obras' },
+                        { key: 'can_manage_machines', label: 'Máquinas' },
+                        { key: 'can_register_events', label: 'Registrar Eventos' },
+                        { key: 'can_approve_events', label: 'Aprovar Eventos' },
+                        { key: 'can_view_financial', label: 'Financeiro' },
+                        { key: 'can_manage_suppliers', label: 'Fornecedores' },
                       { key: 'can_manage_users', label: 'Usuários' },
                       { key: 'can_view_logs', label: 'Logs' },
                     ].map((perm) => (
@@ -933,6 +1288,7 @@ export default function UsuariosPage() {
                     ))}
                   </div>
                 </div>
+                )}
 
                 {error && (
                   <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">
@@ -940,23 +1296,94 @@ export default function UsuariosPage() {
                   </div>
                 )}
 
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="flex-1 px-4 py-2 bg-blue-600 dark:bg-gray-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
-                  >
-                    {saving ? 'Salvando...' : 'Salvar'}
-                  </button>
+                {/* Rodapé com borda - dentro do form */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowModal(false)}
+                      className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {saving ? 'Salvando...' : editingUser ? 'Salvar Alterações' : 'Criar Usuário'}
+                    </button>
+                  </div>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação de Deleção */}
+      {showDeleteModal && userToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md flex flex-col">
+            {/* Cabeçalho com borda */}
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Confirmar Exclusão
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false)
+                    setUserToDelete(null)
+                    setError('')
+                  }}
+                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="p-6 flex-1">
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">
+                  {error}
+                </div>
+              )}
+              <p className="text-gray-700 dark:text-gray-300">
+                Tem certeza que deseja deletar o usuário <span className="font-semibold">{userToDelete.nome}</span>?
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                Esta ação não pode ser desfeita.
+              </p>
+            </div>
+
+            {/* Rodapé com borda */}
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteModal(false)
+                    setUserToDelete(null)
+                    setError('')
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deleting ? 'Deletando...' : 'Deletar'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

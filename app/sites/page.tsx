@@ -45,7 +45,14 @@ export default function SitesPage() {
   const [loading, setLoading] = useState(true)
   const [loadingSites, setLoadingSites] = useState(false)
   const [sites, setSites] = useState<Site[]>([])
-  const [activeTab, setActiveTab] = useState<'sites' | 'suppliers' | 'machines'>('sites')
+  const [loadingMetrics, setLoadingMetrics] = useState(false)
+  const [metrics, setMetrics] = useState({
+    totalActiveSites: 0,
+    totalMachinesAllocated: 0,
+    pendingAllocations: 0,
+    machinesWithIssues: 0,
+    archivedSites: 0,
+  })
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
   const [showArchivedSites, setShowArchivedSites] = useState(false)
@@ -83,6 +90,22 @@ export default function SitesPage() {
     }
   }, [showArchivedSites])
 
+  const loadMetrics = useCallback(async () => {
+    setLoadingMetrics(true)
+    try {
+      const response = await fetch('/api/sites/metrics')
+      const data = await response.json()
+
+      if (data.success) {
+        setMetrics(data.metrics)
+      }
+    } catch (error) {
+      console.error('Error loading metrics:', error)
+    } finally {
+      setLoadingMetrics(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (sessionLoading) return
 
@@ -97,13 +120,16 @@ export default function SitesPage() {
     }
 
     loadSites()
-  }, [user, sessionLoading, router, loadSites])
+    loadMetrics()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, sessionLoading])
 
   useEffect(() => {
     if (!loading && user) {
       loadSites()
     }
-  }, [showArchivedSites, loading, user, loadSites])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showArchivedSites, loading, user])
 
   // Close search dropdown when clicking outside
   useEffect(() => {
@@ -463,53 +489,84 @@ export default function SitesPage() {
         <Sidebar />
         <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-250 ease-in-out ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`}>
           <div className="max-w-7xl mx-auto md:flex md:flex-col md:flex-1 md:overflow-hidden md:w-full">
-            {/* Tabs */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 flex-shrink-0 overflow-hidden">
-              <div className="flex">
-                <button
-                  onClick={() => setActiveTab('sites')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-                    activeTab === 'sites'
-                      ? 'text-blue-600 dark:text-gray-300'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Obras
-                  {activeTab === 'sites' && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
-                  )}
-                </button>
-                <button
-                  onClick={() => setActiveTab('suppliers')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-                    activeTab === 'suppliers'
-                      ? 'text-blue-600 dark:text-gray-300'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Fornecedores
-                  {activeTab === 'suppliers' && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
-                  )}
-                </button>
-                <button
-                  onClick={() => setActiveTab('machines')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-                    activeTab === 'machines'
-                      ? 'text-blue-600 dark:text-gray-300'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Máquinas
-                  {activeTab === 'machines' && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
-                  )}
-                </button>
+            {/* Métricas */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4 flex-shrink-0">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Obras Ativas</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                        {loadingMetrics ? '...' : metrics.totalActiveSites}
+                      </p>
+                    </div>
+                    <div className="bg-blue-100 dark:bg-blue-900 rounded-full p-2">
+                      <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Máquinas Alocadas</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                        {loadingMetrics ? '...' : metrics.totalMachinesAllocated}
+                      </p>
+                    </div>
+                    <div className="bg-green-100 dark:bg-green-900 rounded-full p-2">
+                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Alocações Pendentes</p>
+                      <p className={`text-2xl font-bold mt-1 ${metrics.pendingAllocations > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-900 dark:text-white'}`}>
+                        {loadingMetrics ? '...' : metrics.pendingAllocations}
+                      </p>
+                    </div>
+                    <div className={`rounded-full p-2 ${metrics.pendingAllocations > 0 ? 'bg-yellow-100 dark:bg-yellow-900' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                      <svg className={`w-5 h-5 ${metrics.pendingAllocations > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-600 dark:text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Máquinas com Problemas</p>
+                      <p className={`text-2xl font-bold mt-1 ${metrics.machinesWithIssues > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
+                        {loadingMetrics ? '...' : metrics.machinesWithIssues}
+                      </p>
+                    </div>
+                    <div className={`rounded-full p-2 ${metrics.machinesWithIssues > 0 ? 'bg-red-100 dark:bg-red-900' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                      <svg className={`w-5 h-5 ${metrics.machinesWithIssues > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Sites Tab */}
-            {activeTab === 'sites' && (
+            {/* Lista de Obras */}
+            {(
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -578,7 +635,7 @@ export default function SitesPage() {
                       onClick={() => setShowArchivedSites(!showArchivedSites)}
                       className={`p-2 rounded-lg transition-colors ${
                         showArchivedSites
-                          ? 'text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20'
                           : 'text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}
                       title={showArchivedSites ? 'Mostrar Obras Ativas' : 'Mostrar Obras Arquivadas'}
@@ -678,55 +735,6 @@ export default function SitesPage() {
               </div>
             )}
 
-            {/* Suppliers Tab */}
-            {activeTab === 'suppliers' && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Fornecedores
-                  </h2>
-                  <button
-                    onClick={() => router.push('/suppliers')}
-                    className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                    title="Gerenciar Fornecedores"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-                <div className="p-8 text-center">
-                  <p className="text-gray-500 dark:text-gray-400">
-                    Gerencie fornecedores na página dedicada
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Machines Tab */}
-            {activeTab === 'machines' && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Máquinas
-                  </h2>
-                  <button
-                    onClick={() => router.push('/machines')}
-                    className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                    title="Gerenciar Máquinas"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-                <div className="p-8 text-center">
-                  <p className="text-gray-500 dark:text-gray-400">
-                    Gerencie máquinas na página dedicada
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
         </main>
       </div>

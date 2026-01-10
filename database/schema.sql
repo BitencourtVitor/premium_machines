@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
     telefone VARCHAR(20),
     supplier_type VARCHAR(20) DEFAULT 'rental' CHECK (supplier_type IN ('rental', 'maintenance', 'both')),
     ativo BOOLEAN DEFAULT true,
+    archived BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(nome)
@@ -59,6 +60,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
 -- Índices para suppliers
 CREATE INDEX IF NOT EXISTS idx_suppliers_nome ON suppliers(nome);
 CREATE INDEX IF NOT EXISTS idx_suppliers_ativo ON suppliers(ativo);
+CREATE INDEX IF NOT EXISTS idx_suppliers_archived ON suppliers(archived);
 
 -- Adicionar FK de users para suppliers
 ALTER TABLE users ADD CONSTRAINT fk_users_supplier 

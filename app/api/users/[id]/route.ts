@@ -39,6 +39,7 @@ export async function PUT(
       email, 
       pin,
       role,
+      supplier_id,
       can_view_dashboard,
       can_view_map,
       can_manage_sites,
@@ -59,33 +60,40 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'Permissão negada' }, { status: 403 })
     }
 
-    // Get current user data for logging
-    const { data: currentData } = await supabaseServer
+    // Get current user data for logging and for preserving unchanged fields
+    const { data: currentData, error: fetchError } = await supabaseServer
       .from('users')
       .select('*')
       .eq('id', params.id)
       .single()
 
-    // Build update object
+    if (fetchError || !currentData) {
+      return NextResponse.json({ success: false, error: 'Usuário não encontrado' }, { status: 404 })
+    }
+
+    // Build update object - only update fields that are explicitly provided
     const updateData: any = {
-      nome,
-      email: email || null,
-      role,
-      can_view_dashboard,
-      can_view_map,
-      can_manage_sites,
-      can_manage_machines,
-      can_register_events,
-      can_approve_events,
-      can_view_financial,
-      can_manage_suppliers,
-      can_manage_users,
-      can_view_logs,
-      validado,
       updated_at: new Date().toISOString(),
     }
 
-    // If PIN is provided, hash and update it
+    // Update only fields that are explicitly provided (not undefined)
+    if (nome !== undefined) updateData.nome = nome
+    if (email !== undefined) updateData.email = email || null
+    if (role !== undefined) updateData.role = role
+    if (supplier_id !== undefined) updateData.supplier_id = supplier_id || null
+    if (can_view_dashboard !== undefined) updateData.can_view_dashboard = can_view_dashboard
+    if (can_view_map !== undefined) updateData.can_view_map = can_view_map
+    if (can_manage_sites !== undefined) updateData.can_manage_sites = can_manage_sites
+    if (can_manage_machines !== undefined) updateData.can_manage_machines = can_manage_machines
+    if (can_register_events !== undefined) updateData.can_register_events = can_register_events
+    if (can_approve_events !== undefined) updateData.can_approve_events = can_approve_events
+    if (can_view_financial !== undefined) updateData.can_view_financial = can_view_financial
+    if (can_manage_suppliers !== undefined) updateData.can_manage_suppliers = can_manage_suppliers
+    if (can_manage_users !== undefined) updateData.can_manage_users = can_manage_users
+    if (can_view_logs !== undefined) updateData.can_view_logs = can_view_logs
+    if (validado !== undefined) updateData.validado = validado
+
+    // If PIN is provided and valid, hash and update it
     if (pin && pin.length === 6) {
       updateData.pin_hash = await hashPin(pin)
     }

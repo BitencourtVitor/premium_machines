@@ -700,13 +700,27 @@ export default function MapPage() {
       return
     }
 
+    // Admin e dev sempre têm acesso
+    if (user.role === 'admin' || user.role === 'dev') {
+      loadSites()
+      setLoading(false)
+      return
+    }
+
+    // Se não tem permissão para ver o mapa, limpar sessão e ir para login
+    // (evita loop de redirecionamento)
     if (!user.can_view_map) {
-      router.push('/dashboard')
+      import('@/lib/session').then(({ clearSession }) => {
+        clearSession()
+        router.push('/login')
+      })
       return
     }
 
     loadSites()
-  }, [user, sessionLoading, router, loadSites])
+    setLoading(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, sessionLoading])
 
   useEffect(() => {
     initializeMap()

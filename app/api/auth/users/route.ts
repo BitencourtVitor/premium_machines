@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const { data: users, error } = await supabaseServer
       .from('users')
-      .select('id, nome, role')
+      .select('id, nome, role, supplier_id')
       .eq('validado', true)
       .order('nome', { ascending: true })
 

@@ -80,7 +80,7 @@ export default function BottomNavigation() {
     },
     {
       href: '/events',
-      label: 'Eventos',
+      label: 'Alocações',
       requiredPermission: 'can_register_events' as keyof UserPermissions,
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

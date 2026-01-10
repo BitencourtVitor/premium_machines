@@ -39,6 +39,7 @@ export async function PUT(
       telefone,
       supplier_type,
       ativo,
+      archived,
       currentUserId,
     } = body
 
@@ -49,14 +50,17 @@ export async function PUT(
       .eq('id', params.id)
       .single()
 
-    const updateData = {
-      nome,
-      email: email || null,
-      telefone: telefone || null,
-      supplier_type: supplier_type || 'rental',
-      ativo: ativo !== undefined ? ativo : true,
+    const updateData: any = {
       updated_at: new Date().toISOString(),
     }
+
+    // Only update fields that are explicitly provided
+    if (nome !== undefined) updateData.nome = nome
+    if (email !== undefined) updateData.email = email || null
+    if (telefone !== undefined) updateData.telefone = telefone || null
+    if (supplier_type !== undefined) updateData.supplier_type = supplier_type || 'rental'
+    if (ativo !== undefined) updateData.ativo = ativo
+    if (archived !== undefined) updateData.archived = archived
 
     const { data: supplier, error } = await supabaseServer
       .from('suppliers')
