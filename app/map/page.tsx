@@ -54,10 +54,20 @@ export default function MapPage() {
   // Estados para drag and drop do painel
   const [isDragging, setIsDragging] = useState(false)
   const [panelPosition, setPanelPosition] = useState<{ x: number; y: number } | null>(null)
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
-  const [panelStart, setPanelStart] = useState({ x: 0, y: 0 })
   const panelRef = useRef<HTMLDivElement>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
+
+  // Refs para drag imperativo (sem state durante movimento)
+  const dragStateRef = useRef<{
+    startX: number
+    startY: number
+    panelStartX: number
+    panelStartY: number
+    minX: number
+    maxX: number
+    minY: number
+    maxY: number
+  } | null>(null)
 
   // Calcular posição inicial do handle baseada no painel
   const getInitialHandlePosition = useCallback(() => {
@@ -1071,29 +1081,44 @@ export default function MapPage() {
     return mapStyle === 'satellite' ? 'Satélite' : 'Mapa'
   }
 
-  // Funções para drag and drop do painel
+  // Drag imperativo - manipula DOM diretamente durante movimento
   const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    if (!panelRef.current) return
+    if (!panelRef.current || !mapContainerRef.current) return
 
-    setIsDragging(true)
-    // Coordenadas relativas ao container (sempre position: absolute)
-    const containerRect = mapContainerRef.current.getBoundingClientRect()
+    const container = mapContainerRef.current
+    const panel = panelRef.current
+    const containerRect = container.getBoundingClientRect()
+    const panelRect = panel.getBoundingClientRect()
+    const containerStyle = getComputedStyle(container)
+
     const isMobile = 'touches' in e
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
     const clientY = 'touches' in e ? e.touches[0].pageY : e.clientY
 
-    // Salvar posição inicial do ponteiro relativa ao container
-    setDragStart({
-      x: clientX - containerRect.left,
-      y: clientY - containerRect.top
-    })
+    // Calcular limites uma vez (congelados durante drag)
+    const paddingLeft = parseFloat(containerStyle.paddingLeft)
+    const paddingRight = parseFloat(containerStyle.paddingRight)
+    const paddingTop = parseFloat(containerStyle.paddingTop)
+    const paddingBottom = parseFloat(containerStyle.paddingBottom)
 
-    // Salvar posição inicial do painel relativa ao container
-    const rect = panelRef.current.getBoundingClientRect()
-    setPanelStart({
-      x: rect.left - containerRect.left, // Posição relativa ao container
-      y: rect.top - containerRect.top
-    })
+    const minX = paddingLeft
+    const maxX = containerRect.width - paddingRight - panelRect.width
+    const minY = paddingTop
+    const maxY = containerRect.height - paddingBottom - panelRect.height
+
+    // Salvar estado inicial em ref (não state - evita re-renders)
+    dragStateRef.current = {
+      startX: clientX - containerRect.left,
+      startY: clientY - containerRect.top,
+      panelStartX: panelRect.left - containerRect.left,
+      panelStartY: panelRect.top - containerRect.top,
+      minX,
+      maxX,
+      minY,
+      maxY
+    }
+
+    setIsDragging(true)
 
     // Prevenir seleção de texto durante o arraste (apenas para mouse)
     if ('clientX' in e) {
@@ -1102,44 +1127,47 @@ export default function MapPage() {
   }, [])
 
   const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
-    if (!isDragging || !panelRef.current || !mapContainerRef.current) return
+    if (!isDragging || !panelRef.current || !dragStateRef.current || !mapContainerRef.current) return
 
-    // Coordenadas relativas ao container
     const containerRect = mapContainerRef.current.getBoundingClientRect()
     const isMobile = 'touches' in e
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
     const clientY = 'touches' in e ? e.touches[0].pageY : e.clientY
 
-    // Converter para coordenadas relativas ao container
+    // Calcular movimento relativo ao container
     const relativeX = clientX - containerRect.left
     const relativeY = clientY - containerRect.top
 
-    // Lógica simples e consistente: nova posição = posição inicial + movimento
-    const deltaX = relativeX - dragStart.x
-    const deltaY = relativeY - dragStart.y
+    const state = dragStateRef.current
+    const deltaX = relativeX - state.startX
+    const deltaY = relativeY - state.startY
 
-    const newX = panelStart.x + deltaX
-    const newY = panelStart.y + deltaY
+    // Calcular posição final com limites
+    const newX = Math.max(state.minX, Math.min(state.panelStartX + deltaX, state.maxX))
+    const newY = Math.max(state.minY, Math.min(state.panelStartY + deltaY, state.maxY))
 
-    // Controlar limites do container do mapa (sempre position: absolute)
-    const panel = panelRef.current
-
-    // Limites baseados no container, não na viewport
-    const minX = 16 // left-4 = 16px
-    const maxX = containerRect.width - panel.offsetWidth - 16 // right-4 = 16px
-    const minY = 16 // top padding mínimo
-    const maxY = containerRect.height - panel.offsetHeight - 16 // bottom padding mínimo
-
-    const clampedX = Math.max(minX, Math.min(newX, maxX))
-    const clampedY = Math.max(minY, Math.min(newY, maxY))
-
-    // Atualizar posição durante o drag
-    setPanelPosition({ x: clampedX, y: clampedY })
-  }, [isDragging, dragStart, panelStart])
+    // Aplicar transformação DIRETAMENTE no DOM (sem state, sem re-render)
+    panelRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0)`
+  }, [isDragging])
 
   const handleDragEnd = useCallback(() => {
+    if (!panelRef.current || !dragStateRef.current) return
+
     setIsDragging(false)
-    // A posição final já está em panelPosition
+
+    // Obter posição final baseada no getBoundingClientRect (após transformação)
+    const panelRect = panelRef.current.getBoundingClientRect()
+    const containerRect = mapContainerRef.current.getBoundingClientRect()
+
+    const finalX = panelRect.left - containerRect.left
+    const finalY = panelRect.top - containerRect.top
+
+    // Limpar transformação e atualizar state final
+    panelRef.current.style.transform = ''
+    setPanelPosition({ x: finalX, y: finalY })
+
+    // Limpar ref
+    dragStateRef.current = null
   }, [])
 
   // Adicionar event listeners globais durante o arraste
@@ -1223,15 +1251,15 @@ export default function MapPage() {
             {selectedSite && (
               <div
                 ref={panelRef}
-                className="absolute left-4 right-4 md:left-auto md:right-4 md:w-96 z-[10000]"
-                style={panelPosition ? {
-                  left: `${panelPosition.x}px`,
-                  top: `${panelPosition.y}px`,
+                className="absolute z-[10000]"
+                style={{
+                  left: panelPosition ? `${panelPosition.x}px` : '1rem',
+                  top: panelPosition ? `${panelPosition.y}px` : 'auto',
+                  bottom: panelPosition ? 'auto' : '80px',
                   width: '384px',
                   maxWidth: 'calc(100vw - 2rem)',
-                  height: 'auto'
-                } : {
-                  bottom: '80px' // Posição inicial: 20px (padding) + 60px (altura estimada)
+                  height: 'auto',
+                  willChange: 'transform' // Otimização para animações
                 }}
                 onMouseDown={handleDragStart}
                 onTouchStart={handleDragStart}
