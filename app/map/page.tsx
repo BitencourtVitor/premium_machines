@@ -95,11 +95,20 @@ export default function MapPage() {
         : 'mapbox://styles/mapbox/streets-v12'
     }
 
+    // Detectar se é mobile para ajustar zoom
+    const isMobile = typeof window !== 'undefined' && (
+      window.innerWidth < 768 || 
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    )
+    
+    // Zoom mais retraído em mobile (valores maiores = menos zoom)
+    const initialZoom = isMobile ? 6.5 : 7.5
+
     map.current = new mapboxgl.Map({
       container: container,
       style: styleUrl,
       center: [-71.5412, 42.1301], // Hopedale, MA - Sede da empresa
-      zoom: 7.5, // Zoom reduzido para mostrar área maior (praticamente todo o estado de MA)
+      zoom: initialZoom, // Zoom ajustado: mobile mais retraído, desktop normal
       // Configurações específicas para mobile
       touchZoomRotate: true,
       touchPitch: true,
