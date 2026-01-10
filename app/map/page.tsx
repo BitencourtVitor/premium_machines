@@ -8,6 +8,7 @@ import BottomNavigation from '../components/BottomNavigation'
 import Sidebar from '../components/Sidebar'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
+import { useAllocationDataRefresh } from '@/lib/allocationEvents'
 import { MACHINE_STATUS_LABELS } from '@/lib/permissions'
 
 // Mapbox token will be set from env
@@ -1088,6 +1089,11 @@ export default function MapPage() {
     setLoading(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, sessionLoading])
+
+  // Atualizar automaticamente quando alocações mudam
+  useAllocationDataRefresh(() => {
+    loadSites()
+  })
 
   // Event listener para fechar painel do site
   useEffect(() => {

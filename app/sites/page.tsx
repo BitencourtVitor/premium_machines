@@ -9,6 +9,7 @@ import Sidebar from '../components/Sidebar'
 import CustomInput from '../components/CustomInput'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
+import { useAllocationDataRefresh } from '@/lib/allocationEvents'
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
 
@@ -130,6 +131,12 @@ export default function SitesPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showArchivedSites, loading, user])
+
+  // Atualizar automaticamente quando alocações mudam
+  useAllocationDataRefresh(() => {
+    loadSites()
+    loadMetrics()
+  })
 
   // Close search dropdown when clicking outside
   useEffect(() => {

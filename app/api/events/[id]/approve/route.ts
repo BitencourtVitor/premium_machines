@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+// Note: Server-side can't dispatch client events, but we can return data that triggers client updates
 
 export async function POST(
   request: NextRequest,
@@ -97,7 +98,11 @@ export async function POST(
       // The event was approved successfully, just the machine site update failed
     }
 
-    return NextResponse.json({ success: true, event })
+    return NextResponse.json({
+      success: true,
+      event,
+      message: `Máquina ${event.machine?.unit_number} ${event.event_type === 'allocation' ? 'alocada' : 'desalocada'} com sucesso`
+    })
   } catch (error) {
     console.error('Error:', error)
     return NextResponse.json(

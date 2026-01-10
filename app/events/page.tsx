@@ -8,10 +8,11 @@ import Sidebar from '../components/Sidebar'
 import CustomDropdown from '../components/CustomDropdown'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
-import { 
-  EVENT_TYPE_LABELS, 
+import { refreshAfterAllocation } from '@/lib/allocationEvents'
+import {
+  EVENT_TYPE_LABELS,
   EVENT_STATUS_LABELS,
-  DOWNTIME_REASON_LABELS 
+  DOWNTIME_REASON_LABELS
 } from '@/lib/permissions'
 
 interface AllocationEvent {
@@ -173,6 +174,9 @@ export default function EventsPage() {
       const data = await response.json()
       if (data.success) {
         loadEvents()
+        // Disparar atualização global para todas as interfaces
+        refreshAfterAllocation()
+        alert(data.message || 'Evento aprovado com sucesso!')
       } else {
         alert(data.message || 'Error approving event')
       }

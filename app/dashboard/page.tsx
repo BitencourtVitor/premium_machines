@@ -7,10 +7,11 @@ import BottomNavigation from '../components/BottomNavigation'
 import Sidebar from '../components/Sidebar'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
-import { 
-  MACHINE_STATUS_LABELS, 
+import { useAllocationDataRefresh } from '@/lib/allocationEvents'
+import {
+  MACHINE_STATUS_LABELS,
   EVENT_STATUS_LABELS,
-  OWNERSHIP_TYPE_LABELS 
+  OWNERSHIP_TYPE_LABELS
 } from '@/lib/permissions'
 
 export default function DashboardPage() {
@@ -50,6 +51,11 @@ export default function DashboardPage() {
       setLoadingStats(false)
     }
   }, [])
+
+  // Atualizar automaticamente quando alocações mudam
+  useAllocationDataRefresh(() => {
+    loadStats()
+  })
 
   useEffect(() => {
     if (sessionLoading) return
