@@ -1090,7 +1090,6 @@ export default function MapPage() {
 
     // Salvar posição inicial do painel relativa ao container
     const rect = panelRef.current.getBoundingClientRect()
-    const containerRect = mapContainerRef.current.getBoundingClientRect()
     setPanelStart({
       x: rect.left - containerRect.left, // Posição relativa ao container
       y: rect.top - containerRect.top
@@ -1123,7 +1122,6 @@ export default function MapPage() {
     const newY = panelStart.y + deltaY
 
     // Controlar limites do container do mapa (sempre position: absolute)
-    const containerRect = mapContainerRef.current.getBoundingClientRect()
     const panel = panelRef.current
 
     // Limites baseados no container, não na viewport
