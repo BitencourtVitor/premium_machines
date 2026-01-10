@@ -112,11 +112,14 @@ export default function UsuariosPage() {
     }
 
     loadUsers()
-    if (activeTab === 'suppliers') {
+    setLoading(false)
+  }, [user, sessionLoading, router])
+
+  useEffect(() => {
+    if (activeTab === 'suppliers' && !loading) {
       loadSuppliers()
     }
-    setLoading(false)
-  }, [user, sessionLoading, router, activeTab])
+  }, [activeTab, loading])
 
   // Close search dropdown when clicking outside
   useEffect(() => {
