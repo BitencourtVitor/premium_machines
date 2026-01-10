@@ -18,6 +18,7 @@ interface Site {
   title: string
   latitude: number
   longitude: number
+  address?: string
   city?: string
   machines_count: number
   machines: any[]
@@ -36,6 +37,9 @@ export default function MapPage() {
   const headquartersMarkerRef = useRef<mapboxgl.Marker | null>(null)
   const userSelectedStyle = useRef<'map' | 'satellite' | null>(null)
   const resizeHandlersRef = useRef<(() => void)[]>([])
+  const lastAnimatedSpiderfyRef = useRef<string | null>(null) // Rastrear qual grupo já foi animado
+  const originalGroupsRef = useRef<Map<string, { center: { lng: number; lat: number }; sites: Site[]; id: string }>>(new Map()) // Armazenar grupos originais
+  const previousSitesIdsRef = useRef<string>('') // Rastrear IDs dos sites para detectar mudanças
   const [spiderfiedGroup, setSpiderfiedGroup] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [mapLoaded, setMapLoaded] = useState(false)
@@ -132,11 +136,21 @@ export default function MapPage() {
       }
     })
 
+    // Atualizar marcadores quando o zoom mudar (para recalcular clusters)
+    map.current.on('zoomend', () => {
+      // Se não há grupo expandido, recalcular clusters
+      // Se há grupo expandido, manter expandido mas recalcular se necessário
+      if (map.current && map.current.isStyleLoaded()) {
+        updateMarkers()
+      }
+    })
+
     // Fechar spiderfy ao clicar no mapa (fora dos marcadores)
     map.current.on('click', (e) => {
       // Verifica se clicou em um marcador
       const target = e.originalEvent.target as HTMLElement
       if (!target.closest('.marker-container')) {
+        lastAnimatedSpiderfyRef.current = null // Resetar para permitir animação na próxima vez
         setSpiderfiedGroup(null)
       }
     })
@@ -212,9 +226,22 @@ export default function MapPage() {
     return R * c
   }, [])
 
+  // Função para calcular threshold baseado no zoom
+  // Quanto maior o zoom, menor o threshold (mais preciso)
+  const getClusterThreshold = useCallback((zoom: number) => {
+    // Zoom baixo (visão ampla): threshold maior (até 5km)
+    // Zoom alto (visão próxima): threshold menor (até 500m)
+    if (zoom < 7) return 5000 // 5km para zoom muito baixo
+    if (zoom < 8) return 3000 // 3km para zoom baixo
+    if (zoom < 9) return 2000 // 2km para zoom médio-baixo
+    if (zoom < 10) return 1000 // 1km para zoom médio
+    if (zoom < 11) return 500 // 500m para zoom médio-alto
+    return 250 // 250m para zoom alto (sites muito próximos ainda agrupam)
+  }, [])
+
   // Função para agrupar sites próximos (usa distância geográfica para consistência)
-  // 50 metros é suficiente para agrupar endereços na mesma rua/prédio
-  const groupNearbySites = useCallback((sites: Site[], thresholdMeters: number = 50) => {
+  // Threshold dinâmico baseado no zoom do mapa
+  const groupNearbySites = useCallback((sites: Site[], thresholdMeters: number) => {
     const groups: { center: { lng: number; lat: number }; sites: Site[]; id: string }[] = []
     const processed = new Set<string>()
 
@@ -233,7 +260,7 @@ export default function MapPage() {
           Number(otherSite.longitude), Number(otherSite.latitude)
         )
 
-        // 100 metros = sites muito próximos que devem ser agrupados
+        // Sites dentro do threshold serão agrupados
         if (distance < thresholdMeters) {
           group.push(otherSite)
           processed.add(otherSite.id)
@@ -270,12 +297,13 @@ export default function MapPage() {
     spiderMoveHandlersRef.current = []
   }, [])
 
-  // Criar marcador com ícone map-pin do Phosphor Icons para obras individuais
+  // Criar marcador com ícone map-pin do Phosphor Icons para jobsites individuais
   const createLocationMarker = useCallback((site: Site, currentIsDark: boolean, onClick: (e?: Event) => void, isSelected: boolean = false) => {
-    // Cor diferente quando selecionado (verde/amarelo para destacar)
+    // Cor baseada na condição das máquinas (não muda quando selecionado)
     const baseColorType = site.machines_count > 0 ? 'blue' : 'neutral'
-    const colorType = isSelected ? 'green' : baseColorType
-    const colors = getThemeColors(colorType, currentIsDark)
+    const colors = getThemeColors(baseColorType, currentIsDark)
+    // Borda: 1px normal, 2px selecionado (em escala de viewBox 256 → 32px, multiplicar por 8)
+    const strokeWidth = isSelected ? 16 : 8
     const el = document.createElement('div')
     el.className = 'marker-container'
     el.style.cursor = 'pointer'
@@ -283,9 +311,34 @@ export default function MapPage() {
     el.style.height = '40px'
     el.style.zIndex = isSelected ? '1002' : '1000'
     el.innerHTML = `
-      <div class="relative w-full h-full flex items-center justify-center">
-        <svg class="w-8 h-10" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
-          <path d="M128,16a88.1,88.1,0,0,0-88,88c0,75.3,80,132.17,83.41,134.55a8,8,0,0,0,9.18,0C136,236.17,216,179.3,216,104A88.1,88.1,0,0,0,128,16Zm0,56a32,32,0,1,1-32,32A32,32,0,0,1,128,72Z" fill="${colors.bg}" stroke="white" stroke-width="4"/>
+      <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+        <svg width="32" height="40" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); overflow: visible;">
+          <path d="M128,16a88.1,88.1,0,0,0-88,88c0,75.3,80,132.17,83.41,134.55a8,8,0,0,0,9.18,0C136,236.17,216,179.3,216,104A88.1,88.1,0,0,0,128,16Zm0,56a32,32,0,1,1-32,32A32,32,0,0,1,128,72Z" fill="${colors.bg}" stroke="white" stroke-width="${strokeWidth}"/>
+        </svg>
+      </div>
+    `
+
+    el.addEventListener('click', onClick as EventListener)
+    return el
+  }, [])
+
+  // Criar marcador com ícone circle do Phosphor Icons para jobsites no spiderfy
+  const createSpiderfyMarker = useCallback((site: Site, currentIsDark: boolean, onClick: (e?: Event) => void, isSelected: boolean = false) => {
+    // Cor baseada na condição das máquinas (não muda quando selecionado)
+    const baseColorType = site.machines_count > 0 ? 'blue' : 'neutral'
+    const colors = getThemeColors(baseColorType, currentIsDark)
+    // Borda: 1px normal, 2px selecionado (em escala de viewBox 256 → 24px, multiplicar por ~10.7)
+    const strokeWidth = isSelected ? 21 : 11
+    const el = document.createElement('div')
+    el.className = 'marker-container'
+    el.style.cursor = 'pointer'
+    el.style.width = '24px'
+    el.style.height = '24px'
+    el.style.zIndex = isSelected ? '1002' : '1000'
+    el.innerHTML = `
+      <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+        <svg width="24" height="24" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); overflow: visible;">
+          <circle cx="128" cy="128" r="112" fill="${colors.bg}" stroke="white" stroke-width="${strokeWidth}"/>
         </svg>
       </div>
     `
@@ -328,7 +381,7 @@ export default function MapPage() {
       (!localStorage.theme && window.matchMedia('(prefers-color-scheme: dark)').matches)
     )
 
-    // Separar sede das obras (apenas sites com coordenadas válidas)
+    // Separar sede dos jobsites (apenas sites com coordenadas válidas)
     const validSites = sites.filter(site => {
       const lat = Number(site.latitude)
       const lng = Number(site.longitude)
@@ -336,6 +389,14 @@ export default function MapPage() {
     })
     const headquarters = validSites.find(site => site.is_headquarters)
     const regularSites = validSites.filter(site => !site.is_headquarters)
+
+    // Detectar se os sites mudaram (não apenas zoom)
+    const currentSitesIds = regularSites.map(s => s.id).sort().join(',')
+    if (previousSitesIdsRef.current !== currentSitesIds) {
+      // Sites mudaram, limpar grupos originais para recalcular
+      originalGroupsRef.current.clear()
+      previousSitesIdsRef.current = currentSitesIds
+    }
 
     // Remover todos os marcadores anteriores
     markersRef.current.forEach(marker => marker.remove())
@@ -350,17 +411,21 @@ export default function MapPage() {
     // Adicionar marcador especial para sede da empresa
     if (headquarters) {
       const colors = getThemeColors('neutral', currentIsDark)
+      const isSelected = selectedSite?.id === headquarters.id
       const el = document.createElement('div')
       el.className = 'marker-container'
       el.style.cursor = 'pointer'
+      el.style.zIndex = isSelected ? '1002' : '1000'
+      // Sede com borda de 1px normal, 2px selecionado
+      const borderWidth = isSelected ? '2px' : '1px'
       el.innerHTML = `
         <div class="relative">
-          <div class="rounded-lg flex items-center justify-center shadow-md border-2 border-white" style="width: 30px; height: 30px; background-color: ${colors.bg};">
+          <div class="rounded-lg flex items-center justify-center shadow-md" style="width: 30px; height: 30px; background-color: ${colors.bg}; border: ${borderWidth} solid white;">
             <svg style="width: 15px; height: 15px; color: ${colors.text};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           </div>
-          <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 rotate-45 border-r border-b border-white" style="width: 7.5px; height: 7.5px; background-color: ${colors.bg};"></div>
+          <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 rotate-45" style="width: 7.5px; height: 7.5px; background-color: ${colors.bg}; border-right: ${borderWidth} solid white; border-bottom: ${borderWidth} solid white;"></div>
         </div>
       `
 
@@ -373,8 +438,25 @@ export default function MapPage() {
         .addTo(mapInstance)
     }
 
-    // Agrupar sites próximos
-    const groups = groupNearbySites(regularSites)
+    // Obter zoom atual e calcular threshold dinâmico
+    const currentZoom = mapInstance.getZoom()
+    const thresholdMeters = getClusterThreshold(currentZoom)
+
+    // Agrupar sites próximos com threshold baseado no zoom
+    const groups = groupNearbySites(regularSites, thresholdMeters)
+
+    // Se há um grupo expandido, verificar se ele ainda existe nos grupos recalculados
+    // Se não existir mais (sites não estão mais próximos o suficiente), desagrupar
+    if (spiderfiedGroup) {
+      const expandedGroup = groups.find(g => g.id === spiderfiedGroup)
+      if (!expandedGroup || expandedGroup.sites.length === 1) {
+        // Grupo não existe mais ou tem apenas 1 site, desagrupar
+        setSpiderfiedGroup(null)
+      } else {
+        // Atualizar grupo original armazenado com o grupo recalculado
+        originalGroupsRef.current.set(expandedGroup.id, { ...expandedGroup, sites: [...expandedGroup.sites] })
+      }
+    }
 
     groups.forEach(group => {
       if (group.sites.length === 1) {
@@ -382,6 +464,7 @@ export default function MapPage() {
         const site = group.sites[0]
         const isSelected = selectedSite?.id === site.id
         const el = createLocationMarker(site, currentIsDark, () => {
+          lastAnimatedSpiderfyRef.current = null // Resetar para permitir animação na próxima vez
           setSpiderfiedGroup(null)
           setSelectedSite(site)
         }, isSelected)
@@ -393,25 +476,31 @@ export default function MapPage() {
         markersRef.current.push(marker)
       } else if (spiderfiedGroup === group.id) {
         // ============================================================
-        // SPIDERFY EXPANDIDO - FLUXO SÍNCRONO EM 3 ETAPAS
+        // SPIDERFY EXPANDIDO
         // ============================================================
-        // Etapa 1: Mostrar botão X no centro
-        // Etapa 2: Animar linhas de dentro para fora
-        // Etapa 3: Mostrar marcadores nas pontas das linhas
-        // ============================================================
+        // Usar o grupo recalculado (que já foi atualizado no originalGroupsRef se necessário)
+        const groupToUse = group
+        const groupCenter = groupToUse.center
+        
+        // Verificar se devemos animar ou apenas reposicionar marcadores
+        const shouldAnimate = lastAnimatedSpiderfyRef.current !== group.id
         
         const spiderRadius = 60 // pixels de deslocamento do centro
-        const lineDuration = 200 // ms para animar cada linha
-        const lineDelay = 30 // ms entre cada linha
-        const markerDelay = 50 // ms após linha para mostrar marcador
+        const lineDuration = shouldAnimate ? 200 : 0 // ms para animar cada linha
+        const lineDelay = shouldAnimate ? 30 : 0 // ms entre cada linha
+        const markerDelay = shouldAnimate ? 50 : 0 // ms após linha para mostrar marcador
+
+        // Marcar este grupo como já animado
+        lastAnimatedSpiderfyRef.current = group.id
 
         // Pré-calcular todos os dados necessários ANTES de qualquer renderização
-        const spiderData = group.sites.map((site, index) => {
+        // Usar o centro do grupo atual (pode ter mudado com zoom) mas os sites originais
+        const spiderData = groupToUse.sites.map((site, index) => {
           const siteLng = Number(site.longitude)
           const siteLat = Number(site.latitude)
           
           // Calcular ângulo
-          const centerPoint = mapInstance.project([group.center.lng, group.center.lat])
+          const centerPoint = mapInstance.project([groupCenter.lng, groupCenter.lat])
           const sitePoint = mapInstance.project([siteLng, siteLat])
           const dx = sitePoint.x - centerPoint.x
           const dy = sitePoint.y - centerPoint.y
@@ -434,7 +523,7 @@ export default function MapPage() {
             angle,
             finalPosition,
             getSpiderPosition: () => {
-              const cp = mapInstance.project([group.center.lng, group.center.lat])
+              const cp = mapInstance.project([groupCenter.lng, groupCenter.lat])
               const sx = cp.x + Math.cos(angle) * spiderRadius
               const sy = cp.y + Math.sin(angle) * spiderRadius
               return mapInstance.unproject([sx, sy])
@@ -453,7 +542,7 @@ export default function MapPage() {
         closeEl.style.zIndex = '9999'
         const bgColor = currentIsDark ? '#4B5563' : '#6B7280'
         closeEl.innerHTML = `
-          <div style="width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background-color: ${bgColor}; border: 2px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+          <div style="width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background-color: ${bgColor}; border: 1px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -463,24 +552,25 @@ export default function MapPage() {
 
         closeEl.addEventListener('click', (e) => {
           e.stopPropagation()
+          lastAnimatedSpiderfyRef.current = null // Resetar para permitir animação na próxima vez
           setSpiderfiedGroup(null)
           setSelectedSite(null)
         })
 
         const closeMarker = new mapboxgl.Marker(closeEl)
-          .setLngLat([group.center.lng, group.center.lat])
+          .setLngLat([groupCenter.lng, groupCenter.lat])
           .addTo(mapInstance)
 
         markersRef.current.push(closeMarker)
 
         // ============================================================
-        // ETAPA 2 e 3: Para cada site, animar linha e depois mostrar marcador
+        // ETAPA 2 e 3: Para cada site, criar linhas e marcadores
         // ============================================================
         spiderData.forEach((data, index) => {
           const { site, angle, finalPosition, getSpiderPosition } = data
           const totalDelay = index * lineDelay
 
-          // Criar linha (ainda não visível, ainda não adicionada)
+          // Criar linha
           const lineEl = document.createElement('div')
           lineEl.style.position = 'absolute'
           lineEl.style.pointerEvents = 'none'
@@ -488,15 +578,14 @@ export default function MapPage() {
           lineEl.style.height = '2px'
           lineEl.style.backgroundColor = currentIsDark ? '#60A5FA' : '#2563EB'
           lineEl.style.transformOrigin = '0 50%'
-          lineEl.style.width = '0px'
 
           // Posicionar linha no centro com rotação correta
-          const centerPoint = mapInstance.project([group.center.lng, group.center.lat])
+          const centerPoint = mapInstance.project([groupCenter.lng, groupCenter.lat])
           lineEl.style.left = `${centerPoint.x}px`
           lineEl.style.top = `${centerPoint.y}px`
           lineEl.style.transform = `rotate(${angle * (180 / Math.PI)}deg)`
 
-          // Variável para armazenar o marcador (será criado depois)
+          // Variável para armazenar o marcador
           let marker: mapboxgl.Marker | null = null
           let markerEl: HTMLElement | null = null
 
@@ -507,7 +596,7 @@ export default function MapPage() {
             const targetPos = getSpiderPosition()
             marker.setLngLat([targetPos.lng, targetPos.lat])
 
-            const cp = mapInstance.project([group.center.lng, group.center.lat])
+            const cp = mapInstance.project([groupCenter.lng, groupCenter.lat])
             const mp = mapInstance.project([targetPos.lng, targetPos.lat])
             const dx = mp.x - cp.x
             const dy = mp.y - cp.y
@@ -520,87 +609,98 @@ export default function MapPage() {
             lineEl.style.transform = `rotate(${rotation}deg)`
           }
 
-          // ============================================================
-          // ETAPA 2: Animar linha de dentro para fora
-          // ============================================================
-          setTimeout(() => {
-            // Adicionar linha ao DOM
+          // Função para criar marcador na posição final
+          const createMarkerAtFinalPosition = () => {
+            const markerPos = getSpiderPosition()
+            const isSelected = selectedSite?.id === site.id
+            markerEl = createSpiderfyMarker(site, currentIsDark, (e) => {
+              if (e) e.stopPropagation()
+              setSelectedSite(site)
+            }, isSelected)
+
+            marker = new mapboxgl.Marker(markerEl)
+              .setLngLat([markerPos.lng, markerPos.lat])
+              .addTo(mapInstance)
+
+            markersRef.current.push(marker)
+
+            // Adicionar handlers para zoom/pan
+            mapInstance.on('move', updatePositions)
+            mapInstance.on('zoom', updatePositions)
+            spiderMoveHandlersRef.current.push(updatePositions)
+          }
+
+          if (shouldAnimate) {
+            // COM ANIMAÇÃO
+            lineEl.style.width = '0px'
+            
+            setTimeout(() => {
+              mapInstance.getCanvasContainer().appendChild(lineEl)
+              spiderLinesRef.current.push(lineEl)
+
+              const startTime = Date.now()
+
+              const animateLine = () => {
+                const elapsed = Date.now() - startTime
+                const progress = Math.min(elapsed / lineDuration, 1)
+                const eased = 1 - Math.pow(1 - progress, 3) // cubic-out
+
+                const targetPos = getSpiderPosition()
+                const cp = mapInstance.project([groupCenter.lng, groupCenter.lat])
+                const tp = mapInstance.project([targetPos.lng, targetPos.lat])
+                const dx = tp.x - cp.x
+                const dy = tp.y - cp.y
+                const fullLength = Math.sqrt(dx * dx + dy * dy)
+                const currentLength = fullLength * eased
+                const rotation = Math.atan2(dy, dx) * (180 / Math.PI)
+
+                lineEl.style.left = `${cp.x}px`
+                lineEl.style.top = `${cp.y}px`
+                lineEl.style.width = `${currentLength}px`
+                lineEl.style.transform = `rotate(${rotation}deg)`
+
+                if (progress < 1) {
+                  requestAnimationFrame(animateLine)
+                } else {
+                  setTimeout(() => {
+                    createMarkerAtFinalPosition()
+                    
+                    // Animar entrada do marcador
+                    const innerEl = markerEl?.querySelector('div') as HTMLElement
+                    if (innerEl) {
+                      innerEl.style.opacity = '0'
+                      innerEl.style.transform = 'scale(0.5)'
+                      innerEl.style.transition = 'opacity 150ms ease-out, transform 150ms ease-out'
+                      void innerEl.offsetWidth
+                      innerEl.style.opacity = '1'
+                      innerEl.style.transform = 'scale(1)'
+                    }
+                  }, markerDelay)
+                }
+              }
+
+              requestAnimationFrame(animateLine)
+            }, totalDelay)
+          } else {
+            // SEM ANIMAÇÃO - posicionar diretamente
+            const targetPos = getSpiderPosition()
+            const cp = mapInstance.project([groupCenter.lng, groupCenter.lat])
+            const tp = mapInstance.project([targetPos.lng, targetPos.lat])
+            const dx = tp.x - cp.x
+            const dy = tp.y - cp.y
+            const fullLength = Math.sqrt(dx * dx + dy * dy)
+            const rotation = Math.atan2(dy, dx) * (180 / Math.PI)
+
+            lineEl.style.width = `${fullLength}px`
+            lineEl.style.left = `${cp.x}px`
+            lineEl.style.top = `${cp.y}px`
+            lineEl.style.transform = `rotate(${rotation}deg)`
+
             mapInstance.getCanvasContainer().appendChild(lineEl)
             spiderLinesRef.current.push(lineEl)
 
-            const startTime = Date.now()
-
-            const animateLine = () => {
-              const elapsed = Date.now() - startTime
-              const progress = Math.min(elapsed / lineDuration, 1)
-              const eased = 1 - Math.pow(1 - progress, 3) // cubic-out
-
-              // Calcular comprimento atual da linha
-              const targetPos = getSpiderPosition()
-              const cp = mapInstance.project([group.center.lng, group.center.lat])
-              const tp = mapInstance.project([targetPos.lng, targetPos.lat])
-              const dx = tp.x - cp.x
-              const dy = tp.y - cp.y
-              const fullLength = Math.sqrt(dx * dx + dy * dy)
-              const currentLength = fullLength * eased
-              const rotation = Math.atan2(dy, dx) * (180 / Math.PI)
-
-              lineEl.style.left = `${cp.x}px`
-              lineEl.style.top = `${cp.y}px`
-              lineEl.style.width = `${currentLength}px`
-              lineEl.style.transform = `rotate(${rotation}deg)`
-
-              if (progress < 1) {
-                requestAnimationFrame(animateLine)
-              } else {
-                // ============================================================
-                // ETAPA 3: Linha terminou, agora criar e mostrar o marcador
-                // ============================================================
-                setTimeout(() => {
-                  // Calcular posição EXATA onde o marcador deve aparecer
-                  const markerPos = getSpiderPosition()
-
-                  // Criar elemento do marcador
-                  const isSelected = selectedSite?.id === site.id
-                  markerEl = createLocationMarker(site, currentIsDark, (e) => {
-                    if (e) e.stopPropagation()
-                    setSelectedSite(site)
-                  }, isSelected)
-                  
-                  // IMPORTANTE: Não aplicar transform no elemento root!
-                  // O Mapbox usa transform para posicionar o marcador.
-                  // Aplicar animações apenas no elemento INTERNO.
-                  const innerEl = markerEl.querySelector('div') as HTMLElement
-                  if (innerEl) {
-                    innerEl.style.opacity = '0'
-                    innerEl.style.transform = 'scale(0.5)'
-                    innerEl.style.transition = 'opacity 150ms ease-out, transform 150ms ease-out'
-                  }
-
-                  // Criar marcador na posição CORRETA (não no centro)
-                  marker = new mapboxgl.Marker(markerEl)
-                    .setLngLat([markerPos.lng, markerPos.lat])
-                    .addTo(mapInstance)
-
-                  markersRef.current.push(marker)
-
-                  // Forçar reflow e animar o elemento interno
-                  if (innerEl) {
-                    void innerEl.offsetWidth
-                    innerEl.style.opacity = '1'
-                    innerEl.style.transform = 'scale(1)'
-                  }
-
-                  // Adicionar handlers para zoom/pan
-                  mapInstance.on('move', updatePositions)
-                  mapInstance.on('zoom', updatePositions)
-                  spiderMoveHandlersRef.current.push(updatePositions)
-                }, markerDelay)
-              }
-            }
-
-            requestAnimationFrame(animateLine)
-          }, totalDelay)
+            createMarkerAtFinalPosition()
+          }
         })
       } else {
         // Grupo não expandido - mostrar marcador de cluster
@@ -611,12 +711,13 @@ export default function MapPage() {
         const el = document.createElement('div')
         el.className = 'marker-container'
         el.style.cursor = 'pointer'
-        el.style.width = '44px'
-        el.style.height = '44px'
+        el.style.width = '36px'
+        el.style.height = '36px'
+        // Borda branca de 1px igual aos outros marcadores
         el.innerHTML = `
           <div class="relative w-full h-full flex items-center justify-center">
-            <div class="w-11 h-11 rounded-full flex items-center justify-center shadow-lg border-3 border-white" style="background-color: ${colors.bg}; border-width: 3px;">
-              <span class="text-white text-base font-bold">${group.sites.length}</span>
+            <div class="w-9 h-9 rounded-full flex items-center justify-center shadow-lg" style="background-color: ${colors.bg}; border: 1px solid white;">
+              <span class="text-white text-sm font-normal">${group.sites.length}</span>
             </div>
           </div>
         `
@@ -634,7 +735,7 @@ export default function MapPage() {
       }
     })
 
-  }, [sites, spiderfiedGroup, selectedSite, groupNearbySites, clearSpiderLines, createLocationMarker])
+  }, [sites, spiderfiedGroup, selectedSite, groupNearbySites, clearSpiderLines, createLocationMarker, createSpiderfyMarker, getClusterThreshold, getGeoDistance])
 
   // Detectar tema escuro e ajustar mapa automaticamente (apenas quando estilo for 'map')
   useEffect(() => {
@@ -742,7 +843,7 @@ export default function MapPage() {
     }
   }, [initializeMap])
 
-  // Atualizar marcadores quando o mapa carrega, sites mudam ou spiderfy muda
+  // Atualizar marcadores quando o mapa carrega, sites mudam, spiderfy muda ou site selecionado muda
   useEffect(() => {
     if (!map.current || !mapLoaded) return
     
@@ -754,7 +855,7 @@ export default function MapPage() {
         updateMarkers()
       })
     }
-  }, [sites, mapLoaded, spiderfiedGroup, updateMarkers])
+  }, [sites, mapLoaded, spiderfiedGroup, selectedSite, updateMarkers])
 
   const toggleMapStyle = () => {
     // Alternar entre 'map' e 'satellite'
@@ -840,7 +941,7 @@ export default function MapPage() {
             {/* Sites count - excluindo sede da empresa */}
             <div className="absolute top-4 right-20 bg-white dark:bg-gray-800 rounded-lg shadow px-4 py-2 z-10">
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                <span className="font-semibold text-gray-900 dark:text-white">{sites.filter(s => !s.is_headquarters).length}</span> obras
+                <span className="font-semibold text-gray-900 dark:text-white">{sites.filter(s => !s.is_headquarters).length}</span> jobsites
               </p>
             </div>
 
@@ -878,7 +979,7 @@ export default function MapPage() {
                 </div>
 
                 <p className="text-sm mb-3 text-gray-500 dark:text-gray-400">
-                  {selectedSite.city || 'Localização não disponível'}
+                  {selectedSite.address || selectedSite.city || 'Localização não disponível'}
                 </p>
 
                 {!selectedSite.is_headquarters && (
