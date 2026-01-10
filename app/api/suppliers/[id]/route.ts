@@ -1,0 +1,141 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseServer } from '@/lib/supabase-server'
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { data: supplier, error } = await supabaseServer
+      .from('suppliers')
+      .select('*')
+      .eq('id', params.id)
+      .single()
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
+
+    if (!supplier) {
+      return NextResponse.json({ success: false, error: 'Fornecedor não encontrado' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, supplier })
+  } catch (error) {
+    console.error('Error in get supplier API:', error)
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const body = await request.json()
+    const { 
+      nome, 
+      cnpj, 
+      email, 
+      telefone, 
+      endereco, 
+      contato_nome,
+      ativo,
+      currentUserId,
+    } = body
+
+    // Get current data for logging
+    const { data: currentData } = await supabaseServer
+      .from('suppliers')
+      .select('*')
+      .eq('id', params.id)
+      .single()
+
+    const updateData = {
+      nome,
+      cnpj: cnpj || null,
+      email: email || null,
+      telefone: telefone || null,
+      endereco: endereco || null,
+      contato_nome: contato_nome || null,
+      ativo: ativo !== undefined ? ativo : true,
+      updated_at: new Date().toISOString(),
+    }
+
+    const { data: supplier, error } = await supabaseServer
+      .from('suppliers')
+      .update(updateData)
+      .eq('id', params.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error updating supplier:', error)
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
+
+    // Log the action
+    if (currentUserId) {
+      await supabaseServer
+        .from('audit_logs')
+        .insert({
+          entidade: 'suppliers',
+          entidade_id: params.id,
+          acao: 'update',
+          dados_antes: currentData,
+          dados_depois: updateData,
+          usuario_id: currentUserId,
+        })
+    }
+
+    return NextResponse.json({ success: true, supplier })
+  } catch (error) {
+    console.error('Error in update supplier API:', error)
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const body = await request.json()
+    const { currentUserId } = body
+
+    // Get supplier data for logging
+    const { data: supplierData } = await supabaseServer
+      .from('suppliers')
+      .select('*')
+      .eq('id', params.id)
+      .single()
+
+    const { error } = await supabaseServer
+      .from('suppliers')
+      .delete()
+      .eq('id', params.id)
+
+    if (error) {
+      console.error('Error deleting supplier:', error)
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
+
+    // Log the action
+    if (currentUserId) {
+      await supabaseServer
+        .from('audit_logs')
+        .insert({
+          entidade: 'suppliers',
+          entidade_id: params.id,
+          acao: 'delete',
+          dados_antes: supplierData,
+          usuario_id: currentUserId,
+        })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error in delete supplier API:', error)
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
+  }
+}

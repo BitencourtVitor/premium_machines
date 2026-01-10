@@ -1,0 +1,118 @@
+// Permission configuration for roles
+
+export interface RolePermissions {
+  can_view_dashboard: boolean
+  can_view_map: boolean
+  can_manage_sites: boolean
+  can_manage_machines: boolean
+  can_register_events: boolean
+  can_approve_events: boolean
+  can_view_financial: boolean
+  can_manage_suppliers: boolean
+  can_manage_users: boolean
+  can_view_logs: boolean
+}
+
+export const DEFAULT_PERMISSIONS: Record<string, RolePermissions> = {
+  admin: {
+    can_view_dashboard: true,
+    can_view_map: true,
+    can_manage_sites: true,
+    can_manage_machines: true,
+    can_register_events: true,
+    can_approve_events: true,
+    can_view_financial: true,
+    can_manage_suppliers: true,
+    can_manage_users: true,
+    can_view_logs: true,
+  },
+  dev: {
+    can_view_dashboard: true,
+    can_view_map: true,
+    can_manage_sites: true,
+    can_manage_machines: true,
+    can_register_events: true,
+    can_approve_events: true,
+    can_view_financial: true,
+    can_manage_suppliers: true,
+    can_manage_users: true,
+    can_view_logs: true,
+  },
+  operador: {
+    can_view_dashboard: true,
+    can_view_map: true,
+    can_manage_sites: false,
+    can_manage_machines: true,
+    can_register_events: true,
+    can_approve_events: false,
+    can_view_financial: false,
+    can_manage_suppliers: false,
+    can_manage_users: false,
+    can_view_logs: false,
+  },
+  fornecedor: {
+    can_view_dashboard: true,
+    can_view_map: true,
+    can_manage_sites: false,
+    can_manage_machines: false, // Can only view their own machines
+    can_register_events: false,
+    can_approve_events: false,
+    can_view_financial: false, // Limited to their own data
+    can_manage_suppliers: false,
+    can_manage_users: false,
+    can_view_logs: false,
+  },
+}
+
+export function getDefaultPermissions(role: string): RolePermissions {
+  return DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.operador
+}
+
+// Event types labels
+export const EVENT_TYPE_LABELS: Record<string, string> = {
+  start_allocation: 'Início de Alocação',
+  end_allocation: 'Fim de Alocação',
+  downtime_start: 'Início de Parada',
+  downtime_end: 'Fim de Parada',
+  correction: 'Correção',
+  extension_attach: 'Extensão Conectada',
+  extension_detach: 'Extensão Desconectada',
+}
+
+// Downtime reason labels
+export const DOWNTIME_REASON_LABELS: Record<string, string> = {
+  defect: 'Defeito',
+  lack_of_supplies: 'Falta de Insumos',
+  weather: 'Condições Climáticas',
+  lack_of_operator: 'Falta de Operador',
+  holiday: 'Feriado',
+  other: 'Outro',
+}
+
+// Machine status labels
+export const MACHINE_STATUS_LABELS: Record<string, string> = {
+  available: 'Disponível',
+  allocated: 'Alocada',
+  maintenance: 'Em Manutenção',
+  inactive: 'Inativa',
+}
+
+// Event status labels
+export const EVENT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pendente',
+  approved: 'Aprovado',
+  rejected: 'Rejeitado',
+}
+
+// Billing type labels
+export const BILLING_TYPE_LABELS: Record<string, string> = {
+  daily: 'Diário',
+  weekly: 'Semanal',
+  monthly: 'Mensal',
+}
+
+// Ownership type labels
+export const OWNERSHIP_TYPE_LABELS: Record<string, string> = {
+  owned: 'Própria',
+  rented: 'Alugada',
+}

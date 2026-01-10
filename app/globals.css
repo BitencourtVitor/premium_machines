@@ -1,0 +1,276 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global transitions for smooth interactions */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 250ms;
+}
+
+/* Exclude elements that shouldn't have transitions */
+svg,
+img,
+canvas,
+video,
+iframe,
+[class*="animate-"],
+[class*="transition-none"] {
+  transition-property: none;
+}
+
+/* Page transition wrapper */
+.page-transition {
+  animation: fadeIn 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Smooth navigation transitions */
+a,
+button,
+[role="button"],
+[onclick] {
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Input and form element transitions */
+input,
+textarea,
+select {
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Modal and overlay transitions */
+[class*="modal"],
+[class*="overlay"],
+[class*="fixed"][class*="inset"] {
+  transition: opacity 250ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes spin-reverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-spin-reverse {
+  animation: spin-reverse 1s linear infinite;
+}
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  transition: background-color 250ms cubic-bezier(0.4, 0, 0.2, 1), color 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Input styles for forms */
+input[type="text"]:not([class*="bg-"]):not([class*="dark:"]),
+input[type="email"]:not([class*="bg-"]):not([class*="dark:"]),
+input[type="password"]:not([class*="bg-"]):not([class*="dark:"]),
+input[type="number"]:not([class*="bg-"]):not([class*="dark:"]),
+input[type="tel"]:not([class*="bg-"]):not([class*="dark:"]),
+textarea:not([class*="bg-"]):not([class*="dark:"]),
+select:not([class*="bg-"]):not([class*="dark:"]) {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+/* Dark mode input text */
+html.dark input[type="text"],
+html.dark input[type="email"],
+html.dark input[type="password"],
+html.dark input[type="number"],
+html.dark input[type="tel"],
+html.dark textarea,
+html.dark select,
+.dark input[type="text"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="number"],
+.dark input[type="tel"],
+.dark textarea,
+.dark select {
+  color: #ffffff !important;
+}
+
+/* Placeholders */
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="password"]::placeholder,
+input[type="number"]::placeholder,
+input[type="tel"]::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* PIN inputs */
+input[type="password"][maxlength="1"],
+input[type="tel"][maxlength="1"] {
+  text-align: center !important;
+  letter-spacing: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  text-indent: 0 !important;
+  vertical-align: middle !important;
+}
+
+/* Date inputs */
+input[type="date"] {
+  color-scheme: light;
+}
+
+html.dark input[type="date"],
+.dark input[type="date"] {
+  color-scheme: dark;
+  color: #ffffff !important;
+}
+
+/* Safe area for mobile */
+@media (max-width: 768px) {
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .pb-safe {
+      padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+    }
+    .pb-safe-content {
+      padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    }
+  }
+
+  @supports not (padding-bottom: env(safe-area-inset-bottom)) {
+    @media screen and (-webkit-min-device-pixel-ratio: 2) {
+      .pb-safe {
+        padding-bottom: 2rem;
+      }
+      .pb-safe-content {
+        padding-bottom: 6rem;
+      }
+    }
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+html.dark ::-webkit-scrollbar-thumb,
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover,
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+html.dark *,
+.dark * {
+  scrollbar-color: #475569 transparent;
+}
+
+/* Mapbox overrides */
+.mapboxgl-popup-content {
+  padding: 12px 16px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+.mapboxgl-popup-close-button {
+  font-size: 18px !important;
+  padding: 4px 8px !important;
+}
+
+html.dark .mapboxgl-popup-content,
+.dark .mapboxgl-popup-content {
+  background: #1f2937 !important;
+  color: #ffffff !important;
+}
+
+html.dark .mapboxgl-popup-close-button,
+.dark .mapboxgl-popup-close-button {
+  color: #ffffff !important;
+}
+
+/* Machine status colors */
+.status-available {
+  @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;
+}
+
+.status-allocated {
+  @apply bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200;
+}
+
+.status-maintenance {
+  @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200;
+}
+
+.status-inactive {
+  @apply bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300;
+}
+
+/* Event status colors */
+.event-pending {
+  @apply bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200;
+}
+
+.event-approved {
+  @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;
+}
+
+.event-rejected {
+  @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200;
+}
