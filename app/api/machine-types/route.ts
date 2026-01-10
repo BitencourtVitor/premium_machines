@@ -20,7 +20,7 @@ export async function GET() {
 
     if (error) {
       console.error('Error fetching machine types:', error)
-      return NextResponse.json({ success: false, message: 'Erro ao buscar tipos' }, { status: 500, headers: noCacheHeaders })
+      return NextResponse.json({ success: false, message: 'Error fetching types' }, { status: 500, headers: noCacheHeaders })
     }
 
     return NextResponse.json({ success: true, machineTypes }, { headers: noCacheHeaders })
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       if (error.code === '23505') {
         return NextResponse.json({ success: false, message: 'Já existe um tipo de máquina com este nome' }, { status: 400, headers: noCacheHeaders })
       }
-      return NextResponse.json({ success: false, message: 'Erro ao criar tipo' }, { status: 500, headers: noCacheHeaders })
+      return NextResponse.json({ success: false, message: 'Error creating type' }, { status: 500, headers: noCacheHeaders })
     }
 
     return NextResponse.json({ success: true, machineType }, { headers: noCacheHeaders })

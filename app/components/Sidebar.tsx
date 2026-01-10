@@ -114,7 +114,7 @@ export default function Sidebar() {
     },
     {
       href: '/map',
-      label: 'Mapa',
+      label: 'Map',
       requiredPermission: 'can_view_map' as keyof UserPermissions,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -135,7 +135,7 @@ export default function Sidebar() {
     },
     {
       href: '/machines',
-      label: 'Máquinas',
+      label: 'Machines',
       requiredPermission: 'can_manage_machines' as keyof UserPermissions,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,7 +146,7 @@ export default function Sidebar() {
     },
     {
       href: '/events',
-      label: 'Alocações',
+      label: 'Allocations',
       requiredPermission: 'can_register_events' as keyof UserPermissions,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -156,7 +156,7 @@ export default function Sidebar() {
     },
     {
       href: '/reports',
-      label: 'Relatórios',
+      label: 'Reports',
       requiredPermission: 'can_view_financial' as keyof UserPermissions,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,7 +166,7 @@ export default function Sidebar() {
     },
     {
       href: '/usuarios',
-      label: 'Pessoas',
+      label: 'People',
       requiredPermission: 'can_manage_users' as keyof UserPermissions,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -237,7 +237,7 @@ export default function Sidebar() {
         <button
           onClick={toggleSidebar}
           className="w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-250 ease-in-out"
-          title={isExpanded ? 'Recolher menu' : 'Expandir menu'}
+          title={isExpanded ? 'Collapse menu' : 'Expand menu'}
         >
           {isExpanded ? (
             <svg 

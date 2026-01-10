@@ -16,13 +16,13 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching machines:', error)
-      return NextResponse.json({ success: false, message: 'Erro ao buscar máquinas' }, { status: 500 })
+      return NextResponse.json({ success: false, message: 'Error fetching machines' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, machines })
   } catch (error) {
     console.error('Error:', error)
-    return NextResponse.json({ success: false, message: 'Erro interno' }, { status: 500 })
+    return NextResponse.json({ success: false, message: 'Internal error' }, { status: 500 })
   }
 }
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     if (existing) {
       return NextResponse.json({ 
         success: false, 
-        message: 'Já existe uma máquina com este número de unidade' 
+        message: 'A machine with this unit number already exists' 
       }, { status: 400 })
     }
 
@@ -63,12 +63,107 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating machine:', error)
-      return NextResponse.json({ success: false, message: 'Erro ao criar máquina' }, { status: 500 })
+      return NextResponse.json({ success: false, message: 'Error creating machine' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, machine })
   } catch (error) {
     console.error('Error:', error)
-    return NextResponse.json({ success: false, message: 'Erro interno' }, { status: 500 })
+    return NextResponse.json({ success: false, message: 'Internal error' }, { status: 500 })
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Machine ID is required' }, { status: 400 })
+    }
+
+    const body = await request.json()
+
+    // Check if unit_number already exists (excluding current machine)
+    const { data: existing } = await supabaseServer
+      .from('machines')
+      .select('id')
+      .eq('unit_number', body.unit_number)
+      .neq('id', id)
+      .single()
+
+    if (existing) {
+      return NextResponse.json({
+        success: false,
+        message: 'A machine with this unit number already exists'
+      }, { status: 400 })
+    }
+
+    const { data: machine, error } = await supabaseServer
+      .from('machines')
+      .update({
+        unit_number: body.unit_number,
+        machine_type_id: body.machine_type_id,
+        ownership_type: body.ownership_type,
+        supplier_id: body.ownership_type === 'rented' ? body.supplier_id : null,
+        billing_type: body.ownership_type === 'rented' ? body.billing_type : null,
+        daily_rate: body.daily_rate,
+        weekly_rate: body.weekly_rate,
+        monthly_rate: body.monthly_rate,
+        notas: body.notas,
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error updating machine:', error)
+      return NextResponse.json({ success: false, message: 'Error updating machine' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, machine })
+  } catch (error) {
+    console.error('Error:', error)
+    return NextResponse.json({ success: false, message: 'Internal error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Machine ID is required' }, { status: 400 })
+    }
+
+    // Check if machine has active allocations
+    const { data: allocations } = await supabaseServer
+      .from('allocations')
+      .select('id')
+      .eq('machine_id', id)
+      .eq('status', 'active')
+
+    if (allocations && allocations.length > 0) {
+      return NextResponse.json({
+        success: false,
+        message: 'Cannot delete a machine that has active allocations'
+      }, { status: 400 })
+    }
+
+    const { error } = await supabaseServer
+      .from('machines')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error deleting machine:', error)
+      return NextResponse.json({ success: false, message: 'Error deleting machine' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, message: 'Machine deleted successfully' })
+  } catch (error) {
+    console.error('Error:', error)
+    return NextResponse.json({ success: false, message: 'Internal error' }, { status: 500 })
   }
 }

@@ -115,7 +115,7 @@ export default function Header({ title }: { title: string }) {
               <button
                 onClick={toggleDarkMode}
                 className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-all duration-250 ease-in-out"
-                title={isDark ? "Modo escuro (ativo)" : "Modo claro (ativo)"}
+                title={isDark ? "Dark mode (active)" : "Light mode (active)"}
               >
                 {isDark ? (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -130,7 +130,7 @@ export default function Header({ title }: { title: string }) {
               <button
                 onClick={handleLogout}
                 className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-all duration-250 ease-in-out"
-                title="Sair"
+                title="Logout"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

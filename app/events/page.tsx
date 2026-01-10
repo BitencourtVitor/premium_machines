@@ -151,7 +151,7 @@ export default function EventsPage() {
         })
         loadEvents()
       } else {
-        alert(data.message || 'Erro ao criar evento')
+        alert(data.message || 'Error creating event')
       }
     } catch (error) {
       console.error('Error creating event:', error)
@@ -174,7 +174,7 @@ export default function EventsPage() {
       if (data.success) {
         loadEvents()
       } else {
-        alert(data.message || 'Erro ao aprovar evento')
+        alert(data.message || 'Error approving event')
       }
     } catch (error) {
       console.error('Error approving event:', error)
@@ -199,7 +199,7 @@ export default function EventsPage() {
       if (data.success) {
         loadEvents()
       } else {
-        alert(data.message || 'Erro ao rejeitar evento')
+        alert(data.message || 'Error rejecting event')
       }
     } catch (error) {
       console.error('Error rejecting event:', error)
@@ -213,9 +213,9 @@ export default function EventsPage() {
   })
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('pt-BR', {
-      day: '2-digit',
+    return new Date(dateString).toLocaleString('en-US', {
       month: '2-digit',
+      day: '2-digit',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
@@ -264,36 +264,38 @@ export default function EventsPage() {
                     }))
                   ]}
                 />
-                {(user?.can_register_events || user?.role === 'admin' || user?.role === 'dev') && (
-                  <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                    title="Nova Alocação"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
-                )}
               </div>
             </div>
 
             {/* Events List */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Alocações ({filteredEvents.length})
                 </h2>
-                <button
-                  onClick={loadEvents}
-                  className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  disabled={loadingEvents}
-                  title="Atualizar"
-                >
-                  <svg className={`w-5 h-5 ${loadingEvents ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={loadEvents}
+                    className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    disabled={loadingEvents}
+                    title="Atualizar"
+                  >
+                    <svg className={`w-5 h-5 ${loadingEvents ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                  {(user?.can_register_events || user?.role === 'admin' || user?.role === 'dev') && (
+                    <button
+                      onClick={() => setShowCreateModal(true)}
+                      className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                      title="Nova Alocação"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {loadingEvents ? (
@@ -384,7 +386,7 @@ export default function EventsPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white dark:bg-gray-800 flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Novo Evento</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Nova Alocação</h2>
               <button
                 onClick={() => setShowCreateModal(false)}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
@@ -396,71 +398,61 @@ export default function EventsPage() {
             </div>
 
             <div className="p-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Tipo de Evento *
-                </label>
-                <select
-                  value={newEvent.event_type}
-                  onChange={(e) => setNewEvent({ ...newEvent, event_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                >
-                  {Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </div>
+              <CustomDropdown
+                label="Tipo de Evento *"
+                value={newEvent.event_type}
+                onChange={(value) => setNewEvent({ ...newEvent, event_type: value })}
+                options={Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => ({
+                  value,
+                  label: label as string
+                }))}
+                placeholder="Selecione o tipo de evento"
+                required
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Máquina *
-                </label>
-                <select
-                  value={newEvent.machine_id}
-                  onChange={(e) => setNewEvent({ ...newEvent, machine_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                >
-                  <option value="">Selecione...</option>
-                  {machines.map((machine) => (
-                    <option key={machine.id} value={machine.id}>
-                      {machine.unit_number} - {machine.machine_type?.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CustomDropdown
+                label="Máquina *"
+                value={newEvent.machine_id}
+                onChange={(value) => setNewEvent({ ...newEvent, machine_id: value })}
+                options={[
+                  { value: '', label: 'Selecione...' },
+                  ...machines.map((machine) => ({
+                    value: machine.id,
+                    label: `${machine.unit_number} - ${machine.machine_type?.nome}`
+                  }))
+                ]}
+                placeholder="Selecione uma máquina"
+                required
+              />
 
               {['start_allocation', 'end_allocation'].includes(newEvent.event_type) && (
                 <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Jobsite *
-                    </label>
-                    <select
-                      value={newEvent.site_id}
-                      onChange={(e) => setNewEvent({ ...newEvent, site_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    >
-                      <option value="">Selecione...</option>
-                      {sites.map((site) => (
-                        <option key={site.id} value={site.id}>{site.title}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <CustomDropdown
+                    label="Jobsite *"
+                    value={newEvent.site_id}
+                    onChange={(value) => setNewEvent({ ...newEvent, site_id: value })}
+                    options={[
+                      { value: '', label: 'Selecione...' },
+                      ...sites.map((site) => ({
+                        value: site.id,
+                        label: site.title
+                      }))
+                    ]}
+                    placeholder="Selecione um jobsite"
+                    required
+                  />
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Tipo de Construção
-                    </label>
-                    <select
-                      value={newEvent.construction_type}
-                      onChange={(e) => setNewEvent({ ...newEvent, construction_type: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    >
-                      <option value="">Selecione...</option>
-                      <option value="lot">Lote</option>
-                      <option value="building">Prédio/Edifício</option>
-                    </select>
-                  </div>
+                  <CustomDropdown
+                    label="Tipo de Construção"
+                    value={newEvent.construction_type || ''}
+                    onChange={(value) => setNewEvent({ ...newEvent, construction_type: value || undefined })}
+                    options={[
+                      { value: '', label: 'Selecione...' },
+                      { value: 'lot', label: 'Lote' },
+                      { value: 'building', label: 'Prédio/Edifício' }
+                    ]}
+                    placeholder="Selecione o tipo de construção"
+                  />
 
                   {newEvent.construction_type && (
                     <div>
@@ -497,16 +489,18 @@ export default function EventsPage() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Motivo da Parada
                     </label>
-                    <select
-                      value={newEvent.downtime_reason}
-                      onChange={(e) => setNewEvent({ ...newEvent, downtime_reason: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    >
-                      <option value="">Selecione...</option>
-                      {Object.entries(DOWNTIME_REASON_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
+                    <CustomDropdown
+                      value={newEvent.downtime_reason || ''}
+                      onChange={(value) => setNewEvent({ ...newEvent, downtime_reason: value || undefined })}
+                      options={[
+                        { value: '', label: 'Selecione...' },
+                        ...Object.entries(DOWNTIME_REASON_LABELS).map(([value, label]) => ({
+                          value,
+                          label: label as string
+                        }))
+                      ]}
+                      placeholder="Selecione o motivo da parada"
+                    />
                   </div>
 
                   <div>

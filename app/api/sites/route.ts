@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching sites:', error)
-      return NextResponse.json({ success: false, message: 'Erro ao buscar jobsites' }, { status: 500 })
+      return NextResponse.json({ success: false, message: 'Error fetching jobsites' }, { status: 500 })
     }
 
     // Filtrar no código para garantir que a sede sempre apareça
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     // Validar campos obrigatórios
     if (!body.title) {
-      return NextResponse.json({ success: false, message: 'Título da obra é obrigatório' }, { status: 400 })
+      return NextResponse.json({ success: false, message: 'Jobsite title is required' }, { status: 400 })
     }
 
     if (!body.address) {
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
         body.longitude === null || body.longitude === undefined) {
       return NextResponse.json({ 
         success: false, 
-        message: 'Coordenadas (latitude e longitude) são obrigatórias. É necessário geocodificar o endereço antes de salvar.' 
+        message: 'Coordinates (latitude and longitude) are required. It is necessary to geocode the address before saving.' 
       }, { status: 400 })
     }
 
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       console.error('Error creating site:', error)
       return NextResponse.json({ 
         success: false, 
-        message: error.message || 'Erro ao criar jobsite',
+        message: error.message || 'Error creating jobsite',
         error: error.details || error.hint || error.code
       }, { status: 500 })
     }

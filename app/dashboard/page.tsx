@@ -96,13 +96,13 @@ export default function DashboardPage() {
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Bem-vindo, {user?.nome}!
+                  Welcome, {user?.nome}!
                 </h2>
                 <button
                   onClick={() => loadStats()}
                   className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                   disabled={loadingStats}
-                  title="Atualizar"
+                  title="Refresh"
                 >
                   {loadingStats ? (
                     <svg className="w-5 h-5 animate-spin-reverse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,7 +129,7 @@ export default function DashboardPage() {
                     </svg>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Total Máquinas</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Total Machines</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
                       {loadingStats ? '...' : stats.totalMachines}
                     </p>
@@ -147,7 +147,7 @@ export default function DashboardPage() {
                     </svg>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Alocadas</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Allocated</p>
                     <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                       {loadingStats ? '...' : stats.allocatedMachines}
                     </p>
@@ -164,7 +164,7 @@ export default function DashboardPage() {
                     </svg>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Disponíveis</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Available</p>
                     <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
                       {loadingStats ? '...' : stats.availableMachines}
                     </p>
@@ -181,7 +181,7 @@ export default function DashboardPage() {
                     </svg>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Eventos Pendentes</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Pending Events</p>
                     <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                       {loadingStats ? '...' : stats.pendingEvents}
                     </p>
@@ -198,7 +198,7 @@ export default function DashboardPage() {
                   onClick={() => setExpandedStats(!expandedStats)}
                   className="w-full text-left p-4 flex items-center justify-between"
                 >
-                  <span className="font-semibold text-gray-900 dark:text-white">Detalhes das Máquinas</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">Machine Details</span>
                   <svg
                     className={`w-5 h-5 text-gray-400 transition-transform ${expandedStats ? 'rotate-180' : ''}`}
                     fill="none"
@@ -211,19 +211,19 @@ export default function DashboardPage() {
                 <div className={`overflow-hidden transition-all duration-300 ${expandedStats ? 'max-h-96' : 'max-h-0'}`}>
                   <div className="px-4 pb-4 space-y-3">
                     <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <span className="text-gray-600 dark:text-gray-300">Próprias</span>
+                      <span className="text-gray-600 dark:text-gray-300">Owned</span>
                       <span className="font-semibold text-gray-900 dark:text-white">{stats.ownedMachines}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <span className="text-gray-600 dark:text-gray-300">Alugadas</span>
+                      <span className="text-gray-600 dark:text-gray-300">Rented</span>
                       <span className="font-semibold text-gray-900 dark:text-white">{stats.rentedMachines}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <span className="text-gray-600 dark:text-gray-300">Em Manutenção</span>
+                      <span className="text-gray-600 dark:text-gray-300">Under Maintenance</span>
                       <span className="font-semibold text-yellow-600 dark:text-yellow-400">{stats.maintenanceMachines}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <span className="text-gray-600 dark:text-gray-300">Jobsites Ativos</span>
+                      <span className="text-gray-600 dark:text-gray-300">Active Jobsites</span>
                       <span className="font-semibold text-gray-900 dark:text-white">{stats.activeSites}</span>
                     </div>
                   </div>
@@ -236,7 +236,7 @@ export default function DashboardPage() {
                   onClick={() => setExpandedEvents(!expandedEvents)}
                   className="w-full text-left p-4 flex items-center justify-between"
                 >
-                  <span className="font-semibold text-gray-900 dark:text-white">Eventos Recentes</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">Recent Events</span>
                   <svg
                     className={`w-5 h-5 text-gray-400 transition-transform ${expandedEvents ? 'rotate-180' : ''}`}
                     fill="none"
@@ -250,7 +250,7 @@ export default function DashboardPage() {
                   <div className="px-4 pb-4">
                     {recentEvents.length === 0 ? (
                       <p className="text-gray-500 dark:text-gray-400 text-center py-4">
-                        Nenhum evento recente
+                        No recent events
                       </p>
                     ) : (
                       <div className="space-y-2">
@@ -271,7 +271,7 @@ export default function DashboardPage() {
                               </span>
                             </div>
                             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                              {event.site?.title || 'Sem obra'}
+                              {event.site?.title || 'No site'}
                             </p>
                           </div>
                         ))}
@@ -291,7 +291,7 @@ export default function DashboardPage() {
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                 </svg>
-                <span className="text-sm font-medium">Ver Mapa</span>
+                <span className="text-sm font-medium">View Map</span>
               </button>
               <button
                 onClick={() => router.push('/machines')}
@@ -301,7 +301,7 @@ export default function DashboardPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span className="text-sm font-medium">Máquinas</span>
+                <span className="text-sm font-medium">Machines</span>
               </button>
               <button
                 onClick={() => router.push('/events')}
@@ -310,7 +310,7 @@ export default function DashboardPage() {
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span className="text-sm font-medium">Eventos</span>
+                <span className="text-sm font-medium">Events</span>
               </button>
               <button
                 onClick={() => router.push('/sites')}

@@ -276,7 +276,7 @@ export default function LoginPage() {
 
   const handlePinComplete = async (completedPin: string) => {
     if (!selectedUserId) {
-      setError('Por favor, selecione um usuário primeiro')
+      setError('Please select a user first')
       return
     }
 
@@ -301,10 +301,10 @@ export default function LoginPage() {
           if (data.blockedUntil) {
             setBlockedUntil(new Date(data.blockedUntil))
           }
-          setError('IP bloqueado devido a muitas tentativas')
+          setError('IP blocked due to too many attempts')
         } else if (response.status === 403) {
           // Usuário não validado
-          setError(data.error || 'Seu cadastro ainda não foi validado. Aguarde a aprovação do administrador.')
+          setError(data.error || 'Your registration has not been validated yet. Please wait for administrator approval.')
         } else if (response.status === 401) {
           // PIN incorreto
           setRemainingAttempts(data.remainingAttempts || 0)
@@ -314,15 +314,15 @@ export default function LoginPage() {
             if (data.blockedUntil) {
               setBlockedUntil(new Date(data.blockedUntil))
             }
-            setError('Muitas tentativas incorretas. IP bloqueado por 5 minutos.')
+            setError('Too many incorrect attempts. IP blocked for 5 minutes.')
           } else {
             const attemptsText = data.remainingAttempts > 0 
-              ? `Tentativas restantes: ${data.remainingAttempts}`
-              : 'Última tentativa!'
-            setError(`PIN incorreto. ${attemptsText}`)
+              ? `Attempts remaining: ${data.remainingAttempts}`
+              : 'Last attempt!'
+            setError(`Incorrect PIN. ${attemptsText}`)
           }
         } else {
-          setError(data.error || data.message || 'Erro ao fazer login')
+          setError(data.error || data.message || 'Login error')
         }
         return
       }
@@ -335,7 +335,7 @@ export default function LoginPage() {
         router.push(homePage)
       }
     } catch (err: any) {
-      setError('Erro ao conectar com o servidor')
+      setError('Error connecting to server')
       console.error('Erro no login:', err)
     } finally {
       setLoading(false)
@@ -418,13 +418,13 @@ export default function LoginPage() {
               <span className="text-3xl text-gray-900 dark:text-white">Machines</span>
             </div>
             {!userType ? (
-              <p className="text-gray-600 dark:text-gray-400">Selecione seu tipo de acesso</p>
+              <p className="text-gray-600 dark:text-gray-400">Select your access type</p>
             ) : !selectedUserId ? (
               <p className="text-gray-600 dark:text-gray-400">
-                {userType === 'internal' ? 'Selecione um usuário para continuar' : 'Selecione sua empresa ou prestador'}
+                {userType === 'internal' ? 'Select a user to continue' : 'Select your company or service provider'}
               </p>
             ) : (
-              <p className="text-gray-600 dark:text-gray-400">Digite seu PIN de 6 dígitos</p>
+              <p className="text-gray-600 dark:text-gray-400">Enter your 6-digit PIN</p>
             )}
           </div>
 
@@ -456,8 +456,8 @@ export default function LoginPage() {
                           </svg>
                         </div>
                         <div>
-                          <p className="font-semibold text-gray-900 dark:text-white text-sm">Funcionário Premium</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Acesso para funcionários internos</p>
+                          <p className="font-semibold text-gray-900 dark:text-white text-sm">Premium Employee</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Access for internal employees</p>
                         </div>
                       </div>
                       <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -477,8 +477,8 @@ export default function LoginPage() {
                           </svg>
                         </div>
                         <div>
-                          <p className="font-semibold text-gray-900 dark:text-white text-sm">Prestador de Serviço</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Fornecedores e mecânicos</p>
+                          <p className="font-semibold text-gray-900 dark:text-white text-sm">Service Provider</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Suppliers and mechanics</p>
                         </div>
                       </div>
                       <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -498,7 +498,7 @@ export default function LoginPage() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
-                    Voltar
+                    Back
                   </button>
 
                   {userType === 'internal' ? (
@@ -510,7 +510,7 @@ export default function LoginPage() {
                           onClick={loadUsers}
                           disabled={loadingUsers}
                           className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          title="Recarregar lista de usuários"
+                          title="Reload user list"
                         >
                           <svg
                             className={`w-4 h-4 ${loadingUsers ? 'animate-spin' : ''}`}
@@ -525,7 +525,7 @@ export default function LoginPage() {
                               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                             />
                           </svg>
-                          <span className="text-xs">Atualizar</span>
+                          <span className="text-xs">Refresh</span>
                         </button>
                       </div>
                       <div className="max-h-80 overflow-y-auto pr-2">
@@ -533,11 +533,11 @@ export default function LoginPage() {
                           {loadingUsers ? (
                             <div className="text-center py-8">
                               <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 dark:border-gray-400"></div>
-                              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Carregando usuários...</p>
+                              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading users...</p>
                             </div>
                           ) : users.length === 0 ? (
                             <div className="text-center py-8">
-                              <p className="text-gray-600 dark:text-gray-400">Nenhum usuário disponível</p>
+                              <p className="text-gray-600 dark:text-gray-400">No users available</p>
                             </div>
                           ) : (
                             users.map((user) => (
@@ -570,7 +570,7 @@ export default function LoginPage() {
                     // Lista de usuários do fornecedor selecionado
                     <>
                       <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                        <p className="text-xs text-gray-600 dark:text-gray-400">Empresa selecionada:</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Selected company:</p>
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
                           {suppliers.find((s: any) => s.id === selectedSupplierId)?.nome}
                         </p>
@@ -580,11 +580,11 @@ export default function LoginPage() {
                           {loadingUsers ? (
                             <div className="text-center py-8">
                               <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 dark:border-gray-400"></div>
-                              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Carregando usuários...</p>
+                              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading users...</p>
                             </div>
                           ) : users.length === 0 ? (
                             <div className="text-center py-8">
-                              <p className="text-gray-600 dark:text-gray-400">Nenhum usuário disponível para este fornecedor</p>
+                              <p className="text-gray-600 dark:text-gray-400">No users available for this supplier</p>
                             </div>
                           ) : (
                             users.map((user) => (
@@ -621,7 +621,7 @@ export default function LoginPage() {
                           onClick={loadSuppliers}
                           disabled={loadingSuppliers}
                           className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          title="Recarregar lista"
+                          title="Reload list"
                         >
                           <svg
                             className={`w-4 h-4 ${loadingSuppliers ? 'animate-spin' : ''}`}
@@ -636,14 +636,14 @@ export default function LoginPage() {
                               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                             />
                           </svg>
-                          <span className="text-xs">Atualizar</span>
+                          <span className="text-xs">Refresh</span>
                         </button>
                       </div>
                       <div className="max-h-80 overflow-y-auto pr-2 space-y-4">
                         {/* Fornecedores de Máquinas */}
                         {suppliers.filter((s: any) => s.supplier_type === 'rental' || s.supplier_type === 'both').length > 0 && (
                           <div>
-                            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2 px-1">Fornecedores de Máquinas</h3>
+                            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2 px-1">Machine Suppliers</h3>
                             <div className="space-y-2">
                               {suppliers
                                 .filter((s: any) => s.supplier_type === 'rental' || s.supplier_type === 'both')
@@ -663,9 +663,9 @@ export default function LoginPage() {
                                         <div>
                                           <p className="font-semibold text-gray-900 dark:text-white text-sm">{supplier.nome}</p>
                                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            {supplier.supplier_type === 'both' 
-                                              ? 'Alocação e Manutenção' 
-                                              : 'Fornecedor de máquinas'}
+                                            {supplier.supplier_type === 'both'
+                                              ? 'Allocation and Maintenance'
+                                              : 'Machine supplier'}
                                           </p>
                                         </div>
                                       </div>
@@ -683,7 +683,7 @@ export default function LoginPage() {
                         {/* Empresas com 'both' aparecem apenas em 'Fornecedores de Máquinas', não aqui */}
                         {suppliers.filter((s: any) => s.supplier_type === 'maintenance').length > 0 && (
                           <div>
-                            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2 px-1">Mecânicos</h3>
+                            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2 px-1">Mechanics</h3>
                             <div className="space-y-2">
                               {suppliers
                                 .filter((s: any) => s.supplier_type === 'maintenance')
@@ -703,7 +703,7 @@ export default function LoginPage() {
                                         </div>
                                         <div>
                                           <p className="font-semibold text-gray-900 dark:text-white text-sm">{supplier.nome}</p>
-                                          <p className="text-xs text-gray-500 dark:text-gray-400">Mecânico</p>
+                                          <p className="text-xs text-gray-500 dark:text-gray-400">Mechanic</p>
                                         </div>
                                       </div>
                                       <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -719,11 +719,11 @@ export default function LoginPage() {
                         {loadingSuppliers ? (
                           <div className="text-center py-8">
                             <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 dark:border-gray-400"></div>
-                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Carregando...</p>
+                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading...</p>
                           </div>
                         ) : suppliers.length === 0 && !loadingSuppliers ? (
                           <div className="text-center py-8">
-                            <p className="text-gray-600 dark:text-gray-400">Nenhum fornecedor disponível</p>
+                            <p className="text-gray-600 dark:text-gray-400">No suppliers available</p>
                           </div>
                         ) : null}
                       </div>
@@ -741,12 +741,12 @@ export default function LoginPage() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
-                    Voltar para seleção de usuário
+                    Back to user selection
                   </button>
 
                   {/* Nome do usuário selecionado */}
                   <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Entrando como:</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Logging in as:</p>
                     <p className="font-medium text-gray-900 dark:text-white">
                       {users.find(u => u.id === selectedUserId)?.nome}
                     </p>
@@ -774,7 +774,7 @@ export default function LoginPage() {
               {/* Tentativas restantes */}
               {remainingAttempts !== null && remainingAttempts > 0 && !blocked && (
                 <div className="mt-2 text-center text-sm text-blue-600 dark:text-blue-400">
-                  Tentativas restantes: {remainingAttempts}
+                  Attempts remaining: {remainingAttempts}
                 </div>
               )}
 

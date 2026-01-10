@@ -92,7 +92,7 @@ export default function BottomNavigation() {
     },
     {
       href: '/map',
-      label: 'Mapa',
+      label: 'Map',
       requiredPermission: 'can_view_map' as keyof UserPermissions,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -102,7 +102,7 @@ export default function BottomNavigation() {
     },
     {
       href: '/events',
-      label: 'Alocações',
+      label: 'Allocations',
       requiredPermission: 'can_register_events' as keyof UserPermissions,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,7 +127,7 @@ export default function BottomNavigation() {
     },
     {
       href: '/usuarios',
-      label: 'Pessoas',
+      label: 'People',
       requiredPermission: 'can_manage_users' as keyof UserPermissions,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,7 +137,7 @@ export default function BottomNavigation() {
     },
     {
       href: '/machines',
-      label: 'Máquinas',
+      label: 'Machines',
       requiredPermission: 'can_manage_machines' as keyof UserPermissions,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -148,7 +148,7 @@ export default function BottomNavigation() {
     },
     {
       href: '/reports',
-      label: 'Relatórios',
+      label: 'Reports',
       requiredPermission: 'can_view_financial' as keyof UserPermissions,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -222,7 +222,7 @@ export default function BottomNavigation() {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
             </svg>
-            <span className="text-xs font-medium">Mais</span>
+            <span className="text-xs font-medium">More</span>
           </button>
           
           {/* Dropdown para cima - Jobsites, Pessoas, Máquinas, Relatórios */}

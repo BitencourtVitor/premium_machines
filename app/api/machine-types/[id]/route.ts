@@ -24,7 +24,7 @@ export async function GET(
 
     if (error) {
       console.error('Error fetching machine type:', error)
-      return NextResponse.json({ success: false, message: 'Tipo de máquina não encontrado' }, { status: 404, headers: noCacheHeaders })
+      return NextResponse.json({ success: false, message: 'Machine type not found' }, { status: 404, headers: noCacheHeaders })
     }
 
     return NextResponse.json({ success: true, machineType }, { headers: noCacheHeaders })
@@ -46,7 +46,7 @@ export async function PUT(
     
     if (body.nome !== undefined) {
       if (!body.nome || body.nome.trim() === '') {
-        return NextResponse.json({ success: false, message: 'Nome não pode ser vazio' }, { status: 400, headers: noCacheHeaders })
+        return NextResponse.json({ success: false, message: 'Name cannot be empty' }, { status: 400, headers: noCacheHeaders })
       }
       updateData.nome = body.nome.trim()
     }
@@ -69,13 +69,13 @@ export async function PUT(
     if (error) {
       console.error('Error updating machine type:', error)
       if (error.code === '23505') {
-        return NextResponse.json({ success: false, message: 'Já existe um tipo de máquina com este nome' }, { status: 400, headers: noCacheHeaders })
+        return NextResponse.json({ success: false, message: 'A machine type with this name already exists' }, { status: 400, headers: noCacheHeaders })
       }
-      return NextResponse.json({ success: false, message: 'Erro ao atualizar tipo' }, { status: 500, headers: noCacheHeaders })
+      return NextResponse.json({ success: false, message: 'Error updating type' }, { status: 500, headers: noCacheHeaders })
     }
 
     if (!machineType) {
-      return NextResponse.json({ success: false, message: 'Tipo de máquina não encontrado' }, { status: 404, headers: noCacheHeaders })
+      return NextResponse.json({ success: false, message: 'Machine type not found' }, { status: 404, headers: noCacheHeaders })
     }
 
     return NextResponse.json({ success: true, machineType }, { headers: noCacheHeaders })
@@ -99,13 +99,13 @@ export async function DELETE(
 
     if (machinesError) {
       console.error('Error checking machines:', machinesError)
-      return NextResponse.json({ success: false, message: 'Erro ao verificar dependências' }, { status: 500, headers: noCacheHeaders })
+      return NextResponse.json({ success: false, message: 'Error checking dependencies' }, { status: 500, headers: noCacheHeaders })
     }
 
     if (machines && machines.length > 0) {
       return NextResponse.json({ 
         success: false, 
-        message: 'Não é possível deletar este tipo de máquina pois existem máquinas cadastradas com este tipo' 
+        message: 'Cannot delete this machine type because there are machines registered with this type' 
       }, { status: 400, headers: noCacheHeaders })
     }
 
@@ -116,7 +116,7 @@ export async function DELETE(
 
     if (error) {
       console.error('Error deleting machine type:', error)
-      return NextResponse.json({ success: false, message: 'Erro ao deletar tipo' }, { status: 500, headers: noCacheHeaders })
+      return NextResponse.json({ success: false, message: 'Error deleting type' }, { status: 500, headers: noCacheHeaders })
     }
 
     return NextResponse.json({ success: true }, { headers: noCacheHeaders })

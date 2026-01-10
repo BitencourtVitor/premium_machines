@@ -7,6 +7,7 @@ import Header from '../components/Header'
 import BottomNavigation from '../components/BottomNavigation'
 import Sidebar from '../components/Sidebar'
 import ExportDropdown from '../components/ExportDropdown'
+import CustomDropdown from '../components/CustomDropdown'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
 import { 
@@ -54,6 +55,7 @@ export default function MachinesPage() {
   const [machineTypes, setMachineTypes] = useState<MachineType[]>([])
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingMachine, setEditingMachine] = useState<Machine | null>(null)
   const [creating, setCreating] = useState(false)
   const [newMachine, setNewMachine] = useState({
     unit_number: '',
@@ -80,7 +82,7 @@ export default function MachinesPage() {
 
   const handleExportExcel = () => {
     // TODO: Implementar exportação para Excel
-    alert('Exportação para Excel será implementada em breve')
+    alert('Excel export will be implemented soon')
   }
 
   const loadMachines = useCallback(async () => {
@@ -192,19 +194,22 @@ export default function MachinesPage() {
 
   const handleCreateMachine = async () => {
     if (!newMachine.unit_number || !newMachine.machine_type_id) {
-      alert('Preencha os campos obrigatórios')
+      alert('Please fill in the required fields')
       return
     }
 
     if (newMachine.ownership_type === 'rented' && !newMachine.supplier_id) {
-      alert('Selecione um fornecedor para máquina alugada')
+      alert('Select a supplier for rented machine')
       return
     }
 
     setCreating(true)
     try {
-      const response = await fetch('/api/machines', {
-        method: 'POST',
+      const url = editingMachine ? `/api/machines/${editingMachine.id}` : '/api/machines'
+      const method = editingMachine ? 'PUT' : 'POST'
+
+      const response = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...newMachine,
@@ -218,6 +223,7 @@ export default function MachinesPage() {
 
       if (data.success) {
         setShowCreateModal(false)
+        setEditingMachine(null)
         setNewMachine({
           unit_number: '',
           machine_type_id: '',
@@ -230,10 +236,10 @@ export default function MachinesPage() {
         })
         loadMachines()
       } else {
-        alert(data.message || 'Erro ao criar máquina')
+        alert(data.message || 'Error saving machine')
       }
     } catch (error) {
-      console.error('Error creating machine:', error)
+      console.error('Error saving machine:', error)
     } finally {
       setCreating(false)
     }
@@ -241,7 +247,7 @@ export default function MachinesPage() {
 
   const handleCreateType = async () => {
     if (!newType.nome || newType.nome.trim() === '') {
-      alert('Nome é obrigatório')
+      alert('Name is required')
       return
     }
 
@@ -269,18 +275,56 @@ export default function MachinesPage() {
         loadTypes()
         loadMachineTypes() // Atualizar também para o dropdown de máquinas
       } else {
-        alert(data.message || 'Erro ao salvar tipo')
+        alert(data.message || 'Error saving type')
       }
     } catch (error) {
       console.error('Error saving type:', error)
-      alert('Erro ao conectar com o servidor')
+      alert('Error connecting to server')
     } finally {
       setCreatingType(false)
     }
   }
 
+  const handleDeleteMachine = async (machine: Machine) => {
+    if (!confirm(`Are you sure you want to delete the machine "${machine.unit_number}"?`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/machines?id=${machine.id}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        loadMachines()
+      } else {
+        alert(data.message || 'Error deleting machine')
+      }
+    } catch (error) {
+      console.error('Error deleting machine:', error)
+      alert('Error connecting to server')
+    }
+  }
+
+  const handleEditMachine = (machine: Machine) => {
+    setEditingMachine(machine)
+    setNewMachine({
+      unit_number: machine.unit_number,
+      machine_type_id: machine.machine_type?.id || '',
+      ownership_type: machine.ownership_type,
+      supplier_id: machine.supplier?.id || '',
+      billing_type: machine.billing_type || 'daily',
+      daily_rate: machine.daily_rate || '',
+      weekly_rate: machine.weekly_rate || '',
+      monthly_rate: machine.monthly_rate || '',
+    })
+    setShowCreateModal(true)
+  }
+
   const handleDeleteType = async (type: MachineType) => {
-    if (!confirm(`Tem certeza que deseja deletar o tipo "${type.nome}"?`)) {
+    if (!confirm(`Are you sure you want to delete the type "${type.nome}"?`)) {
       return
     }
 
@@ -295,11 +339,11 @@ export default function MachinesPage() {
         loadTypes()
         loadMachineTypes()
       } else {
-        alert(data.message || 'Erro ao deletar tipo')
+        alert(data.message || 'Error deleting type')
       }
     } catch (error) {
       console.error('Error deleting type:', error)
-      alert('Erro ao conectar com o servidor')
+      alert('Error connecting to server')
     }
   }
 
@@ -327,7 +371,7 @@ export default function MachinesPage() {
 
   return (
     <div className="min-h-screen md:h-screen md:max-h-screen bg-gray-50 dark:bg-gray-900 pb-safe-content md:pb-0 md:flex md:flex-col md:overflow-hidden">
-      <Header title="Máquinas" />
+      <Header title="Machines" />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
         <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-250 ease-in-out ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`}>
@@ -414,15 +458,19 @@ export default function MachinesPage() {
                         // Determinar o caminho da imagem baseado no tipo de máquina
                         const getMachineImagePath = () => {
                           if (!machine.machine_type) return null
-                          
+
                           let imageName = ''
-                          
+
                           if (machine.machine_type.nome) {
                             // Converter nome do tipo para slug
                             imageName = machine.machine_type.nome.toLowerCase().replace(/\s+/g, '-')
                           }
-                          
-                          return imageName ? `/${imageName}.png` : null
+
+                          // Alguns tipos usam JPG ao invés de PNG
+                          const jpgTypes = ['fork-extensions', 'man-basket', 'truss-boom']
+                          const extension = jpgTypes.includes(imageName) ? '.jpg' : '.png'
+
+                          return imageName ? `/${imageName}${extension}` : null
                         }
 
                         const machineImagePath = getMachineImagePath()
@@ -451,11 +499,10 @@ export default function MachinesPage() {
                         return (
                           <div
                             key={machine.id}
-                            className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                            onClick={() => router.push(`/machines/${machine.id}`)}
+                            className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                           >
                             <div className="flex items-center justify-between">
-                              <div className="flex-1 flex items-center gap-3">
+                              <div className="flex items-center gap-3">
                                 {/* Imagem do tipo de máquina */}
                                 {machineImagePath && (
                                   <div className="flex-shrink-0 w-12 h-12 relative rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
@@ -464,15 +511,9 @@ export default function MachinesPage() {
                                       alt={machine.machine_type?.nome || 'Máquina'}
                                       className="w-full h-full object-cover rounded-lg"
                                       onError={(e) => {
-                                        // Se PNG não existir, tentar JPG
+                                        // Se a imagem não carregar, ocultar o container
                                         const target = e.target as HTMLImageElement
-                                        const currentSrc = target.src
-                                        if (currentSrc.endsWith('.png')) {
-                                          target.src = currentSrc.replace('.png', '.jpg')
-                                        } else {
-                                          // Se JPG também não existir, ocultar o container
-                                          target.style.display = 'none'
-                                        }
+                                        target.style.display = 'none'
                                       }}
                                     />
                                   </div>
@@ -495,12 +536,15 @@ export default function MachinesPage() {
                                     {/* Ownership com bolinha + texto */}
                                     <div className="flex items-center gap-1.5">
                                       <div className={`w-2 h-2 rounded-full ${
-                                        machine.ownership_type === 'owned' 
+                                        machine.ownership_type === 'owned'
                                           ? 'bg-green-600 dark:bg-green-400'
                                           : 'bg-orange-600 dark:bg-orange-400'
                                       }`}></div>
                                       <span className={`text-xs font-medium ${getOwnershipColor()}`}>
                                         {OWNERSHIP_TYPE_LABELS[machine.ownership_type]}
+                                        {machine.ownership_type === 'rented' && machine.supplier && (
+                                          <span className="ml-1">- {machine.supplier.nome}</span>
+                                        )}
                                       </span>
                                     </div>
                                   </div>
@@ -512,16 +556,28 @@ export default function MachinesPage() {
                                       {machine.current_site.title}
                                     </p>
                                   )}
-                                  {machine.supplier && (
-                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                      Fornecedor: {machine.supplier.nome}
-                                    </p>
-                                  )}
                                 </div>
                               </div>
-                              <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleEditMachine(machine)}
+                                  className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                                  title="Editar"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteMachine(machine)}
+                                  className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                                  title="Deletar"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
                             </div>
                           </div>
                         )
@@ -593,9 +649,12 @@ export default function MachinesPage() {
                           // Se não tem icon, usar o nome do tipo convertido para slug
                           imageName = type.nome.toLowerCase().replace(/\s+/g, '-')
                         }
-                        
-                        // Retornar caminho PNG (o usuário disse que colocou PNGs)
-                        return `/${imageName}.png`
+
+                        // Alguns tipos usam JPG ao invés de PNG
+                        const jpgTypes = ['fork-extensions', 'man-basket', 'truss-boom']
+                        const extension = jpgTypes.includes(imageName) ? '.jpg' : '.png'
+
+                        return `/${imageName}${extension}`
                       }
 
                       const imagePath = getImagePath()
@@ -614,15 +673,9 @@ export default function MachinesPage() {
                                   alt={type.nome}
                                   className="w-full h-full object-cover rounded-lg"
                                   onError={(e) => {
-                                    // Se PNG não existir, tentar JPG
+                                    // Se a imagem não carregar, ocultar o container
                                     const target = e.target as HTMLImageElement
-                                    const currentSrc = target.src
-                                    if (currentSrc.endsWith('.png')) {
-                                      target.src = currentSrc.replace('.png', '.jpg')
-                                    } else {
-                                      // Se JPG também não existir, ocultar o container
-                                      target.style.display = 'none'
-                                    }
+                                    target.style.display = 'none'
                                   }}
                                 />
                               </div>
@@ -682,9 +735,24 @@ export default function MachinesPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white dark:bg-gray-800 flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Nova Máquina</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {editingMachine ? 'Editar Máquina' : 'Nova Máquina'}
+              </h2>
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false)
+                  setEditingMachine(null)
+                  setNewMachine({
+                    unit_number: '',
+                    machine_type_id: '',
+                    ownership_type: 'owned',
+                    supplier_id: '',
+                    billing_type: 'daily',
+                    daily_rate: '',
+                    weekly_rate: '',
+                    monthly_rate: '',
+                  })
+                }}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
               >
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -707,21 +775,20 @@ export default function MachinesPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Tipo de Máquina *
-                </label>
-                <select
-                  value={newMachine.machine_type_id}
-                  onChange={(e) => setNewMachine({ ...newMachine, machine_type_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                >
-                  <option value="">Selecione...</option>
-                  {machineTypes.filter(t => !t.is_attachment).map((type) => (
-                    <option key={type.id} value={type.id}>{type.nome}</option>
-                  ))}
-                </select>
-              </div>
+              <CustomDropdown
+                label="Tipo de Máquina *"
+                value={newMachine.machine_type_id}
+                onChange={(value) => setNewMachine({ ...newMachine, machine_type_id: value })}
+                options={[
+                  { value: '', label: 'Selecione...' },
+                  ...machineTypes.map((type) => ({
+                    value: type.id,
+                    label: type.nome
+                  }))
+                ]}
+                placeholder="Selecione um tipo de máquina"
+                required
+              />
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -760,44 +827,39 @@ export default function MachinesPage() {
 
               {newMachine.ownership_type === 'rented' && (
                 <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Fornecedor *
-                    </label>
-                    <select
-                      value={newMachine.supplier_id}
-                      onChange={(e) => setNewMachine({ ...newMachine, supplier_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    >
-                      <option value="">Selecione...</option>
-                      {suppliers.map((supplier) => (
-                        <option key={supplier.id} value={supplier.id}>{supplier.nome}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <CustomDropdown
+                    label="Fornecedor *"
+                    value={newMachine.supplier_id}
+                    onChange={(value) => setNewMachine({ ...newMachine, supplier_id: value })}
+                    options={[
+                      { value: '', label: 'Selecione...' },
+                      ...suppliers.map((supplier) => ({
+                        value: supplier.id,
+                        label: supplier.nome
+                      }))
+                    ]}
+                    placeholder="Selecione um fornecedor"
+                    required
+                  />
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Tipo de Cobrança
-                    </label>
-                    <select
-                      value={newMachine.billing_type}
-                      onChange={(e) => setNewMachine({ 
-                        ...newMachine, 
-                        billing_type: e.target.value as 'daily' | 'weekly' | 'monthly'
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    >
-                      {Object.entries(BILLING_TYPE_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <CustomDropdown
+                    label="Billing Type"
+                    value={newMachine.billing_type}
+                    onChange={(value) => setNewMachine({
+                      ...newMachine,
+                      billing_type: value as 'daily' | 'weekly' | 'monthly'
+                    })}
+                    options={Object.entries(BILLING_TYPE_LABELS).map(([value, label]) => ({
+                      value,
+                      label: label as string
+                    }))}
+                    placeholder="Select billing type"
+                  />
 
                   <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Diária (R$)
+                        Daily (USD)
                       </label>
                       <input
                         type="number"
@@ -810,7 +872,7 @@ export default function MachinesPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Semanal (R$)
+                        Weekly (USD)
                       </label>
                       <input
                         type="number"
@@ -823,7 +885,7 @@ export default function MachinesPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Mensal (R$)
+                        Monthly (USD)
                       </label>
                       <input
                         type="number"
@@ -841,7 +903,20 @@ export default function MachinesPage() {
 
             <div className="sticky bottom-0 bg-white dark:bg-gray-800 flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false)
+                  setEditingMachine(null)
+                  setNewMachine({
+                    unit_number: '',
+                    machine_type_id: '',
+                    ownership_type: 'owned',
+                    supplier_id: '',
+                    billing_type: 'daily',
+                    daily_rate: '',
+                    weekly_rate: '',
+                    monthly_rate: '',
+                  })
+                }}
                 className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 Cancelar
@@ -851,7 +926,7 @@ export default function MachinesPage() {
                 disabled={creating}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
-                {creating ? 'Criando...' : 'Criar Máquina'}
+                {creating ? (editingMachine ? 'Salvando...' : 'Criando...') : (editingMachine ? 'Salvar Alterações' : 'Criar Máquina')}
               </button>
             </div>
           </div>

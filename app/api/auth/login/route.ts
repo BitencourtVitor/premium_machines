@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const { userId, pin } = await request.json()
 
     if (!userId || !pin) {
-      return NextResponse.json({ success: false, message: 'Dados incompletos' }, { status: 400 })
+      return NextResponse.json({ success: false, message: 'Incomplete data' }, { status: 400 })
     }
 
     // Fetch user
@@ -19,14 +19,14 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error || !user) {
-      return NextResponse.json({ success: false, message: 'Usuário não encontrado' }, { status: 404 })
+      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
 
     // Verify PIN
     const isValid = await verifyPin(pin, user.pin_hash)
 
     if (!isValid) {
-      return NextResponse.json({ success: false, message: 'PIN incorreto' }, { status: 401 })
+      return NextResponse.json({ success: false, message: 'Incorrect PIN' }, { status: 401 })
     }
 
     // Return user data (without sensitive info)
@@ -51,6 +51,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, user: sessionUser })
   } catch (error) {
     console.error('Login error:', error)
-    return NextResponse.json({ success: false, message: 'Erro interno' }, { status: 500 })
+    return NextResponse.json({ success: false, message: 'Internal error' }, { status: 500 })
   }
 }

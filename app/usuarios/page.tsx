@@ -395,7 +395,7 @@ export default function UsuariosPage() {
           loadSuppliers()
         }
       } else {
-        setError(data.error || 'Erro ao salvar usuário')
+        setError(data.error || 'Error saving user')
       }
     } catch (err) {
       setError('Erro ao conectar com o servidor')
@@ -439,7 +439,7 @@ export default function UsuariosPage() {
         loadSuppliers()
         loadUsers()
       } else {
-        setError(data.error || 'Erro ao salvar fornecedor')
+        setError(data.error || 'Error saving supplier')
       }
     } catch (err) {
       setError('Erro ao conectar com o servidor')
@@ -470,7 +470,7 @@ export default function UsuariosPage() {
   }
 
   const handleArchiveSupplier = async (supplierId: string) => {
-    if (!confirm('Tem certeza que deseja arquivar esta empresa? Ela não será deletada, mas ficará oculta da lista.')) {
+    if (!confirm('Are you sure you want to archive this company? It will not be deleted, but will be hidden from the list.')) {
       return
     }
 
@@ -490,7 +490,7 @@ export default function UsuariosPage() {
         await loadSuppliers(showArchivedSuppliers)
         await loadUsers()
       } else {
-        setError(data.error || 'Erro ao arquivar fornecedor')
+        setError(data.error || 'Error archiving supplier')
       }
     } catch (err) {
       console.error('Erro ao arquivar fornecedor:', err)
@@ -499,7 +499,7 @@ export default function UsuariosPage() {
   }
 
   const handleUnarchiveSupplier = async (supplierId: string) => {
-    if (!confirm('Tem certeza que deseja desarquivar esta empresa?')) {
+    if (!confirm('Are you sure you want to unarchive this company?')) {
       return
     }
 
@@ -519,7 +519,7 @@ export default function UsuariosPage() {
         await loadSuppliers(showArchivedSuppliers)
         await loadUsers()
       } else {
-        setError(data.error || 'Erro ao desarquivar fornecedor')
+        setError(data.error || 'Error unarchiving supplier')
       }
     } catch (err) {
       console.error('Erro ao desarquivar fornecedor:', err)
@@ -574,7 +574,7 @@ export default function UsuariosPage() {
           loadSuppliers()
         }
       } else {
-        setError(data.error || 'Erro ao deletar usuário')
+        setError(data.error || 'Error deleting user')
       }
     } catch (err) {
       setError('Erro ao conectar com o servidor')
@@ -1535,7 +1535,7 @@ export default function UsuariosPage() {
                 </div>
               )}
               <p className="text-gray-700 dark:text-gray-300">
-                Tem certeza que deseja deletar o usuário <span className="font-semibold">{userToDelete.nome}</span>?
+                Are you sure you want to delete the user <span className="font-semibold">{userToDelete.nome}</span>?
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                 Esta ação não pode ser desfeita.

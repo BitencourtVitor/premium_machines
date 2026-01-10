@@ -3,7 +3,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Premium Machines',
-  description: 'Sistema de Gestão de Máquinas com Geolocalização - Premium Machines',
+  description: 'Machine Management System with Geolocation - Premium Machines',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -42,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning className="transition-colors duration-250 ease-in-out">
+    <html lang="en" suppressHydrationWarning className="transition-colors duration-250 ease-in-out">
       <head>
         <link href='https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.css' rel='stylesheet' />
         <script

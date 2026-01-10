@@ -150,7 +150,7 @@ export default function SitesPage() {
   }, [showSearchDropdown])
 
   const handleArchiveSite = async (site: Site) => {
-    if (!confirm(`Tem certeza que deseja ${site.ativo ? 'arquivar' : 'desarquivar'} esta obra?`)) {
+    if (!confirm(`Are you sure you want to ${site.ativo ? 'archive' : 'unarchive'} this jobsite?`)) {
       return
     }
 
@@ -169,17 +169,17 @@ export default function SitesPage() {
       if (data.success) {
         loadSites()
       } else {
-        alert(data.message || 'Erro ao arquivar jobsite')
+        alert(data.message || 'Error archiving jobsite')
       }
     } catch (error) {
       console.error('Error archiving site:', error)
-      alert('Erro ao conectar com o servidor')
+      alert('Error connecting to server')
     }
   }
 
   const handleGeocode = async () => {
     if (!newSite.address) {
-      alert('Por favor, informe o endereço antes de geocodificar')
+      alert('Please enter the address before geocoding')
       return
     }
 
@@ -199,14 +199,14 @@ export default function SitesPage() {
           setGeocodingResult(data.result)
           setMapCoordinates({ lat: data.result.latitude, lng: data.result.longitude })
         } else {
-          alert('Erro: A API não retornou coordenadas válidas. Tente um endereço mais específico.')
+          alert('Error: The API did not return valid coordinates. Try a more specific address.')
         }
       } else {
-        alert(data.message || 'Não foi possível encontrar o endereço. Verifique se o endereço está completo (inclua cidade e estado).')
+        alert(data.message || 'Could not find the address. Please make sure the address is complete (include city and state).')
       }
     } catch (error: any) {
       console.error('Geocoding error:', error)
-      alert('Erro ao conectar com o serviço de geocodificação. Verifique sua conexão e tente novamente.')
+      alert('Error connecting to geocoding service. Check your connection and try again.')
     } finally {
       setGeocoding(false)
     }
@@ -259,19 +259,19 @@ export default function SitesPage() {
 
   const handleCreateSite = async () => {
     if (!newSite.title) {
-      alert('Por favor, informe o nome do jobsite')
+      alert('Please enter the jobsite name')
       return
     }
 
     if (!mapCoordinates) {
-      alert('Por favor, geocodifique o endereço e confirme a localização no mapa antes de salvar.')
+      alert('Please geocode the address and confirm the location on the map before saving.')
       return
     }
 
     // Validar que temos coordenadas válidas
     if (!mapCoordinates.lat || !mapCoordinates.lng ||
         isNaN(mapCoordinates.lat) || isNaN(mapCoordinates.lng)) {
-      alert('Erro: Coordenadas inválidas. Por favor, geocodifique o endereço novamente.')
+      alert('Error: Invalid coordinates. Please geocode the address again.')
       return
     }
 
@@ -312,11 +312,11 @@ export default function SitesPage() {
         }
         loadSites()
       } else {
-        alert(data.message || 'Erro ao criar jobsite')
+        alert(data.message || 'Error creating jobsite')
       }
     } catch (error: any) {
       console.error('Error creating site:', error)
-      alert('Erro ao criar obra. Verifique sua conexão e tente novamente.')
+      alert('Error creating jobsite. Check your connection and try again.')
     } finally {
       setCreating(false)
     }

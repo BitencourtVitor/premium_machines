@@ -37,69 +37,18 @@ export default function MapPage() {
   const headquartersMarkerRef = useRef<mapboxgl.Marker | null>(null)
   const userSelectedStyle = useRef<'map' | 'satellite' | null>(null)
   const resizeHandlersRef = useRef<(() => void)[]>([])
-  const lastAnimatedSpiderfyRef = useRef<string | null>(null) // Rastrear qual grupo já foi animado
-  const originalGroupsRef = useRef<Map<string, { center: { lng: number; lat: number }; sites: Site[]; id: string }>>(new Map()) // Armazenar grupos originais
-  const previousSitesIdsRef = useRef<string>('') // Rastrear IDs dos sites para detectar mudanças
-  const updateMarkersRef = useRef<(() => void) | null>(null) // Ref para updateMarkers para uso nos listeners
+  const lastAnimatedSpiderfyRef = useRef<string | null>(null)
+  const originalGroupsRef = useRef<Map<string, { center: { lng: number; lat: number }; sites: Site[]; id: string }>>(new Map())
+  const previousSitesIdsRef = useRef<string>('')
+  const updateMarkersRef = useRef<(() => void) | null>(null)
   const [spiderfiedGroup, setSpiderfiedGroup] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [sites, setSites] = useState<Site[]>([])
   const [selectedSite, setSelectedSite] = useState<Site | null>(null)
   const [isDarkMode, setIsDarkMode] = useState(false)
-
-  // Inicializar estilo como 'map' (que será claro/escuro baseado no tema)
   const [mapStyle, setMapStyle] = useState<'map' | 'satellite'>('map')
 
-  // Estados para drag and drop do painel
-  const [isDragging, setIsDragging] = useState(false)
-  const [panelPosition, setPanelPosition] = useState<{ x: number; y: number } | null>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const mapContainerRef = useRef<HTMLDivElement>(null)
-
-  // Inicializar panelPosition baseado na posição inicial do layout
-  useEffect(() => {
-    if (panelRef.current && mapContainerRef.current && !panelPosition) {
-      const container = mapContainerRef.current
-      const containerStyle = getComputedStyle(container)
-
-      const paddingLeft = parseFloat(containerStyle.paddingLeft)
-      const paddingBottom = parseFloat(containerStyle.paddingBottom)
-
-      // Posição inicial: canto inferior esquerdo com margem
-      setPanelPosition({
-        x: paddingLeft,
-        y: container.offsetHeight - paddingBottom - 80 // 80px acima do bottom
-      })
-    }
-  }, [panelPosition])
-
-  // Refs para drag imperativo (sem state durante movimento)
-  const dragStateRef = useRef<{
-    startX: number
-    startY: number
-    panelStartX: number
-    panelStartY: number
-    minX: number
-    maxX: number
-    minY: number
-    maxY: number
-  } | null>(null)
-
-  // Calcular posição inicial do handle baseada no painel
-  const getInitialHandlePosition = useCallback(() => {
-    if (!panelRef.current) return { x: 0, y: 0 }
-
-    const panelRect = panelRef.current.getBoundingClientRect()
-    const handleWidth = 96 // 25% de 384px
-    const handleHeight = 48 // h-12
-
-    // Handle fica acima do painel, centralizado na largura
-    const handleX = panelRect.left + (panelRect.width - handleWidth) / 2
-    const handleY = panelRect.top - handleHeight
-
-    return { x: handleX, y: handleY }
-  }, [])
 
   const loadSites = useCallback(async () => {
     try {
@@ -494,6 +443,73 @@ export default function MapPage() {
     return el
   }, [])
 
+  // Criar painel separado para exibir informações do site
+  const createSitePanel = useCallback((site: Site, currentIsDark: boolean) => {
+    const el = document.createElement('div')
+    el.className = 'site-panel'
+    el.style.width = '280px'
+    el.style.zIndex = '9999' // Acima de tudo, incluindo botão X do spiderfy
+    el.style.pointerEvents = 'auto'
+    el.innerHTML = `
+      <div style="background: ${currentIsDark ? '#1f2937' : 'white'}; border: 1px solid ${currentIsDark ? '#374151' : '#d1d5db'}; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); padding: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            ${site.is_headquarters ? '<svg style="width: 16px; height: 16px; color: #6b7280;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>' : ''}
+            <h3 style="font-weight: 600; font-size: 14px; color: ${currentIsDark ? 'white' : '#111827'};">
+              ${site.title}
+            </h3>
+            ${site.is_headquarters ? '<span style="font-size: 10px; padding: 2px 6px; background: #e5e7eb; color: #374151; border-radius: 4px; font-weight: 500;">Sede</span>' : ''}
+          </div>
+          <button onclick="event.stopPropagation(); window.dispatchEvent(new CustomEvent('closeSitePanel', { detail: '${site.id}' }));" style="padding: 2px; border-radius: 4px; color: #6b7280; cursor: pointer;">
+            <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <p style="font-size: 12px; color: ${currentIsDark ? '#9ca3af' : '#6b7280'}; margin-bottom: 12px;">
+          ${site.address || site.city || 'Localização não disponível'}
+        </p>
+
+        ${!site.is_headquarters ? `
+          <div style="border-top: 1px solid ${currentIsDark ? '#374151' : '#e5e7eb'}; padding-top: 12px;">
+            <p style="font-size: 12px; font-weight: 500; color: ${currentIsDark ? '#d1d5db' : '#374151'}; margin-bottom: 8px;">
+              Máquinas (${site.machines_count})
+            </p>
+            ${site.machines?.length > 0 ? `
+              <div style="max-height: 120px; overflow-y: auto; gap: 4px; display: flex; flex-direction: column;">
+                ${site.machines.map((machine: any) => `
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px; background: ${currentIsDark ? '#374151' : '#f9fafb'}; border-radius: 4px;">
+                    <span style="font-size: 12px; font-weight: 500; color: ${currentIsDark ? 'white' : '#111827'};">
+                      ${machine.unit_number}
+                    </span>
+                    <span class="status-${machine.status}" style="font-size: 10px; padding: 2px 6px; border-radius: 9999px; font-weight: 500;">
+                      ${MACHINE_STATUS_LABELS[machine.status]}
+                    </span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : `
+              <p style="font-size: 12px; color: ${currentIsDark ? '#9ca3af' : '#6b7280'};">
+                Nenhuma máquina alocada
+              </p>
+            `}
+            <div style="margin-top: 8px; width: 100%; padding: 6px; background: ${currentIsDark ? '#374151' : '#f3f4f6'}; color: ${currentIsDark ? '#9ca3af' : '#6b7280'}; border-radius: 6px; font-size: 12px; font-weight: 500; text-align: center; cursor: not-allowed;">
+              Detalhes Indisponíveis
+            </div>
+          </div>
+        ` : `
+          <div style="border-top: 1px solid ${currentIsDark ? '#374151' : '#e5e7eb'}; padding-top: 12px;">
+            <p style="font-size: 12px; color: ${currentIsDark ? '#9ca3af' : '#6b7280'}; font-style: italic;">
+              Esta é a sede da empresa Premium Group Inc.
+            </p>
+          </div>
+        `}
+      </div>
+    `
+    return el
+  }, [])
+
   // Criar marcador com ícone circle do Phosphor Icons para jobsites no spiderfy
   const createSpiderfyMarker = useCallback((site: Site, currentIsDark: boolean, onClick: (e?: Event) => void, isSelected: boolean = false) => {
     // Cor baseada na condição das máquinas (não muda quando selecionado)
@@ -584,6 +600,8 @@ export default function MapPage() {
     if (headquarters) {
       const colors = getThemeColors('neutral', currentIsDark)
       const isSelected = selectedSite?.id === headquarters.id
+
+      // Criar marcador da sede
       const el = document.createElement('div')
       el.className = 'marker-container'
       el.style.cursor = 'pointer'
@@ -603,12 +621,28 @@ export default function MapPage() {
 
       el.addEventListener('click', () => {
         setSelectedSite(headquarters)
-        setPanelPosition(null)
       })
 
       headquartersMarkerRef.current = new mapboxgl.Marker(el)
         .setLngLat([Number(headquarters.longitude), Number(headquarters.latitude)])
         .addTo(mapInstance)
+
+      markersRef.current.push(headquartersMarkerRef.current)
+
+      // Se a sede estiver selecionada, criar painel separado
+      if (isSelected) {
+        const panelEl = createSitePanel(headquarters, currentIsDark)
+        // Calcular posição abaixo do marcador (100 pixels abaixo)
+        const markerLngLat = [Number(headquarters.longitude), Number(headquarters.latitude)] as [number, number]
+        const markerPoint = mapInstance.project(markerLngLat)
+        const offsetPoint = [markerPoint.x, markerPoint.y + 100] as [number, number]
+        const offsetLngLat = mapInstance.unproject(offsetPoint)
+
+        const panelMarker = new mapboxgl.Marker(panelEl)
+          .setLngLat(offsetLngLat)
+          .addTo(mapInstance)
+        markersRef.current.push(panelMarker)
+      }
     }
 
     // Verificar se há sites para processar
@@ -664,7 +698,6 @@ export default function MapPage() {
           lastAnimatedSpiderfyRef.current = null // Resetar para permitir animação na próxima vez
           setSpiderfiedGroup(null)
           setSelectedSite(site)
-          setPanelPosition(null)
         }, isSelected)
 
         const marker = new mapboxgl.Marker(el)
@@ -672,6 +705,21 @@ export default function MapPage() {
           .addTo(mapInstance)
 
         markersRef.current.push(marker)
+
+        // Se o site estiver selecionado, criar painel separado abaixo do marcador
+        if (isSelected) {
+          const panelEl = createSitePanel(site, currentIsDark)
+          // Calcular posição abaixo do marcador (140 pixels abaixo para jobsites)
+          const markerLngLat = [Number(site.longitude), Number(site.latitude)] as [number, number]
+          const markerPoint = mapInstance.project(markerLngLat)
+          const offsetPoint = [markerPoint.x, markerPoint.y + 140] as [number, number]
+          const offsetLngLat = mapInstance.unproject(offsetPoint)
+
+          const panelMarker = new mapboxgl.Marker(panelEl)
+            .setLngLat(offsetLngLat)
+            .addTo(mapInstance)
+          markersRef.current.push(panelMarker)
+        }
       } else if (spiderfiedGroup === group.id) {
         // ============================================================
         // SPIDERFY EXPANDIDO
@@ -753,7 +801,6 @@ export default function MapPage() {
           lastAnimatedSpiderfyRef.current = null // Resetar para permitir animação na próxima vez
           setSpiderfiedGroup(null)
           setSelectedSite(null)
-          setPanelPosition(null)
         })
 
         const closeMarker = new mapboxgl.Marker(closeEl)
@@ -815,7 +862,6 @@ export default function MapPage() {
             markerEl = createSpiderfyMarker(site, currentIsDark, (e) => {
               if (e) e.stopPropagation()
               setSelectedSite(site)
-              setPanelPosition(null)
             }, isSelected)
 
             marker = new mapboxgl.Marker(markerEl)
@@ -823,6 +869,21 @@ export default function MapPage() {
               .addTo(mapInstance)
 
             markersRef.current.push(marker)
+
+            // Se o site estiver selecionado, criar painel separado
+            if (isSelected) {
+              const panelEl = createSitePanel(site, currentIsDark)
+              // Calcular posição abaixo do marcador (130 pixels abaixo para jobsites)
+              const markerLngLat = [markerPos.lng, markerPos.lat] as [number, number]
+              const markerPoint = mapInstance.project(markerLngLat)
+              const offsetPoint = [markerPoint.x, markerPoint.y + 130] as [number, number]
+              const offsetLngLat = mapInstance.unproject(offsetPoint)
+
+              const panelMarker = new mapboxgl.Marker(panelEl)
+                .setLngLat(offsetLngLat)
+                .addTo(mapInstance)
+              markersRef.current.push(panelMarker)
+            }
 
             // Adicionar handlers para zoom/pan
             mapInstance.on('move', updatePositions)
@@ -935,7 +996,7 @@ export default function MapPage() {
       }
     })
 
-  }, [sites, spiderfiedGroup, selectedSite, groupNearbySites, clearSpiderLines, createLocationMarker, createSpiderfyMarker, getGeoDistance])
+  }, [sites, spiderfiedGroup, selectedSite, groupNearbySites, clearSpiderLines, createLocationMarker, createSpiderfyMarker, createSitePanel, getGeoDistance])
 
   // Atualizar ref de updateMarkers sempre que a função mudar
   useEffect(() => {
@@ -1028,6 +1089,22 @@ export default function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, sessionLoading])
 
+  // Event listener para fechar painel do site
+  useEffect(() => {
+    const handleCloseSitePanel = (event: CustomEvent) => {
+      const siteId = event.detail
+      if (selectedSite?.id === siteId) {
+        setSelectedSite(null)
+      }
+    }
+
+    window.addEventListener('closeSitePanel', handleCloseSitePanel as EventListener)
+
+    return () => {
+      window.removeEventListener('closeSitePanel', handleCloseSitePanel as EventListener)
+    }
+  }, [selectedSite])
+
   useEffect(() => {
     initializeMap()
 
@@ -1098,125 +1175,13 @@ export default function MapPage() {
     return mapStyle === 'satellite' ? 'Satélite' : 'Mapa'
   }
 
-  // Drag imperativo - manipula DOM diretamente durante movimento
-  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    // Só permite drag se panelPosition já foi inicializado
-    if (!panelRef.current || !mapContainerRef.current || !panelPosition) return
-
-    const container = mapContainerRef.current
-    const containerStyle = getComputedStyle(container)
-
-    const isMobile = 'touches' in e
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-    const clientY = 'touches' in e ? e.touches[0].pageY : e.clientY
-
-    // Calcular limites baseados no layout atual
-    const paddingLeft = parseFloat(containerStyle.paddingLeft)
-    const paddingRight = parseFloat(containerStyle.paddingRight)
-    const paddingTop = parseFloat(containerStyle.paddingTop)
-    const paddingBottom = parseFloat(containerStyle.paddingBottom)
-
-    // Usar dimensões fixas do painel (384px x auto) - não ler do DOM
-    const panelWidth = 384
-    const panelHeight = panelRef.current.offsetHeight
-
-    const containerRect = container.getBoundingClientRect()
-    const minX = paddingLeft
-    const maxX = containerRect.width - paddingRight - panelWidth
-    const minY = paddingTop
-    const maxY = containerRect.height - paddingBottom - panelHeight
-
-    // Estado lógico como fonte da verdade - SEM FALLBACK
-    dragStateRef.current = {
-      startX: clientX,
-      startY: clientY,
-      panelStartX: panelPosition.x,  // ← Estado real, não fallback
-      panelStartY: panelPosition.y,  // ← Estado real, não fallback
-      minX,
-      maxX,
-      minY,
-      maxY
-    }
-
-    setIsDragging(true)
-
-    // Prevenir seleção de texto durante o arraste (apenas para mouse)
-    if ('clientX' in e) {
-      e.preventDefault()
-    }
-  }, [panelPosition])
-
-  const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
-    if (!isDragging || !panelRef.current || !dragStateRef.current) return
-
-    const isMobile = 'touches' in e
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-    const clientY = 'touches' in e ? e.touches[0].pageY : e.clientY
-
-    const state = dragStateRef.current
-
-    // Cálculo puro baseado no estado lógico (sem DOM)
-    const deltaX = clientX - state.startX
-    const deltaY = clientY - state.startY
-
-    const newX = Math.max(state.minX, Math.min(state.panelStartX + deltaX, state.maxX))
-    const newY = Math.max(state.minY, Math.min(state.panelStartY + deltaY, state.maxY))
-
-    // Aplicar transformação DIRETAMENTE no DOM (sem state, sem re-render)
-    panelRef.current.style.transform = `translate3d(${newX}px, ${newY}px, 0)`
-  }, [isDragging])
-
-  const handleDragEnd = useCallback(() => {
-    if (!panelRef.current || !dragStateRef.current) return
-
-    setIsDragging(false)
-
-    // Obter posição final baseada no getBoundingClientRect (após transformação)
-    const panelRect = panelRef.current.getBoundingClientRect()
-    const containerRect = mapContainerRef.current.getBoundingClientRect()
-
-    const finalX = panelRect.left - containerRect.left
-    const finalY = panelRect.top - containerRect.top
-
-    // Limpar transformação e atualizar state final
-    panelRef.current.style.transform = ''
-    setPanelPosition({ x: finalX, y: finalY })
-
-    // Limpar ref
-    dragStateRef.current = null
-  }, [])
-
-  // Adicionar event listeners globais durante o arraste
-  useEffect(() => {
-    if (isDragging) {
-      const handleMouseMove = (e: MouseEvent) => handleDragMove(e)
-      const handleTouchMove = (e: TouchEvent) => {
-        e.preventDefault() // Bloquear scroll da página durante drag no mobile
-        handleDragMove(e)
-      }
-      const handleMouseUp = () => handleDragEnd()
-      const handleTouchEnd = () => handleDragEnd()
-
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('touchmove', handleTouchMove, { passive: false })
-      document.addEventListener('mouseup', handleMouseUp)
-      document.addEventListener('touchend', handleTouchEnd)
-
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove)
-        document.removeEventListener('touchmove', handleTouchMove)
-        document.removeEventListener('mouseup', handleMouseUp)
-        document.removeEventListener('touchend', handleTouchEnd)
-      }
-    }
-  }, [isDragging, handleDragMove, handleDragEnd])
 
   return (
     <div className="min-h-screen md:h-screen md:max-h-screen bg-gray-50 dark:bg-gray-900 md:flex md:flex-col md:overflow-hidden">
       <Header title="Mapa" />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
-        <main ref={mapContainerRef} className={`relative flex-1 p-4 md:p-6 transition-all duration-250 ease-in-out md:flex md:flex-col md:overflow-hidden ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`} style={{ minHeight: 'calc(100vh - 200px)' }}>
+        <main className={`relative flex-1 p-4 md:p-6 transition-all duration-250 ease-in-out md:flex md:flex-col md:overflow-hidden ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`} style={{ minHeight: 'calc(100vh - 200px)' }}>
           <div className="relative w-full h-full rounded-lg overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700" style={{ minHeight: '400px' }}>
             {/* Map Container */}
             <div ref={mapContainer} className="map-container w-full h-full" />
@@ -1263,121 +1228,6 @@ export default function MapPage() {
               </p>
             </div>
 
-            {/* Drag Container - Transparente */}
-            {selectedSite && (
-              <div
-                ref={panelRef}
-                className="absolute z-[10000]"
-                style={{
-                  left: `${panelPosition?.x || 0}px`,
-                  top: `${panelPosition?.y || 0}px`,
-                  width: '384px',
-                  maxWidth: 'calc(100vw - 2rem)',
-                  height: 'auto',
-                  willChange: 'transform' // Otimização para animações
-                }}
-                onMouseDown={handleDragStart}
-                onTouchStart={handleDragStart}
-              >
-                {/* Drag Handle - Barra Superior */}
-                <div
-                  className={`w-24 h-12 mx-auto cursor-move touch-none flex items-center justify-center rounded-t-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 border-b-0`}
-                  style={{ touchAction: 'none' }}
-                  onMouseDown={handleDragStart}
-                  onTouchStart={handleDragStart}
-                >
-                  <div className="flex space-x-1">
-                    <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                    <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                    <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
-                  </div>
-                </div>
-
-                {/* Panel Content - Com suas próprias bordas e padding */}
-                <div
-                  className={`rounded-t-lg rounded-b-lg shadow-lg p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 ${isDragging ? 'select-none' : ''}`}
-                >
-                  <div className="flex items-center justify-between mb-2 mt-1">
-                  <div className="flex items-center gap-2">
-                    {selectedSite.is_headquarters && (
-                      <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                      </svg>
-                    )}
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
-                      {selectedSite.title}
-                    </h3>
-                    {selectedSite.is_headquarters && (
-                      <span className="text-xs px-2 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded font-medium">
-                        Sede
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => {
-                      setSelectedSite(null)
-                      setPanelPosition(null)
-                    }}
-                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                  >
-                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                <p className="text-sm mb-3 text-gray-500 dark:text-gray-400">
-                  {selectedSite.address || selectedSite.city || 'Localização não disponível'}
-                </p>
-
-                {!selectedSite.is_headquarters && (
-                  <>
-                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Máquinas ({selectedSite.machines_count})
-                      </p>
-                      {selectedSite.machines?.length > 0 ? (
-                        <div className="space-y-2 max-h-40 overflow-y-auto">
-                          {selectedSite.machines.map((machine: any) => (
-                            <div
-                              key={machine.id}
-                              className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"
-                            >
-                              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                {machine.unit_number}
-                              </span>
-                              <span className={`text-xs px-2 py-1 rounded-full ${
-                                machine.status === 'allocated' ? 'status-allocated' :
-                                machine.status === 'available' ? 'status-available' :
-                                machine.status === 'maintenance' ? 'status-maintenance' : 'status-inactive'
-                              }`}>
-                                {MACHINE_STATUS_LABELS[machine.status]}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Nenhuma máquina alocada
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="mt-3 w-full py-2 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-lg text-sm font-medium text-center cursor-not-allowed">
-                      Detalhes Indisponíveis
-                    </div>
-                  </>
-                )}
-                {selectedSite.is_headquarters && (
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-                    <p className="text-sm text-gray-600 dark:text-gray-400 italic">
-                      Esta é a sede da empresa Premium Group Inc.
-                    </p>
-                  </div>
-                )}
-                </div>
-              </div>
-            )}
           </div>
         </main>
       </div>
