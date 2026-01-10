@@ -483,25 +483,25 @@ export default function SitesPage() {
   }
 
   return (
-    <div className="min-h-screen md:h-screen md:max-h-screen bg-gray-50 dark:bg-gray-900 pb-safe-content md:pb-0 md:flex md:flex-col md:overflow-hidden">
+    <div className="min-h-screen md:h-screen md:max-h-screen bg-gray-50 dark:bg-gray-900 pb-safe-content md:pb-0 md:flex md:flex-col md:overflow-hidden overflow-x-hidden">
       <Header title="Obras" />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
-        <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-250 ease-in-out ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`}>
-          <div className="max-w-7xl mx-auto md:flex md:flex-col md:flex-1 md:overflow-hidden md:w-full">
+        <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-250 ease-in-out ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'} min-w-0 max-w-full overflow-x-hidden`}>
+          <div className="max-w-7xl mx-auto md:flex md:flex-col md:flex-1 md:overflow-hidden md:w-full w-full min-w-0">
             {/* Métricas */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4 flex-shrink-0">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Obras Ativas</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4 flex-shrink-0 min-w-0">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden min-w-0">
+                <div className="p-3 md:p-4">
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">Obras Ativas</p>
+                      <p className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mt-1">
                         {loadingMetrics ? '...' : metrics.totalActiveSites}
                       </p>
                     </div>
-                    <div className="bg-blue-100 dark:bg-blue-900 rounded-full p-2">
-                      <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="bg-blue-100 dark:bg-blue-900 rounded-full p-1.5 md:p-2 flex-shrink-0">
+                      <svg className="w-4 h-4 md:w-5 md:h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                       </svg>
                     </div>
@@ -509,17 +509,17 @@ export default function SitesPage() {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Máquinas Alocadas</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden min-w-0">
+                <div className="p-3 md:p-4">
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">Máquinas Alocadas</p>
+                      <p className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mt-1">
                         {loadingMetrics ? '...' : metrics.totalMachinesAllocated}
                       </p>
                     </div>
-                    <div className="bg-green-100 dark:bg-green-900 rounded-full p-2">
-                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="bg-green-100 dark:bg-green-900 rounded-full p-1.5 md:p-2 flex-shrink-0">
+                      <svg className="w-4 h-4 md:w-5 md:h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
@@ -528,17 +528,17 @@ export default function SitesPage() {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Alocações Pendentes</p>
-                      <p className={`text-2xl font-bold mt-1 ${metrics.pendingAllocations > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-900 dark:text-white'}`}>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden min-w-0">
+                <div className="p-3 md:p-4">
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">Alocações Pendentes</p>
+                      <p className={`text-xl md:text-2xl font-bold mt-1 ${metrics.pendingAllocations > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-900 dark:text-white'}`}>
                         {loadingMetrics ? '...' : metrics.pendingAllocations}
                       </p>
                     </div>
-                    <div className={`rounded-full p-2 ${metrics.pendingAllocations > 0 ? 'bg-yellow-100 dark:bg-yellow-900' : 'bg-gray-100 dark:bg-gray-700'}`}>
-                      <svg className={`w-5 h-5 ${metrics.pendingAllocations > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-600 dark:text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className={`rounded-full p-1.5 md:p-2 flex-shrink-0 ${metrics.pendingAllocations > 0 ? 'bg-yellow-100 dark:bg-yellow-900' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                      <svg className={`w-4 h-4 md:w-5 md:h-5 ${metrics.pendingAllocations > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-600 dark:text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
@@ -546,17 +546,17 @@ export default function SitesPage() {
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Máquinas com Problemas</p>
-                      <p className={`text-2xl font-bold mt-1 ${metrics.machinesWithIssues > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden min-w-0">
+                <div className="p-3 md:p-4">
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">Máquinas com Problemas</p>
+                      <p className={`text-xl md:text-2xl font-bold mt-1 ${metrics.machinesWithIssues > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
                         {loadingMetrics ? '...' : metrics.machinesWithIssues}
                       </p>
                     </div>
-                    <div className={`rounded-full p-2 ${metrics.machinesWithIssues > 0 ? 'bg-red-100 dark:bg-red-900' : 'bg-gray-100 dark:bg-gray-700'}`}>
-                      <svg className={`w-5 h-5 ${metrics.machinesWithIssues > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className={`rounded-full p-1.5 md:p-2 flex-shrink-0 ${metrics.machinesWithIssues > 0 ? 'bg-red-100 dark:bg-red-900' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                      <svg className={`w-4 h-4 md:w-5 md:h-5 ${metrics.machinesWithIssues > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                     </div>
@@ -567,16 +567,16 @@ export default function SitesPage() {
 
             {/* Lista de Obras */}
             {(
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden min-w-0">
+                <div className="p-3 md:p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2 min-w-0">
+                  <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white truncate min-w-0 flex-1">
                     {showArchivedSites ? 'Obras Arquivadas' : 'Obras'} ({filteredSites.length})
                   </h2>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                     <div className="relative">
                       <button
                         onClick={() => setShowSearchDropdown(!showSearchDropdown)}
-                        className={`p-2 rounded-lg transition-colors ${
+                        className={`p-1.5 md:p-2 rounded-lg transition-colors flex-shrink-0 ${
                           searchQuery.trim()
                             ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30'
                             : showSearchDropdown
@@ -585,12 +585,12 @@ export default function SitesPage() {
                         }`}
                         title="Buscar"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                       </button>
                       {showSearchDropdown && (
-                        <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 z-10">
+                        <div className="absolute top-full right-0 mt-2 w-56 md:w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3 z-10">
                           <div className="relative">
                             <input
                               type="text"
@@ -617,40 +617,40 @@ export default function SitesPage() {
                     </div>
                     <button
                       onClick={loadSites}
-                      className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                      className="p-1.5 md:p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0"
                       disabled={loadingSites}
                       title="Atualizar"
                     >
                       {loadingSites ? (
-                        <svg className="w-5 h-5 animate-spin-reverse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 md:w-5 md:h-5 animate-spin-reverse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                       ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                       )}
                     </button>
                     <button
                       onClick={() => setShowArchivedSites(!showArchivedSites)}
-                      className={`p-2 rounded-lg transition-colors ${
+                      className={`p-1.5 md:p-2 rounded-lg transition-colors flex-shrink-0 ${
                         showArchivedSites
                           ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20'
                           : 'text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}
                       title={showArchivedSites ? 'Mostrar Obras Ativas' : 'Mostrar Obras Arquivadas'}
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                       </svg>
                     </button>
                     {!showArchivedSites && (
                       <button 
                         onClick={() => handleOpenModal()}
-                        className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        className="p-1.5 md:p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0"
                         title="Nova Obra"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
                       </button>
@@ -669,38 +669,44 @@ export default function SitesPage() {
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-200 dark:divide-gray-700 md:flex-1 md:overflow-y-auto">
+                <div className="divide-y divide-gray-200 dark:divide-gray-700 md:flex-1 md:overflow-y-auto min-w-0">
                   {filteredSites.map((site) => (
                     <div
                       key={site.id}
-                      className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      className="p-3 md:p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors min-w-0"
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2 min-w-0">
                         <div 
-                          className="flex-1 cursor-pointer"
+                          className="flex-1 min-w-0 cursor-pointer"
                           onClick={() => router.push(`/sites/${site.id}`)}
                         >
-                          <p className="font-medium text-gray-900 dark:text-white">{site.title}</p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate max-w-md">
+                          <p className="font-medium text-gray-900 dark:text-white truncate">{site.title}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">
                             {cleanAddress(site.address)}
                           </p>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-center">
-                            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
+                          <div className="text-center hidden sm:block">
+                            <p className="text-xl md:text-2xl font-bold text-blue-600 dark:text-blue-400">
                               {site.machines_count || 0}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400">máquinas</p>
+                          </div>
+                          <div className="text-center sm:hidden">
+                            <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                              {site.machines_count || 0}
+                            </p>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400">máq</p>
                           </div>
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
                               handleOpenModal(site)
                             }}
-                            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                            className="p-1.5 md:p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors flex-shrink-0"
                             title="Editar"
                           >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
@@ -709,7 +715,7 @@ export default function SitesPage() {
                               e.stopPropagation()
                               handleArchiveSite(site)
                             }}
-                            className={`p-2 rounded-lg transition-colors ${
+                            className={`p-1.5 md:p-2 rounded-lg transition-colors flex-shrink-0 ${
                               site.ativo
                                 ? 'text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30'
                                 : 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'
@@ -717,11 +723,11 @@ export default function SitesPage() {
                             title={site.ativo ? 'Arquivar' : 'Desarquivar'}
                           >
                             {site.ativo ? (
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                               </svg>
                             ) : (
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                               </svg>
                             )}
@@ -743,8 +749,8 @@ export default function SitesPage() {
 
       {/* Create Site Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl my-8">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 md:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl my-4 md:my-8 min-w-0 max-w-[calc(100vw-1.5rem)] md:max-w-2xl">
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {editingSite ? 'Editar Obra' : 'Nova Obra'}

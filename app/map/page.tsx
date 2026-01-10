@@ -355,12 +355,12 @@ export default function MapPage() {
       el.style.cursor = 'pointer'
       el.innerHTML = `
         <div class="relative">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center shadow-md border-2 border-white" style="background-color: ${colors.bg};">
-            <svg class="w-5 h-5" style="color: ${colors.text};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="rounded-lg flex items-center justify-center shadow-md border-2 border-white" style="width: 30px; height: 30px; background-color: ${colors.bg};">
+            <svg style="width: 15px; height: 15px; color: ${colors.text};" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           </div>
-          <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2.5 h-2.5 rotate-45 border-r border-b border-white" style="background-color: ${colors.bg};"></div>
+          <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 rotate-45 border-r border-b border-white" style="width: 7.5px; height: 7.5px; background-color: ${colors.bg};"></div>
         </div>
       `
 

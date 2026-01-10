@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import PinInput from '../components/PinInput'
@@ -24,6 +24,7 @@ export default function LoginPage() {
   // Estado de montagem do cliente para evitar hydration mismatch
   const [mounted, setMounted] = useState(false)
   const [isDark, setIsDark] = useState(false)
+  const hasCheckedSession = useRef(false)
 
   // Marcar como montado no cliente (evita hydration mismatch)
   useEffect(() => {
@@ -39,7 +40,9 @@ export default function LoginPage() {
 
   // Verificar se já está logado - redirecionar para página correta
   useEffect(() => {
-    if (!mounted) return
+    if (!mounted || hasCheckedSession.current) return
+    
+    hasCheckedSession.current = true
     
     const checkSession = async () => {
       try {
@@ -54,7 +57,8 @@ export default function LoginPage() {
       }
     }
     checkSession()
-  }, [mounted, router])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted])
 
   // Observar mudanças no tema
   useEffect(() => {
