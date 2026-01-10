@@ -47,9 +47,17 @@ export default function MapPage() {
   const [sites, setSites] = useState<Site[]>([])
   const [selectedSite, setSelectedSite] = useState<Site | null>(null)
   const [isDarkMode, setIsDarkMode] = useState(false)
-  
+
   // Inicializar estilo como 'map' (que será claro/escuro baseado no tema)
   const [mapStyle, setMapStyle] = useState<'map' | 'satellite'>('map')
+
+  // Estados para drag and drop do painel
+  const [isDragging, setIsDragging] = useState(false)
+  const [panelPosition, setPanelPosition] = useState<{ x: number; y: number } | null>(null)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [panelStart, setPanelStart] = useState({ x: 0, y: 0 })
+  const panelRef = useRef<HTMLDivElement>(null)
+  const mapContainerRef = useRef<HTMLDivElement>(null)
 
   const loadSites = useCallback(async () => {
     try {
@@ -553,6 +561,7 @@ export default function MapPage() {
 
       el.addEventListener('click', () => {
         setSelectedSite(headquarters)
+        setPanelPosition(null)
       })
 
       headquartersMarkerRef.current = new mapboxgl.Marker(el)
@@ -613,6 +622,7 @@ export default function MapPage() {
           lastAnimatedSpiderfyRef.current = null // Resetar para permitir animação na próxima vez
           setSpiderfiedGroup(null)
           setSelectedSite(site)
+          setPanelPosition(null)
         }, isSelected)
 
         const marker = new mapboxgl.Marker(el)
@@ -701,6 +711,7 @@ export default function MapPage() {
           lastAnimatedSpiderfyRef.current = null // Resetar para permitir animação na próxima vez
           setSpiderfiedGroup(null)
           setSelectedSite(null)
+          setPanelPosition(null)
         })
 
         const closeMarker = new mapboxgl.Marker(closeEl)
@@ -762,6 +773,7 @@ export default function MapPage() {
             markerEl = createSpiderfyMarker(site, currentIsDark, (e) => {
               if (e) e.stopPropagation()
               setSelectedSite(site)
+              setPanelPosition(null)
             }, isSelected)
 
             marker = new mapboxgl.Marker(markerEl)
@@ -1044,12 +1056,89 @@ export default function MapPage() {
     return mapStyle === 'satellite' ? 'Satélite' : 'Mapa'
   }
 
+  // Funções para drag and drop do painel
+  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (!panelRef.current) return
+
+    setIsDragging(true)
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+
+    // Salvar posição inicial do mouse
+    setDragStart({ x: clientX, y: clientY })
+
+    // Salvar posição inicial do painel
+    const rect = panelRef.current.getBoundingClientRect()
+    const currentPos = panelPosition || { x: rect.left, y: rect.top }
+    setPanelStart(currentPos)
+
+    // Prevenir seleção de texto durante o arraste
+    e.preventDefault()
+  }, [panelPosition])
+
+  const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
+    if (!isDragging || !panelRef.current || !mapContainerRef.current) return
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+
+    // Calcular diferença do movimento
+    const deltaX = clientX - dragStart.x
+    const deltaY = clientY - dragStart.y
+
+    // Nova posição = posição inicial do painel + diferença do movimento
+    const newX = panelStart.x + deltaX
+    const newY = panelStart.y + deltaY
+
+    // Controlar limites do container do mapa
+    const mapRect = mapContainerRef.current.getBoundingClientRect()
+    const panel = panelRef.current
+
+    const minX = mapRect.left
+    const maxX = mapRect.right - panel.offsetWidth
+    const minY = mapRect.top
+    const maxY = mapRect.bottom - panel.offsetHeight
+
+    const clampedX = Math.max(minX, Math.min(newX, maxX))
+    const clampedY = Math.max(minY, Math.min(newY, maxY))
+
+    // Atualizar posição durante o drag
+    setPanelPosition({ x: clampedX, y: clampedY })
+  }, [isDragging, dragStart, panelStart])
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false)
+    // A posição final já está em panelPosition
+  }, [])
+
+  // Adicionar event listeners globais durante o arraste
+  useEffect(() => {
+    if (isDragging) {
+      const handleMouseMove = (e: MouseEvent) => handleDragMove(e)
+      const handleTouchMove = (e: TouchEvent) => handleDragMove(e)
+      const handleMouseUp = () => handleDragEnd()
+      const handleTouchEnd = () => handleDragEnd()
+
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('touchmove', handleTouchMove, { passive: false })
+      document.addEventListener('mouseup', handleMouseUp)
+      document.addEventListener('touchend', handleTouchEnd)
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('touchmove', handleTouchMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+        document.removeEventListener('touchend', handleTouchEnd)
+      }
+    }
+  }, [isDragging, handleDragMove, handleDragEnd, panelStart])
+
   return (
     <div className="min-h-screen md:h-screen md:max-h-screen bg-gray-50 dark:bg-gray-900 md:flex md:flex-col md:overflow-hidden">
       <Header title="Mapa" />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
-        <main className={`flex-1 p-4 md:p-6 transition-all duration-250 ease-in-out md:flex md:flex-col md:overflow-hidden ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`} style={{ minHeight: 'calc(100vh - 200px)' }}>
+        <main ref={mapContainerRef} className={`flex-1 p-4 md:p-6 transition-all duration-250 ease-in-out md:flex md:flex-col md:overflow-hidden ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`} style={{ minHeight: 'calc(100vh - 200px)' }}>
           <div className="relative w-full h-full rounded-lg overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700" style={{ minHeight: '400px' }}>
             {/* Map Container */}
             <div ref={mapContainer} className="map-container w-full h-full" />
@@ -1098,12 +1187,37 @@ export default function MapPage() {
 
             {/* Selected Site Panel */}
             {selectedSite && (
-              <div className={`absolute bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 rounded-lg shadow-lg p-4 z-[10000] ${
-                selectedSite.is_headquarters 
-                  ? 'bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600' 
-                  : 'bg-white dark:bg-gray-800'
-              }`}>
-                <div className="flex items-center justify-between mb-3">
+              <div
+                ref={panelRef}
+                className={`absolute bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 rounded-lg shadow-lg p-4 z-[10000] transition-none ${
+                  selectedSite.is_headquarters
+                    ? 'bg-gray-50 dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600'
+                    : 'bg-white dark:bg-gray-800'
+                } ${isDragging ? 'cursor-move select-none' : ''}`}
+                style={panelPosition ? {
+                  position: 'fixed',
+                  left: `${panelPosition.x}px`,
+                  top: `${panelPosition.y}px`,
+                  bottom: 'auto',
+                  right: 'auto',
+                  width: '384px', // md:w-96 = 24rem = 384px
+                  maxWidth: 'calc(100vw - 2rem)',
+                  maxHeight: 'calc(100vh - 2rem)'
+                } : undefined}
+              >
+                {/* Drag Handle */}
+                <div
+                  className="absolute top-2 left-1/2 transform -translate-x-1/2 cursor-move touch-none"
+                  onMouseDown={handleDragStart}
+                  onTouchStart={handleDragStart}
+                >
+                  <div className="flex space-x-1">
+                    <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                    <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                    <div className="w-1 h-1 bg-gray-400 dark:bg-gray-500 rounded-full"></div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between mb-3 mt-2">
                   <div className="flex items-center gap-2">
                     {selectedSite.is_headquarters && (
                       <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1120,7 +1234,10 @@ export default function MapPage() {
                     )}
                   </div>
                   <button
-                    onClick={() => setSelectedSite(null)}
+                    onClick={() => {
+                      setSelectedSite(null)
+                      setPanelPosition(null)
+                    }}
                     className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                   >
                     <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1166,12 +1283,9 @@ export default function MapPage() {
                       )}
                     </div>
 
-                    <button
-                      onClick={() => router.push(`/sites/${selectedSite.id}`)}
-                      className="mt-3 w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-                    >
-                      Ver Detalhes
-                    </button>
+                    <div className="mt-3 w-full py-2 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-lg text-sm font-medium text-center cursor-not-allowed">
+                      Detalhes Indisponíveis
+                    </div>
                   </>
                 )}
                 {selectedSite.is_headquarters && (
