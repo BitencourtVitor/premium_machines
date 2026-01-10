@@ -115,30 +115,6 @@ export default function UsuariosPage() {
     setLoading(false)
   }, [user, sessionLoading, router])
 
-  useEffect(() => {
-    if (activeTab === 'suppliers' && !loading) {
-      loadSuppliers()
-    }
-  }, [activeTab, loading, loadSuppliers])
-
-  // Close search dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      if (!target.closest('.relative')) {
-        setShowSearchDropdown(false)
-      }
-    }
-
-    if (showSearchDropdown) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showSearchDropdown])
-
   const loadUsers = async () => {
     setLoadingUsers(true)
     try {
@@ -174,6 +150,30 @@ export default function UsuariosPage() {
       setLoadingSuppliers(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (activeTab === 'suppliers' && !loading) {
+      loadSuppliers()
+    }
+  }, [activeTab, loading, loadSuppliers])
+
+  // Close search dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (!target.closest('.relative')) {
+        setShowSearchDropdown(false)
+      }
+    }
+
+    if (showSearchDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showSearchDropdown])
 
   const handleOpenModal = (userToEdit?: any) => {
     if (userToEdit) {
