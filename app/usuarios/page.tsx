@@ -362,8 +362,7 @@ export default function UsuariosPage() {
   }
 
   const filteredUsers = users.filter(u => {
-    // Filtrar por tab
-    if (activeTab === 'suppliers' && u.role !== 'fornecedor') return false
+    // Na aba users, filtrar apenas usuários internos (não fornecedores)
     if (activeTab === 'users' && u.role === 'fornecedor') return false
     
     if (showOnlyPending && u.validado) return false
@@ -371,8 +370,7 @@ export default function UsuariosPage() {
     return true
   })
 
-  const pendingCount = users.filter(u => !u.validado && (activeTab === 'users' ? u.role !== 'fornecedor' : u.role === 'fornecedor')).length
-  const supplierUsers = users.filter(u => u.role === 'fornecedor')
+  const pendingCount = users.filter(u => !u.validado && u.role !== 'fornecedor').length
 
   if (loading) {
     return (
