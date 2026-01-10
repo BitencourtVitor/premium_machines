@@ -101,8 +101,8 @@ export default function MapPage() {
       /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
     )
     
-    // Zoom mais retraído em mobile (metade do desktop: 3.75 vs 7.5)
-    const initialZoom = isMobile ? 3.75 : 7.5
+    // Zoom mais retraído em mobile (ajustado para 5.0)
+    const initialZoom = isMobile ? 5.0 : 7.5
 
     map.current = new mapboxgl.Map({
       container: container,
