@@ -24,6 +24,8 @@ interface AllocationEvent {
   downtime_reason?: string
   created_by_user: { nome: string }
   created_at: string
+  construction_type?: string
+  lot_building_number?: string
 }
 
 export default function EventsPage() {
@@ -43,6 +45,8 @@ export default function EventsPage() {
     event_type: 'start_allocation',
     machine_id: '',
     site_id: '',
+    construction_type: '',
+    lot_building_number: '',
     event_date: new Date().toISOString().slice(0, 16),
     downtime_reason: '',
     downtime_description: '',
@@ -115,7 +119,7 @@ export default function EventsPage() {
     }
 
     if (['start_allocation', 'end_allocation'].includes(newEvent.event_type) && !newEvent.site_id) {
-      alert('Selecione uma obra para eventos de alocação')
+      alert('Selecione um jobsite para eventos de alocação')
       return
     }
 
@@ -138,6 +142,8 @@ export default function EventsPage() {
           event_type: 'start_allocation',
           machine_id: '',
           site_id: '',
+          construction_type: '',
+          lot_building_number: '',
           event_date: new Date().toISOString().slice(0, 16),
           downtime_reason: '',
           downtime_description: '',
@@ -321,6 +327,11 @@ export default function EventsPage() {
                           {event.site && (
                             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                               {event.site.title}
+                              {event.construction_type && event.lot_building_number && (
+                                <span className="ml-2">
+                                  • {event.construction_type === 'lot' ? 'Lote' : 'Prédio'} {event.lot_building_number}
+                                </span>
+                              )}
                             </p>
                           )}
                           {event.downtime_reason && (
@@ -419,21 +430,53 @@ export default function EventsPage() {
               </div>
 
               {['start_allocation', 'end_allocation'].includes(newEvent.event_type) && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Obra *
-                  </label>
-                  <select
-                    value={newEvent.site_id}
-                    onChange={(e) => setNewEvent({ ...newEvent, site_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    <option value="">Selecione...</option>
-                    {sites.map((site) => (
-                      <option key={site.id} value={site.id}>{site.title}</option>
-                    ))}
-                  </select>
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Jobsite *
+                    </label>
+                    <select
+                      value={newEvent.site_id}
+                      onChange={(e) => setNewEvent({ ...newEvent, site_id: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <option value="">Selecione...</option>
+                      {sites.map((site) => (
+                        <option key={site.id} value={site.id}>{site.title}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Tipo de Construção
+                    </label>
+                    <select
+                      value={newEvent.construction_type}
+                      onChange={(e) => setNewEvent({ ...newEvent, construction_type: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <option value="">Selecione...</option>
+                      <option value="lot">Lote</option>
+                      <option value="building">Prédio/Edifício</option>
+                    </select>
+                  </div>
+
+                  {newEvent.construction_type && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Número do {newEvent.construction_type === 'lot' ? 'Lote' : 'Prédio'}
+                      </label>
+                      <input
+                        type="text"
+                        value={newEvent.lot_building_number}
+                        onChange={(e) => setNewEvent({ ...newEvent, lot_building_number: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder={`Número do ${newEvent.construction_type === 'lot' ? 'lote' : 'prédio'}`}
+                      />
+                    </div>
+                  )}
+                </>
               )}
 
               <div>
