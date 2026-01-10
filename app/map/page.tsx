@@ -172,6 +172,12 @@ export default function MapPage() {
     // Listener para zoom (dispara durante o zoom, mais confiável no mobile)
     map.current.on('zoom', handleZoomUpdate)
     
+    // Detectar se é mobile para atualização automática após zoom
+    const isMobileDevice = typeof window !== 'undefined' && (
+      window.innerWidth < 768 || 
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    )
+
     // Listener para zoomend (dispara quando o zoom termina) - mais confiável
     // Este é o evento principal que deve sempre atualizar os marcadores
     map.current.on('zoomend', () => {
@@ -192,6 +198,14 @@ export default function MapPage() {
           requestAnimationFrame(() => {
             if (map.current && map.current.isStyleLoaded()) {
               updateMarkers()
+              
+              // No mobile, atualizar os sites automaticamente após o zoom
+              if (isMobileDevice) {
+                // Pequeno delay para garantir que os marcadores foram atualizados primeiro
+                setTimeout(() => {
+                  loadSites()
+                }, 300)
+              }
             }
           })
         })
@@ -250,7 +264,7 @@ export default function MapPage() {
     
     // Armazenar handlers para cleanup
     resizeHandlersRef.current.push(handleResize, handleOrientationChange)
-  }, [mapStyle])
+  }, [mapStyle, loadSites, updateMarkers])
 
   // Função para obter cores adaptadas ao tema
   const getThemeColors = (colorType: 'neutral' | 'blue' | 'red' | 'green' | 'yellow' | 'orange' | 'purple', isDark: boolean) => {
