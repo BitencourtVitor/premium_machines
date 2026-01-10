@@ -15,7 +15,10 @@ sobre:
 - quando ficaram paradas
 - qual o impacto financeiro real dessas paradas
 - quais máquinas pertencem à empresa e quais são alugadas
-- e qual fornecedor é responsável por cada máquina alugada
+- qual fornecedor é responsável por cada máquina alugada
+- quando uma máquina quebra e precisa de manutenção
+- tempo de resposta e resolução de problemas de manutenção
+- quem são os mecânicos/prestadores disponíveis para cada tipo de problema
 
 IMPORTANTE: O mapa não é o núcleo do sistema. Ele é apenas uma camada de 
 visualização. O núcleo do sistema é orientado a eventos, com forte separação 
@@ -51,6 +54,11 @@ registrado como evento:
 - fim de alocação
 - parada por defeito
 - parada por falta de insumo
+- solicitação de manutenção
+- início de manutenção
+- fim de manutenção
+- remoção de máquina (para manutenção externa)
+- retorno de máquina (após manutenção)
 - correção de evento
 - aprovação ou rejeição de evento
 
@@ -210,6 +218,73 @@ Campos principais:
 - approved_by
 - created_at
 
+5.5 Maintenance Events (Eventos de Manutenção)
+
+Representam o ciclo completo de manutenção de uma máquina, desde a solicitação 
+até a conclusão.
+
+Tipos de eventos de manutenção:
+- maintenance_request (solicitação de manutenção)
+- maintenance_start (início do trabalho)
+- maintenance_complete (conclusão)
+- machine_removal (remoção para manutenção externa)
+- machine_return (retorno após manutenção)
+
+Campos principais:
+- id
+- machine_id
+- site_id (onde a máquina estava quando quebrou)
+- event_type
+- maintenance_type (breakdown | preventive | scheduled)
+- supplier_id (mecânico/prestador responsável)
+- requested_at (quando foi solicitado)
+- started_at (quando o mecânico chegou/iniciou)
+- completed_at (quando foi concluído)
+- response_time (tempo entre solicitação e início)
+- resolution_time (tempo entre início e conclusão)
+- description (descrição do problema)
+- cost (custo da manutenção, se aplicável)
+- status (pending | in_progress | completed | cancelled)
+- created_by
+- approved_by
+- created_at
+
+Observação: Para máquinas alugadas, o supplier_id referencia a empresa de 
+aluguel. Para máquinas próprias, referencia o mecânico/prestador de serviço.
+
+5.6 Suppliers (Fornecedores)
+
+Fornecedores podem ser de dois tipos:
+
+5.6.1 Rental Suppliers (Fornecedores de Aluguel)
+- Empresas que alugam máquinas para a empresa
+- Associados a máquinas com ownership_type = 'rented'
+- Responsáveis pela manutenção de suas próprias máquinas alugadas
+
+5.6.2 Maintenance Suppliers (Fornecedores de Manutenção / Mecânicos)
+- Prestadores de serviço que consertam máquinas próprias da empresa
+- Podem ser mecânicos individuais ou empresas especializadas
+- Associados a eventos de manutenção de máquinas próprias
+- Campos adicionais:
+  * service_type (repair | preventive | emergency)
+  * specialties (tipos de máquinas que conserta)
+  * average_response_time (tempo médio de resposta)
+  * contact_info (telefone, email, etc.)
+
+Campos principais (comuns a ambos):
+- id
+- name
+- supplier_type (rental | maintenance | both)
+- contact_info
+- created_at
+- updated_at
+
+Lógica de responsabilidade:
+- Máquina própria quebra → sistema sugere/permite selecionar fornecedor de 
+  manutenção
+- Máquina alugada quebra → sistema automaticamente referencia o fornecedor de 
+  aluguel da máquina
+
 
 ================================================================================
 6. MODELO TEMPORAL E TRACKING DIÁRIO
@@ -219,6 +294,7 @@ O sistema não armazena dias calculados diretamente. O tracking diário é
 derivado a partir de:
 - eventos de alocação
 - eventos de parada
+- eventos de manutenção
 - eventos de correção
 
 A linha do tempo de uma máquina é reconstruída dinamicamente quando necessário.
@@ -249,6 +325,15 @@ Isso permite:
 - administrador aprova
 - sistema recalcula automaticamente
 
+7.3 Custos de manutenção
+
+- manutenções de máquinas próprias geram custos diretos (cobrança do mecânico)
+- manutenções de máquinas alugadas podem gerar:
+  * dedução de dias de aluguel (se a manutenção é responsabilidade do fornecedor)
+  * custos adicionais (se a manutenção é cobrada separadamente)
+- tempo de resposta e resolução são rastreados para análise de performance
+- custos de manutenção são registrados nos eventos e consolidados nos relatórios
+
 Nenhum valor financeiro é ajustado manualmente.
 
 
@@ -274,8 +359,10 @@ Campos típicos:
 - period_end
 - total_days
 - downtime_days
+- maintenance_days (dias em manutenção)
 - billable_days
 - estimated_cost
+- maintenance_cost (custos de manutenção no período)
 - calculated_at
 
 Snapshots podem ser:
