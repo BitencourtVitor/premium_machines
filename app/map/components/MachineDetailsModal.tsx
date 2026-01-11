@@ -142,32 +142,32 @@ export default function MachineDetailsModal({
                 <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                   <div className="text-sm text-gray-500 dark:text-gray-400">Status Atual</div>
                   <div className={`text-lg font-medium ${
-                    machineDetails?.status === 'allocated' ? 'text-green-600 dark:text-green-400' :
-                    machineDetails?.status === 'maintenance' ? 'text-yellow-600 dark:text-yellow-400' :
+                    machine?.status === 'allocated' ? 'text-green-600 dark:text-green-400' :
+                    machine?.status === 'maintenance' ? 'text-yellow-600 dark:text-yellow-400' :
                     'text-gray-600 dark:text-gray-400'
                   }`}>
-                    {machineDetails?.status || 'Desconhecido'}
+                    {machine?.status || 'Desconhecido'}
                   </div>
                 </div>
                 <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                   <div className="text-sm text-gray-500 dark:text-gray-400">Propriedade</div>
                   <div className={`text-lg font-medium ${
-                    machineDetails?.ownership_type === 'owned' ? 'text-blue-600 dark:text-blue-400' :
+                    machine?.ownership_type === 'owned' ? 'text-blue-600 dark:text-blue-400' :
                     'text-orange-600 dark:text-orange-400'
                   }`}>
-                    {machineDetails?.ownership_type === 'owned' ? 'Própria' : 'Alugada'}
+                    {machine?.ownership_type === 'owned' ? 'Própria' : 'Alugada'}
                   </div>
                 </div>
                 <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                   <div className="text-sm text-gray-500 dark:text-gray-400">Tipo</div>
                   <div className="text-lg font-medium text-gray-900 dark:text-white">
-                    {machineDetails?.machine_type?.nome || 'N/A'}
+                    {machine?.machine_type?.nome || 'N/A'}
                   </div>
                 </div>
                 <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                   <div className="text-sm text-gray-500 dark:text-gray-400">Fornecedor</div>
                   <div className="text-lg font-medium text-gray-900 dark:text-white">
-                    {machineDetails?.supplier?.nome || 'N/A'}
+                    {machine?.supplier?.nome || 'N/A'}
                   </div>
                 </div>
               </div>
