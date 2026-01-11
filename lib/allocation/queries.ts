@@ -40,7 +40,13 @@ export async function getActiveAllocations(): Promise<ActiveAllocation[]> {
           allocation_event_id: state.current_allocation_event_id,
           machine_id: machine.id,
           machine_unit_number: machine.unit_number,
-          machine_type: machine.machine_type?.nome || '',
+          machine_type: (() => {
+            const type = machine.machine_type;
+            if (Array.isArray(type)) {
+              return (type[0] as any)?.nome || '';
+            }
+            return (type as any)?.nome || '';
+          })(),
           machine_ownership: machine.ownership_type,
           machine_supplier_id: machine.supplier?.id || null,
           machine_supplier_name: machine.supplier?.nome || null,
