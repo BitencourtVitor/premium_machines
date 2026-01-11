@@ -70,6 +70,8 @@ export function getDefaultPermissions(role: string): RolePermissions {
 
 // Event types labels
 export const EVENT_TYPE_LABELS: Record<string, string> = {
+  request_allocation: 'Solicitação de Alocação',
+  confirm_allocation: 'Confirmação de Alocação',
   start_allocation: 'Início de Alocação',
   end_allocation: 'Fim de Alocação',
   downtime_start: 'Início de Parada',

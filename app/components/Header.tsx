@@ -96,7 +96,7 @@ export default function Header({ title }: { title: string }) {
             className="object-contain"
           />
           <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
-          <span className="text-xl text-gray-900 dark:text-white">Machines</span>
+          <span className="text-xl text-gray-900 dark:text-white">{title || 'Machines'}</span>
         </div>
         <div className="flex items-center gap-3">
           {user && (

@@ -1,0 +1,17 @@
+{
+  "name": "@premium-machines/ui-library",
+  "version": "1.0.0",
+  "description": "Object-oriented UI component library for Premium Machines",
+  "main": "index.ts",
+  "types": "index.ts",
+  "scripts": {
+    "test": "jest"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "tailwindcss": ">=3"
+  },
+  "author": "Premium Machines Dev Team",
+  "license": "UNLICENSED"
+}

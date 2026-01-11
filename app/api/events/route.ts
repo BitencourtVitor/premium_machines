@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+import { validateEvent, getActiveDowntimeByMachine } from '@/lib/allocationService'
 
 export async function GET(request: NextRequest) {
   try {
@@ -57,6 +58,24 @@ export async function POST(request: NextRequest) {
     if (!body.event_type || !body.machine_id || !body.event_date || !body.created_by) {
       return NextResponse.json(
         { success: false, message: 'Campos obrigatórios: event_type, machine_id, event_date, created_by' },
+        { status: 400 }
+      )
+    }
+
+    // Se for downtime_end e não tiver corrects_event_id, buscar automaticamente
+    if (body.event_type === 'downtime_end' && !body.corrects_event_id) {
+      const activeDowntime = await getActiveDowntimeByMachine(body.machine_id)
+      if (activeDowntime) {
+        body.corrects_event_id = activeDowntime.downtime_event_id
+        body.site_id = activeDowntime.site_id
+      }
+    }
+
+    // Validação usando o allocationService
+    const validation = await validateEvent(body)
+    if (!validation.valid) {
+      return NextResponse.json(
+        { success: false, message: validation.reason },
         { status: 400 }
       )
     }

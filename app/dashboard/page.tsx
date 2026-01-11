@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import Header from '../components/Header'
-import BottomNavigation from '../components/BottomNavigation'
-import Sidebar from '../components/Sidebar'
+import Header from '@/app/components/Header'
+import BottomNavigation from '@/app/components/BottomNavigation'
+import Sidebar from '@/app/components/Sidebar'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
 import { useAllocationDataRefresh } from '@/lib/allocationEvents'
@@ -92,11 +92,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-safe-content">
+    <div className="min-h-screen md:h-screen md:max-h-screen bg-gray-50 dark:bg-gray-900 pb-safe-content md:pb-0 md:flex md:flex-col md:overflow-hidden">
       <Header title="Dashboard" />
-      <div className="flex">
+      <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
-        <main className={`flex-1 p-4 md:p-6 transition-all duration-250 ease-in-out ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`}>
+        <main className={`flex-1 p-4 md:p-6 transition-all duration-250 ease-in-out md:overflow-y-auto ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`}>
           <div className="max-w-7xl mx-auto">
             {/* Welcome Message */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
@@ -332,7 +332,6 @@ export default function DashboardPage() {
           </div>
         </main>
       </div>
-
       <BottomNavigation />
     </div>
   )

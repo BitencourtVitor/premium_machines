@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "jest",
     "clean": "rm -rf .next",
     "clean:win": "powershell -Command \"if (Test-Path .next) { Remove-Item -Recurse -Force .next }\""
   },
@@ -23,15 +24,23 @@
     "recharts": "^3.6.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.1",
     "@types/bcryptjs": "^2.4.6",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.11.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "@types/testing-library__react": "^10.0.1",
     "autoprefixer": "^10.4.0",
     "eslint": "^8.56.0",
     "eslint-config-next": "^14.2.0",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
+    "ts-jest": "^29.4.6",
     "typescript": "^5.3.0"
   }
 }
