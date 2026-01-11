@@ -16,6 +16,7 @@ import { Site } from './types'
 import { useMapInitialization } from './hooks/useMapInitialization'
 import { useMapMarkers } from './hooks/useMapMarkers'
 import { useMapModals } from './hooks/useMapModals'
+import { useThemeDetector } from './hooks/useThemeDetector'
 
 // Mapbox token will be set from env
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
@@ -45,6 +46,9 @@ export default function MapPage() {
   const [selectedMachine, setSelectedMachine] = useState<any | null>(null)
   const [selectedSite, setSelectedSite] = useState<Site | null>(null)
   const [mapStyle, setMapStyle] = useState<'map' | 'satellite'>('map')
+
+  // Detect theme
+  const isDark = useThemeDetector()
 
   // Hooks
   const {
@@ -200,7 +204,8 @@ export default function MapPage() {
     onZoomUpdate: handleZoomUpdate,
     onZoomEnd: handleZoomEnd,
     onMoveEnd: handleMoveEnd,
-    onClick: handleClick
+    onClick: handleClick,
+    isDark
   })
 
   // Effects
@@ -251,7 +256,7 @@ export default function MapPage() {
         updateMarkers()
       })
     }
-  }, [sites, mapLoaded, spiderfiedGroup, selectedSite, updateMarkers])
+  }, [sites, mapLoaded, spiderfiedGroup, selectedSite, updateMarkers, isDark])
 
   // Cleanup
   useEffect(() => {

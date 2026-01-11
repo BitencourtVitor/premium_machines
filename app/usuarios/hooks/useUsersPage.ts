@@ -60,6 +60,9 @@ export function useUsersPage() {
     supplier_type: 'rental' as 'rental' | 'maintenance' | 'both',
   })
 
+  const [fixedRole, setFixedRole] = useState<string | undefined>(undefined)
+  const [fixedSupplierId, setFixedSupplierId] = useState<string | undefined>(undefined)
+
   // Auth check
   useEffect(() => {
     if (sessionLoading) return
@@ -141,8 +144,12 @@ export function useUsersPage() {
       loadSuppliers()
     }
     
-    if (userToEdit) {
+    if (userToEdit && userToEdit.id) {
+      // Edição de usuário existente
       setEditingUser(userToEdit)
+      setFixedRole(undefined)
+      setFixedSupplierId(undefined)
+      
       const isSupplier = userToEdit.role === 'fornecedor'
       setFormData({
         nome: userToEdit.nome,
@@ -162,25 +169,55 @@ export function useUsersPage() {
         validado: userToEdit.validado,
       })
       setSelectedSupplier(userToEdit.supplier_id || null)
-    } else {
+    } else if (userToEdit && !userToEdit.id) {
+      // Novo usuário com predefinições (ex: adicionar usuário para um fornecedor específico)
       setEditingUser(null)
+      setFixedRole(userToEdit.role)
+      setFixedSupplierId(userToEdit.supplier_id)
+      
+      const isSupplier = userToEdit.role === 'fornecedor'
       setFormData({
         nome: '',
         email: '',
         pin: '',
-        role: selectedSupplier ? 'fornecedor' : 'operador',
+        role: userToEdit.role,
         can_view_dashboard: false,
-        can_view_map: selectedSupplier ? true : false,
+        can_view_map: isSupplier ? true : false,
         can_manage_sites: false,
         can_manage_machines: false,
-        can_register_events: selectedSupplier ? true : false,
-        can_approve_events: selectedSupplier ? true : false,
+        can_register_events: isSupplier ? true : false,
+        can_approve_events: isSupplier ? true : false,
         can_view_financial: false,
         can_manage_suppliers: false,
         can_manage_users: false,
         can_view_logs: false,
         validado: true,
-      } as any) // Type assertion to avoid duplicate key error if strictly checked
+      })
+      setSelectedSupplier(userToEdit.supplier_id || null)
+    } else {
+      // Novo usuário sem predefinições
+      setEditingUser(null)
+      setFixedRole(undefined)
+      setFixedSupplierId(undefined)
+      
+      setFormData({
+        nome: '',
+        email: '',
+        pin: '',
+        role: 'operador',
+        can_view_dashboard: false,
+        can_view_map: false,
+        can_manage_sites: false,
+        can_manage_machines: false,
+        can_register_events: false,
+        can_approve_events: false,
+        can_view_financial: false,
+        can_manage_suppliers: false,
+        can_manage_users: false,
+        can_view_logs: false,
+        validado: true,
+      })
+      setSelectedSupplier(null)
     }
     setError('')
     setShowModal(true)
@@ -504,5 +541,7 @@ export function useUsersPage() {
     handleValidate,
     handleDelete,
     toggleSupplierExpansion,
+    fixedRole,
+    fixedSupplierId,
   }
 }

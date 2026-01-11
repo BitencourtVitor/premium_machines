@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+import { createAuditLog } from '@/lib/auditLog'
 
 export async function GET(
   request: NextRequest,
@@ -77,6 +78,15 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const body = await request.json().catch(() => ({}))
+
+    // Get site data for log
+    const { data: siteData } = await supabaseServer
+      .from('sites')
+      .select('*')
+      .eq('id', params.id)
+      .single()
+
     const { error } = await supabaseServer
       .from('sites')
       .delete()
@@ -89,6 +99,15 @@ export async function DELETE(
         message: error.message || 'Erro ao deletar jobsite' 
       }, { status: 500 })
     }
+
+    // Log action
+    await createAuditLog({
+      entidade: 'sites',
+      entidade_id: params.id,
+      acao: 'delete',
+      dados_antes: siteData,
+      usuario_id: body.currentUserId,
+    })
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

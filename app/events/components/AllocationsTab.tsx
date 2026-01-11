@@ -32,12 +32,9 @@ export default function AllocationsTab({
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Máquinas Alocadas
+          <h2 className="text-base font-normal text-gray-500 dark:text-gray-400">
+            Máquinas Alocadas • {activeAllocations.length}
           </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {activeAllocations.filter(a => !a.is_in_downtime).length} operando • {activeAllocations.filter(a => a.is_in_downtime).length} em downtime
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <button

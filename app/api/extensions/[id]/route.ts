@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 import { calculateExtensionState } from '@/lib/allocationService'
+import { createAuditLog } from '@/lib/auditLog'
 
 /**
  * GET /api/extensions/[id]
@@ -64,7 +65,7 @@ export async function PUT(
     // Verificar se a extensão existe
     const { data: existing, error: fetchError } = await supabaseServer
       .from('machine_extensions')
-      .select('id')
+      .select('*')
       .eq('id', params.id)
       .single()
 
@@ -120,6 +121,16 @@ export async function PUT(
       )
     }
 
+    // Log action
+    await createAuditLog({
+      entidade: 'machine_extensions',
+      entidade_id: extension.id,
+      acao: 'update',
+      dados_antes: existing,
+      dados_depois: extension,
+      usuario_id: body.currentUserId,
+    })
+
     return NextResponse.json({ success: true, extension })
   } catch (error) {
     console.error('Erro:', error)
@@ -153,6 +164,13 @@ export async function DELETE(
       )
     }
 
+    // Get data for logging
+    const { data: extensionData } = await supabaseServer
+      .from('machine_extensions')
+      .select('*')
+      .eq('id', params.id)
+      .single()
+
     const { error } = await supabaseServer
       .from('machine_extensions')
       .update({ ativo: false })
@@ -165,6 +183,24 @@ export async function DELETE(
         { status: 500 }
       )
     }
+
+    // Log action
+    // Try to get currentUserId from body if present
+    let currentUserId = undefined
+    try {
+        const body = await request.json()
+        currentUserId = body.currentUserId
+    } catch (e) {
+        // ignore
+    }
+
+    await createAuditLog({
+      entidade: 'machine_extensions',
+      entidade_id: params.id,
+      acao: 'delete', // Soft delete
+      dados_antes: extensionData,
+      usuario_id: currentUserId,
+    })
 
     return NextResponse.json({ 
       success: true, 

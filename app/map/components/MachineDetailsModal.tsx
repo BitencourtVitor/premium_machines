@@ -54,9 +54,6 @@ export default function MachineDetailsModal({
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {machine?.machine_type?.nome}
-                {machine?.supplier && (
-                  <span> • {machine.supplier.nome}</span>
-                )}
               </p>
             </div>
           </div>
@@ -78,67 +75,8 @@ export default function MachineDetailsModal({
             </div>
           ) : (
             <div className="p-6">
-              {/* Timeline de Eventos da Máquina */}
-              <div className="mb-6">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                  Histórico de Eventos nesta Obra
-                </h3>
-
-                {events.length === 0 ? (
-                  <p className="text-gray-500 dark:text-gray-400">Nenhum evento registrado para esta máquina nesta obra</p>
-                ) : (
-                  <div className="space-y-4">
-                    {events
-                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                      .map((event) => (
-                        <div key={event.id} className="flex gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                          <div className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${
-                            event.status === 'approved' ? 'bg-green-500' :
-                            event.status === 'pending' ? 'bg-yellow-500' : 'bg-red-500'
-                          }`} />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                event.event_type === 'start_allocation' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                event.event_type === 'end_allocation' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                event.event_type === 'downtime_start' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                                event.event_type === 'downtime_end' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                                event.event_type === 'request_allocation' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                                event.event_type === 'confirm_allocation' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' :
-                                'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
-                              }`}>
-                                {event.event_type.replace('_', ' ')}
-                              </span>
-                              <span className={`px-2 py-1 rounded-full text-xs ${
-                                event.status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                event.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                                'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                              }`}>
-                                {event.status}
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-                              <p><strong>Data do Evento:</strong> {new Date(event.event_date).toLocaleDateString('pt-BR')}</p>
-                              <p><strong>Registrado em:</strong> {new Date(event.created_at).toLocaleDateString('pt-BR')}</p>
-                              {event.downtime_reason && (
-                                <p><strong>Motivo:</strong> {event.downtime_reason}</p>
-                              )}
-                              {event.downtime_description && (
-                                <p><strong>Descrição:</strong> {event.downtime_description}</p>
-                              )}
-                              {event.construction_type && event.lot_building_number && (
-                                <p><strong>Localização:</strong> {event.construction_type === 'lot' ? 'Lote' : 'Prédio'} {event.lot_building_number}</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-
               {/* Informações da Máquina */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                   <div className="text-sm text-gray-500 dark:text-gray-400">Status Atual</div>
                   <div className={`text-lg font-medium ${
@@ -170,6 +108,71 @@ export default function MachineDetailsModal({
                     {machine?.supplier?.nome || 'N/A'}
                   </div>
                 </div>
+              </div>
+
+              {/* Timeline de Eventos da Máquina */}
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">
+                  Histórico de Eventos nesta Obra
+                </h3>
+
+                {events.length === 0 ? (
+                  <p className="text-gray-500 dark:text-gray-400">Nenhum evento registrado para esta máquina nesta obra</p>
+                ) : (
+                  <div className="relative border-l-2 border-gray-200 dark:border-gray-700 ml-3 space-y-8">
+                    {events
+                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                      .map((event) => (
+                        <div key={event.id} className="relative ml-6">
+                          <span className={`absolute flex items-center justify-center w-6 h-6 rounded-full -left-[37px] ring-4 ring-white dark:ring-gray-800 ${
+                            event.status === 'approved' ? 'bg-green-100 dark:bg-green-900' :
+                            event.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900' :
+                            'bg-red-100 dark:bg-red-900'
+                          }`}>
+                            <div className={`w-2.5 h-2.5 rounded-full ${
+                              event.status === 'approved' ? 'bg-green-500' :
+                              event.status === 'pending' ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }`} />
+                          </span>
+                          
+                          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                event.event_type === 'start_allocation' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                event.event_type === 'end_allocation' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                event.event_type === 'downtime_start' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                event.event_type === 'downtime_end' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                event.event_type === 'request_allocation' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                                event.event_type === 'confirm_allocation' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' :
+                                'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                              }`}>
+                                {event.event_type.replace('_', ' ')}
+                              </span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {new Date(event.event_date).toLocaleDateString('pt-BR')}
+                              </span>
+                            </div>
+                            
+                            <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                                {event.downtime_reason && (
+                                    <p><span className="font-medium text-gray-900 dark:text-white">Motivo:</span> {event.downtime_reason}</p>
+                                )}
+                                {event.downtime_description && (
+                                    <p><span className="font-medium text-gray-900 dark:text-white">Descrição:</span> {event.downtime_description}</p>
+                                )}
+                                {event.construction_type && event.lot_building_number && (
+                                    <p><span className="font-medium text-gray-900 dark:text-white">Localização:</span> {event.construction_type === 'lot' ? 'lot' : 'building'} {event.lot_building_number}</p>
+                                )}
+                                <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                    Registrado em {new Date(event.created_at).toLocaleString('pt-BR')}
+                                </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

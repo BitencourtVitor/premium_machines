@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+import { createAuditLog } from '@/lib/auditLog'
 
 export async function GET(
   request: NextRequest,

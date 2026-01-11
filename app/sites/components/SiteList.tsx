@@ -42,8 +42,8 @@ export default function SiteList({
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden min-w-0">
       <div className="p-3 md:p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2 min-w-0">
-        <h2 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white truncate min-w-0 flex-1">
-          {showArchivedSites ? 'Jobsites Arquivados' : 'Jobsites'} ({filteredSites.length})
+        <h2 className="text-base font-normal text-gray-500 dark:text-gray-400 truncate min-w-0 flex-1">
+          Jobsites • {filteredSites.length}
         </h2>
         <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
           <div className="relative">

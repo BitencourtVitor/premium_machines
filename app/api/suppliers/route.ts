@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+import { createAuditLog } from '@/lib/auditLog'
 
 // Forçar rota dinâmica para evitar cache
 export const dynamic = 'force-dynamic'
@@ -70,6 +71,15 @@ export async function POST(request: NextRequest) {
       console.error('Error creating supplier:', error)
       return NextResponse.json({ success: false, message: 'Erro ao criar fornecedor' }, { status: 500 })
     }
+
+    // Log action
+    await createAuditLog({
+      entidade: 'suppliers',
+      entidade_id: supplier.id,
+      acao: 'insert',
+      dados_depois: supplier,
+      usuario_id: body.currentUserId,
+    })
 
     return NextResponse.json({ success: true, supplier })
   } catch (error) {

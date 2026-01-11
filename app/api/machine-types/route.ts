@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+import { createAuditLog } from '@/lib/auditLog'
 
 // Headers para evitar cache
 const noCacheHeaders = {
@@ -55,6 +56,15 @@ export async function POST(request: NextRequest) {
       }
       return NextResponse.json({ success: false, message: 'Error creating type' }, { status: 500, headers: noCacheHeaders })
     }
+
+    // Log action
+    await createAuditLog({
+      entidade: 'machine_types',
+      entidade_id: machineType.id,
+      acao: 'insert',
+      dados_depois: machineType,
+      usuario_id: body.currentUserId,
+    })
 
     return NextResponse.json({ success: true, machineType }, { headers: noCacheHeaders })
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 import { validateEvent, getActiveDowntimeByMachine } from '@/lib/allocationService'
+import { createAuditLog } from '@/lib/auditLog'
 
 export async function GET(request: NextRequest) {
   try {
@@ -115,6 +116,15 @@ export async function POST(request: NextRequest) {
       console.error('Error creating event:', error)
       return NextResponse.json({ success: false, message: 'Erro ao criar evento' }, { status: 500 })
     }
+
+    // Log action
+    await createAuditLog({
+      entidade: 'allocation_events',
+      entidade_id: event.id,
+      acao: 'insert',
+      dados_depois: event,
+      usuario_id: body.created_by,
+    })
 
     return NextResponse.json({ success: true, event })
   } catch (error) {

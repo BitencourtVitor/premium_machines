@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+import { createAuditLog } from '@/lib/auditLog'
 import { calculateExtensionState } from '@/lib/allocationService'
 
 /**
@@ -142,6 +143,15 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Log action
+    await createAuditLog({
+      entidade: 'machine_extensions',
+      entidade_id: extension.id,
+      acao: 'insert',
+      dados_depois: extension,
+      usuario_id: body.currentUserId,
+    })
 
     return NextResponse.json({ success: true, extension })
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 import { processEventApproval } from '@/lib/eventProcessor'
+import { createAuditLog } from '@/lib/auditLog'
 
 export async function POST(
   request: NextRequest,
@@ -77,6 +78,16 @@ export async function POST(
       `)
       .eq('id', params.id)
       .single()
+
+    // Log action
+    await createAuditLog({
+      entidade: 'allocation_events',
+      entidade_id: params.id,
+      acao: 'update',
+      dados_antes: eventData,
+      dados_depois: updatedEvent,
+      usuario_id: approved_by,
+    })
 
     // Gerar mensagem apropriada baseada no tipo de evento
     let message = 'Evento aprovado com sucesso'

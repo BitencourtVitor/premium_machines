@@ -211,7 +211,7 @@ export default function LogsPage() {
 
   return (
     <div className="min-h-screen md:h-screen md:max-h-screen bg-gray-50 dark:bg-gray-900 pb-safe-content md:pb-0 md:flex md:flex-col md:overflow-hidden">
-      <Header title="Logs" />
+      <Header />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
         <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-250 ease-in-out ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`}>
@@ -298,7 +298,7 @@ export default function LogsPage() {
             {/* Logs List */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
               <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Histórico de Atividades</h2>
+                <h2 className="text-base font-normal text-gray-500 dark:text-gray-400">Histórico • {filteredLogs.length}</h2>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={loadLogs}

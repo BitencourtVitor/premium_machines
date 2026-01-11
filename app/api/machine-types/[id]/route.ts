@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+import { createAuditLog } from '@/lib/auditLog'
 
 // Headers para evitar cache
 const noCacheHeaders = {
@@ -59,6 +60,13 @@ export async function PUT(
       updateData.is_attachment = body.is_attachment
     }
 
+    // Get current data for logging
+    const { data: currentData } = await supabaseServer
+      .from('machine_types')
+      .select('*')
+      .eq('id', params.id)
+      .single()
+
     const { data: machineType, error } = await supabaseServer
       .from('machine_types')
       .update(updateData)
@@ -109,6 +117,13 @@ export async function DELETE(
       }, { status: 400, headers: noCacheHeaders })
     }
 
+    // Fetch data before delete for audit log
+    const { data: typeData } = await supabaseServer
+      .from('machine_types')
+      .select('*')
+      .eq('id', params.id)
+      .single()
+
     const { error } = await supabaseServer
       .from('machine_types')
       .delete()
@@ -118,6 +133,26 @@ export async function DELETE(
       console.error('Error deleting machine type:', error)
       return NextResponse.json({ success: false, message: 'Error deleting type' }, { status: 500, headers: noCacheHeaders })
     }
+
+    // Log action
+    // Get current user id from request body if possible, or leave undefined if not passed (DELETE usually doesn't have body)
+    // Actually, createAuditLog handles undefined usuario_id gracefully? No, interface says string | undefined.
+    // We should try to get it from request if it's there.
+    let currentUserId = undefined
+    try {
+        const body = await request.json()
+        currentUserId = body.currentUserId
+    } catch (e) {
+        // ignore JSON parse error for DELETE requests without body
+    }
+
+    await createAuditLog({
+      entidade: 'machine_types',
+      entidade_id: params.id,
+      acao: 'delete',
+      dados_antes: typeData,
+      usuario_id: currentUserId,
+    })
 
     return NextResponse.json({ success: true }, { headers: noCacheHeaders })
   } catch (error) {

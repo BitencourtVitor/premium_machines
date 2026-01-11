@@ -40,7 +40,7 @@ function getRoleIcon(role: string) {
   }
 }
 
-export default function Header({ title }: { title: string }) {
+export default function Header({ title }: { title?: string }) {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [isDark, setIsDark] = useState(false)

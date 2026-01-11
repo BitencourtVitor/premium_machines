@@ -11,6 +11,7 @@ interface UseMapInitializationProps {
   onZoomEnd: () => void
   onMoveEnd: () => void
   onClick: (e: mapboxgl.MapMouseEvent) => void
+  isDark: boolean
 }
 
 export function useMapInitialization({
@@ -22,7 +23,8 @@ export function useMapInitialization({
   onZoomUpdate,
   onZoomEnd,
   onMoveEnd,
-  onClick
+  onClick,
+  isDark
 }: UseMapInitializationProps) {
   const resizeHandlersRef = useRef<(() => void)[]>([])
 
@@ -56,13 +58,8 @@ export function useMapInitialization({
     if (mapStyle === 'satellite') {
       styleUrl = 'mapbox://styles/mapbox/satellite-streets-v12'
     } else {
-      // Estilo 'map' - detectar tema do sistema
-      const currentIsDark = typeof window !== 'undefined' && (
-        document.documentElement.classList.contains('dark') ||
-        localStorage.theme === 'dark' ||
-        (!localStorage.theme && window.matchMedia('(prefers-color-scheme: dark)').matches)
-      )
-      styleUrl = currentIsDark 
+      // Estilo 'map' - usar isDark passado via props
+      styleUrl = isDark 
         ? 'mapbox://styles/mapbox/dark-v11'
         : 'mapbox://styles/mapbox/streets-v12'
     }
@@ -132,7 +129,7 @@ export function useMapInitialization({
         // Note: we are NOT removing the map instance here to avoid flashing on re-renders
         // The parent component should handle full cleanup if needed
     }
-  }, [mapStyle, mapboxToken]) // Re-run if style changes (though mapbox usually handles style updates differently)
+  }, [mapStyle, mapboxToken, mapContainer, mapRef, onMapLoad, onZoomUpdate, onZoomEnd, onMoveEnd, onClick, isDark])
 
   // Effect to update style dynamically without recreating map
   useEffect(() => {
@@ -142,12 +139,7 @@ export function useMapInitialization({
     if (mapStyle === 'satellite') {
       styleUrl = 'mapbox://styles/mapbox/satellite-streets-v12'
     } else {
-      const currentIsDark = typeof window !== 'undefined' && (
-        document.documentElement.classList.contains('dark') ||
-        localStorage.theme === 'dark' ||
-        (!localStorage.theme && window.matchMedia('(prefers-color-scheme: dark)').matches)
-      )
-      styleUrl = currentIsDark 
+      styleUrl = isDark 
         ? 'mapbox://styles/mapbox/dark-v11'
         : 'mapbox://styles/mapbox/streets-v12'
     }
@@ -161,7 +153,7 @@ export function useMapInitialization({
         })
     }
     
-  }, [mapStyle])
+  }, [mapStyle, isDark, mapRef])
 
   return {}
 }

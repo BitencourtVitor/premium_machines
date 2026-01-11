@@ -31,6 +31,8 @@ interface UserModalProps {
   suppliers: any[]
   selectedSupplier: string | null
   setSelectedSupplier: (id: string | null) => void
+  fixedRole?: string
+  fixedSupplierId?: string
 }
 
 export default function UserModal({
@@ -44,7 +46,9 @@ export default function UserModal({
   error,
   suppliers,
   selectedSupplier,
-  setSelectedSupplier
+  setSelectedSupplier,
+  fixedRole,
+  fixedSupplierId
 }: UserModalProps) {
   if (!isOpen) return null
 
@@ -142,6 +146,7 @@ export default function UserModal({
                 { value: 'admin', label: 'Administrador' },
                 { value: 'fornecedor', label: 'Fornecedor' },
               ]}
+              disabled={!!fixedRole}
             />
             {formData.role === 'fornecedor' && (
               <CustomDropdown
@@ -153,6 +158,7 @@ export default function UserModal({
                   ...suppliers.map(s => ({ value: s.id, label: s.nome }))
                 ]}
                 required={formData.role === 'fornecedor'}
+                disabled={!!fixedSupplierId}
               />
             )}
             {selectedSupplier && (

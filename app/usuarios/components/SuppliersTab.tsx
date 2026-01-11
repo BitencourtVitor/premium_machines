@@ -31,13 +31,13 @@ export default function SuppliersTab({
   onToggleArchived,
   onValidateUser,
   onEditUser,
-  onDeleteUser
+  onDeleteUser,
 }: SuppliersTabProps) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate min-w-0 flex-1">
-          {showArchivedSuppliers ? 'Fornecedores Arquivados' : 'Fornecedores'} ({suppliers.length})
+        <h2 className="text-base font-normal text-gray-500 dark:text-gray-400 truncate min-w-0 flex-1">
+          {showArchivedSuppliers ? 'Fornecedores Arquivados' : 'Fornecedores'} • {suppliers.length}
         </h2>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
@@ -195,9 +195,8 @@ export default function SuppliersTab({
 
                   {/* Mobile: Container de usuários abaixo */}
                   <div className="md:hidden">
-                    <div className="flex items-center justify-evenly px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg">
-                      {/* Bonequinho com número de usuários */}
-                      <div className="flex items-center gap-1.5">
+                    <div className="flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-1.5 border border-gray-200 dark:border-gray-600">
+                      <div className="flex items-center gap-2">
                         <div className="text-gray-500 dark:text-gray-400">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -207,47 +206,66 @@ export default function SuppliersTab({
                           {supplierUsers.length}
                         </span>
                       </div>
-                      <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 mx-2"></div>
-                      <button
-                        onClick={() => onToggleExpand(supplier.id)}
-                        className="text-sm text-blue-600 dark:text-blue-400 font-medium hover:underline flex items-center gap-1"
-                      >
-                        {expandedSuppliers.has(supplier.id) ? 'Recolher' : 'Ver usuários'}
-                        <svg className={`w-4 h-4 transition-transform duration-200 ${expandedSuppliers.has(supplier.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onEditUser({ role: 'fornecedor', supplier_id: supplier.id })
+                          }}
+                          className="p-1 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded"
+                          title="Adicionar usuário"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => onToggleExpand(supplier.id)}
+                          className="p-1 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                        >
+                          <svg className={`w-4 h-4 transition-transform duration-200 ${expandedSuppliers.has(supplier.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
 
                   {/* Desktop: Ações */}
                   <div className="hidden md:flex items-center gap-4">
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
                       <div className="text-gray-500 dark:text-gray-400">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
                       </div>
                       <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {supplierUsers.length} usuários
+                        {supplierUsers.length}
                       </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onEditUser({ role: 'fornecedor', supplier_id: supplier.id })
+                        }}
+                        className="p-1 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded"
+                        title="Adicionar usuário"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => onToggleExpand(supplier.id)}
+                        className="p-1 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                        title={expandedSuppliers.has(supplier.id) ? "Recolher usuários" : "Expandir usuários"}
+                      >
+                        <svg className={`w-4 h-4 transition-transform duration-200 ${expandedSuppliers.has(supplier.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
                     </div>
 
                     <div className="h-8 w-px bg-gray-200 dark:bg-gray-700"></div>
-
-                    <button
-                      onClick={() => onToggleExpand(supplier.id)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        expandedSuppliers.has(supplier.id)
-                          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400'
-                      }`}
-                      title={expandedSuppliers.has(supplier.id) ? "Recolher usuários" : "Expandir usuários"}
-                    >
-                      <svg className={`w-5 h-5 transition-transform duration-200 ${expandedSuppliers.has(supplier.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
                     <button
                       onClick={() => onEditSupplier(supplier)}
                       className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"

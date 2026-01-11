@@ -54,8 +54,8 @@ export default function UsersTab({
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          {showOnlyPending ? 'Usuários Pendentes' : 'Lista de Usuários'}
+        <h2 className="text-base font-normal text-gray-500 dark:text-gray-400">
+          {showOnlyPending ? 'Usuários Pendentes' : 'Usuários'} • {filteredUsers.length}
         </h2>
         <div className="flex items-center gap-2">
           <div className="relative">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+import { createAuditLog } from '@/lib/auditLog'
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,6 +67,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Error creating machine' }, { status: 500 })
     }
 
+    // Log action
+    await createAuditLog({
+      entidade: 'machines',
+      entidade_id: machine.id,
+      acao: 'insert',
+      dados_depois: machine,
+      usuario_id: body.currentUserId,
+    })
+
     return NextResponse.json({ success: true, machine })
   } catch (error) {
     console.error('Error:', error)
@@ -98,6 +108,13 @@ export async function PUT(request: NextRequest) {
         message: 'A machine with this unit number already exists'
       }, { status: 400 })
     }
+
+    // Get current data for logging
+    const { data: currentData } = await supabaseServer
+      .from('machines')
+      .select('*')
+      .eq('id', id)
+      .single()
 
     const { data: machine, error } = await supabaseServer
       .from('machines')
@@ -151,6 +168,13 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // Fetch data before delete for audit log
+    const { data: machineData } = await supabaseServer
+      .from('machines')
+      .select('*')
+      .eq('id', id)
+      .single()
+
     const { error } = await supabaseServer
       .from('machines')
       .delete()
@@ -160,6 +184,15 @@ export async function DELETE(request: NextRequest) {
       console.error('Error deleting machine:', error)
       return NextResponse.json({ success: false, message: 'Error deleting machine' }, { status: 500 })
     }
+
+    // Log action
+    await createAuditLog({
+      entidade: 'machines',
+      entidade_id: id,
+      acao: 'delete',
+      dados_antes: machineData,
+      usuario_id: searchParams.get('currentUserId') || undefined, // DELETE usually passes params in query or body. Here request is used.
+    })
 
     return NextResponse.json({ success: true, message: 'Machine deleted successfully' })
   } catch (error) {

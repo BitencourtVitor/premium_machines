@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+import { createAuditLog } from '@/lib/auditLog'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,11 +23,12 @@ export async function GET(request: NextRequest) {
     let sites = allSites || []
 
     if (archived === 'true') {
-      // Arquivados: sites inativos OU sede
-      sites = sites.filter(s => s.ativo === false || s.is_headquarters === true)
+      // Arquivados: sites inativos (EXCLUINDO sede se estiver ativa, mas sede geralmente não é arquivada)
+      // Se o usuário quer APENAS arquivados, mostramos apenas inativos.
+      sites = sites.filter(s => s.ativo === false)
     } else if (archived === 'false') {
-      // Ativos: sites ativos OU sede
-      sites = sites.filter(s => s.ativo === true || s.is_headquarters === true)
+      // Ativos: sites ativos
+      sites = sites.filter(s => s.ativo === true)
     }
     // Se archived não for especificado, retornar todos
 
@@ -150,6 +152,15 @@ export async function POST(request: NextRequest) {
         error: error.details || error.hint || error.code
       }, { status: 500 })
     }
+
+    // Log action
+    await createAuditLog({
+      entidade: 'sites',
+      entidade_id: site.id,
+      acao: 'insert',
+      dados_depois: site,
+      usuario_id: body.currentUserId,
+    })
 
     return NextResponse.json({ success: true, site })
   } catch (error: any) {

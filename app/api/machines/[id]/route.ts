@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+import { createAuditLog } from '@/lib/auditLog'
 
 /**
  * GET /api/machines/[id]
@@ -57,7 +58,7 @@ export async function PUT(
     // Verificar se a máquina existe
     const { data: existingMachine, error: fetchError } = await supabaseServer
       .from('machines')
-      .select('id')
+      .select('*')
       .eq('id', params.id)
       .single()
 
@@ -151,6 +152,8 @@ export async function DELETE(
       )
     }
 
+    const body = await request.json().catch(() => ({}))
+
     const { error } = await supabaseServer
       .from('machines')
       .update({ ativo: false })
@@ -163,6 +166,15 @@ export async function DELETE(
         { status: 500 }
       )
     }
+
+    // Log action
+    await createAuditLog({
+      entidade: 'machines',
+      entidade_id: params.id,
+      acao: 'delete', // Soft delete
+      dados_antes: machine,
+      usuario_id: body.currentUserId,
+    })
 
     return NextResponse.json({
       success: true,
