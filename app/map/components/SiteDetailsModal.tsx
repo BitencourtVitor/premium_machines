@@ -189,7 +189,7 @@ export default function SiteDetailsModal({
                           {/* Ícone de olho */}
                           <button
                             onClick={() => window.dispatchEvent(new CustomEvent('openMachineDetails', {
-                              detail: { machineId: allocation.machine_id, siteId: siteDetails?.id }
+                              detail: { machineId: allocation.machine_id, siteId: site?.id }
                             }))}
                             className="flex-shrink-0 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                             title="Ver detalhes da máquina"

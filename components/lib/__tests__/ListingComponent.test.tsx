@@ -8,7 +8,7 @@ describe('ListingComponent', () => {
     { id: 2, name: 'Item 2' },
   ]
 
-  const mockRenderItem = (item: any) => (
+  const mockRenderItem = (item: typeof mockItems[0]) => (
     <div data-testid="item">{item.name}</div>
   )
 
