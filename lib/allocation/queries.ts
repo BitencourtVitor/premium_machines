@@ -48,8 +48,20 @@ export async function getActiveAllocations(): Promise<ActiveAllocation[]> {
             return (type as any)?.nome || '';
           })(),
           machine_ownership: machine.ownership_type,
-          machine_supplier_id: machine.supplier?.id || null,
-          machine_supplier_name: machine.supplier?.nome || null,
+          machine_supplier_id: (() => {
+            const supplier = machine.supplier;
+            if (Array.isArray(supplier)) {
+              return (supplier[0] as any)?.id || null;
+            }
+            return (supplier as any)?.id || null;
+          })(),
+          machine_supplier_name: (() => {
+            const supplier = machine.supplier;
+            if (Array.isArray(supplier)) {
+              return (supplier[0] as any)?.nome || null;
+            }
+            return (supplier as any)?.nome || null;
+          })(),
           site_id: state.current_site_id,
           site_title: state.current_site_title || '',
           construction_type: state.construction_type,
