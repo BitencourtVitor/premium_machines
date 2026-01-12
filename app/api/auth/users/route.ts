@@ -10,7 +10,7 @@ export async function GET() {
     const { data: users, error } = await supabaseServer
       .from('users')
       .select('id, nome, role, supplier_id')
-      .eq('validado', true)
+      .or('validado.eq.true,validado.is.null')
       .order('nome', { ascending: true })
 
     if (error) {
@@ -27,6 +27,8 @@ export async function GET() {
         }
       )
     }
+
+    console.log(`[API] Users fetched: ${users?.length || 0}`)
 
     return NextResponse.json(
       { success: true, users },
