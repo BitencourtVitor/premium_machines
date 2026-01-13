@@ -30,8 +30,6 @@ export default function SiteDetailsModal({
     }
   }, [isOpen, allocations, selectedMachineId])
 
-  if (!isOpen) return null
-
   // Helper function for day status based on selected machine events
   const getDayStatus = (date: Date, machineId: string | null, allEvents: any[]) => {
     if (!machineId) return 'not-allocated'
