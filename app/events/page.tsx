@@ -210,6 +210,17 @@ export default function EventsPage() {
 
   const handleEditEvent = (event: AllocationEvent) => {
     setEditingEventId(event.id)
+    
+    // Adjust date to local time for input
+    let localDateString = ''
+    if (event.event_date) {
+      const date = new Date(event.event_date)
+      // Subtract timezone offset to get the correct local time string
+      // getTimezoneOffset() returns positive minutes for zones behind UTC (e.g., 180 for UTC-3)
+      const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
+      localDateString = localDate.toISOString().slice(0, 16)
+    }
+
     setNewEvent({
       event_type: event.event_type,
       machine_id: event.machine?.id || '',
@@ -217,7 +228,7 @@ export default function EventsPage() {
       extension_id: event.extension_id || '',
       construction_type: event.construction_type || '',
       lot_building_number: event.lot_building_number || '',
-      event_date: event.event_date ? event.event_date.slice(0, 16) : '',
+      event_date: localDateString,
       downtime_reason: event.downtime_reason || '',
       downtime_description: event.downtime_description || '',
       corrects_event_id: event.corrects_event_id || '',

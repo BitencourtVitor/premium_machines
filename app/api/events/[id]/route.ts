@@ -66,10 +66,24 @@ export async function PUT(
       updated_at: new Date().toISOString(),
     }
 
-    // Remove immutable fields
+    // Remove immutable fields and fields not present in table
     delete updateData.id
     delete updateData.created_at
-    delete updateData.created_by 
+    delete updateData.created_by
+    // updated_by is used for audit log but might not be in the table structure if not added
+    // If the table has updated_by column, keep it. If not, delete it.
+    // Assuming standard Supabase pattern where updated_by might not be a column on the event itself
+    // but we use it for audit. Let's try to keep it but if it fails we know why.
+    // Actually, to be safe against "column does not exist" error, let's remove it from updateData
+    // since we already extracted it for audit log above (actually we need to extract it)
+    
+    const userId = body.updated_by
+    delete updateData.updated_by
+    
+    // Clean nulls for UUIDs again just in case (though frontend handles it)
+    if (updateData.site_id === '') updateData.site_id = null
+    if (updateData.extension_id === '') updateData.extension_id = null
+    if (updateData.corrects_event_id === '') updateData.corrects_event_id = null
 
     const { data: updatedEvent, error: updateError } = await supabaseServer
       .from('allocation_events')
@@ -100,7 +114,7 @@ export async function PUT(
       acao: 'update',
       dados_antes: existingEvent,
       dados_depois: updatedEvent,
-      usuario_id: body.updated_by || existingEvent.created_by,
+      usuario_id: userId || existingEvent.created_by,
     })
 
     return NextResponse.json({ success: true, event: updatedEvent })
