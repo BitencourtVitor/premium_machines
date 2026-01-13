@@ -276,7 +276,7 @@ export default function CreateEventModal({
                 onChange={(value) => setNewEvent({ ...newEvent, machine_id: value })}
                 options={[
                   { value: '', label: 'Selecione...' },
-                  ...filteredMachines.map((machine) => ({
+                  ...displayMachines.map((machine) => ({
                     value: machine.id,
                     label: `${machine.unit_number} - ${machine.machine_type?.nome}`
                   }))
