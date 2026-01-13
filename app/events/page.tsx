@@ -510,6 +510,7 @@ export default function EventsPage() {
         activeDowntimes={activeDowntimes}
         creating={creating}
         handleCreateEvent={handleCreateEvent}
+        editingEventId={editingEventId}
       />
     </div>
   )
