@@ -61,6 +61,15 @@ export default function CreateEventModal({
     activeDowntimes
   )
 
+  // Ensure selected machine is in the list when editing
+  const machinesToDisplay = [...filteredMachines]
+  if (editingEventId && newEvent.machine_id) {
+    const selectedMachine = machines.find(m => m.id === newEvent.machine_id)
+    if (selectedMachine && !machinesToDisplay.find(m => m.id === selectedMachine.id)) {
+      machinesToDisplay.unshift(selectedMachine)
+    }
+  }
+
   const getAvailableCount = (type: string) => {
     return filterMachinesForEvent(type, machines, activeAllocations, activeDowntimes).length
   }
@@ -276,7 +285,7 @@ export default function CreateEventModal({
                 onChange={(value) => setNewEvent({ ...newEvent, machine_id: value })}
                 options={[
                   { value: '', label: 'Selecione...' },
-                  ...displayMachines.map((machine) => ({
+                  ...machinesToDisplay.map((machine) => ({
                     value: machine.id,
                     label: `${machine.unit_number} - ${machine.machine_type?.nome}`
                   }))
