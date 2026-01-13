@@ -211,115 +211,146 @@ export default function SiteDetailsModal({
                 )}
               </div>
 
-              {/* Calendário */}
-              <div className="col-span-2 p-4 md:p-6 overflow-y-auto">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white capitalize text-center sm:text-left">
-                    {calendarMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
-                  </h3>
-                  <div className="flex items-center gap-2">
+              {/* Calendário e Legenda */}
+              <div className="col-span-2 flex flex-col h-full bg-white dark:bg-gray-800">
+                {/* Cabeçalho do Calendário */}
+                <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">
+                      Calendário de Obras
+                    </span>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white capitalize">
+                      {calendarMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                    </h3>
+                  </div>
+                  
+                  <div className="flex items-center bg-gray-50 dark:bg-gray-700/50 rounded-xl p-1.5 shadow-sm border border-gray-100 dark:border-gray-600">
                     <button
                       onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
-                      className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
+                      className="p-2 hover:bg-white dark:hover:bg-gray-600 rounded-lg transition-all text-gray-600 dark:text-gray-300 shadow-sm hover:shadow"
                       aria-label="Mês anterior"
                     >
-                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                       </svg>
                     </button>
                     <button
                       onClick={() => setCalendarMonth(new Date())}
-                      className="h-8 sm:h-10 w-12 sm:w-[60px] flex items-center justify-center bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                      title="Hoje"
+                      className="px-4 py-2 mx-1 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-600 rounded-lg transition-all shadow-sm hover:shadow"
                     >
-                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
+                      Hoje
                     </button>
                     <button
                       onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
-                      className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-600 dark:text-gray-300"
+                      className="p-2 hover:bg-white dark:hover:bg-gray-600 rounded-lg transition-all text-gray-600 dark:text-gray-300 shadow-sm hover:shadow"
                       aria-label="Próximo mês"
                     >
-                      <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
                   </div>
                 </div>
 
-                {/* Legenda */}
-                <div className="flex flex-wrap gap-3 mb-6 justify-center sm:justify-start">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-blue-500 rounded"></div>
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Solicitado</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-green-500 rounded"></div>
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Funcionando</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-orange-500 rounded"></div>
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Manutenção</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-gray-300 rounded"></div>
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Não solicitado</span>
-                  </div>
-                </div>
-
-                {/* Grade do Calendário */}
-                <div className="flex justify-center">
-                  <div className="grid grid-cols-7 gap-2">
-                    {/* Cabeçalhos dos dias da semana */}
-                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                      <div key={day} className="w-8 sm:w-10 h-8 sm:h-10 flex items-center justify-center text-xs sm:text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                        {day}
+                <div className="flex-1 p-6 flex flex-col xl:flex-row gap-8 overflow-y-auto">
+                  {/* Lado Esquerdo: Legenda */}
+                  <div className="xl:w-64 flex-shrink-0">
+                    <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">
+                      Legenda de Status
+                    </h4>
+                    <div className="space-y-3 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-2xl border border-gray-100 dark:border-gray-700">
+                      <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-colors">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full ring-2 ring-blue-100 dark:ring-blue-900/30"></div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Solicitado</span>
                       </div>
-                    ))}
+                      <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-colors">
+                        <div className="w-3 h-3 bg-green-500 rounded-full ring-2 ring-green-100 dark:ring-green-900/30"></div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Funcionando</span>
+                      </div>
+                      <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-colors">
+                        <div className="w-3 h-3 bg-orange-500 rounded-full ring-2 ring-orange-100 dark:ring-orange-900/30"></div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Manutenção</span>
+                      </div>
+                      <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-colors">
+                        <div className="w-3 h-3 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Não solicitado</span>
+                      </div>
+                    </div>
 
-                    {/* Dias do mês */}
-                    {(() => {
-                      const year = calendarMonth.getFullYear()
-                      const month = calendarMonth.getMonth()
-                      const firstDay = new Date(year, month, 1)
-                      const lastDay = new Date(year, month + 1, 0)
-                      const startDate = new Date(firstDay)
-                      startDate.setDate(startDate.getDate() - firstDay.getDay())
+                    {/* Resumo do Mês (Opcional) */}
+                    <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800">
+                       <h4 className="text-xs font-bold text-blue-600 dark:text-blue-300 uppercase tracking-wider mb-2">
+                         Dica
+                       </h4>
+                       <p className="text-xs text-blue-700 dark:text-blue-200 leading-relaxed">
+                         Visualize rapidamente o status das máquinas dia a dia. Dias com manutenção têm prioridade visual sobre funcionamento.
+                       </p>
+                    </div>
+                  </div>
 
-                      const days = []
-                      const currentDate = new Date(startDate)
-
-                      while (currentDate <= lastDay || days.length < 42) {
-                        const dayStatus = getDayStatus(currentDate, allocations, events)
-                        const isCurrentMonth = currentDate.getMonth() === month
-
-                        days.push(
-                          <div
-                            key={currentDate.toISOString()}
-                            className="flex items-center justify-center"
-                          >
-                            <div className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center text-sm font-medium rounded-lg transition-all ${
-                              isCurrentMonth
-                                ? dayStatus === 'working'
-                                  ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100 ring-1 ring-green-300 dark:ring-green-700'
-                                  : dayStatus === 'maintenance'
-                                  ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-900 dark:text-orange-100 ring-1 ring-orange-300 dark:ring-orange-700'
-                                  : dayStatus === 'requested'
-                                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100 ring-1 ring-blue-300 dark:ring-blue-700'
-                                  : 'bg-transparent text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                : 'text-gray-300 dark:text-gray-600'
-                            }`}>
-                              {currentDate.getDate()}
-                            </div>
+                  {/* Lado Direito: Grade do Calendário */}
+                  <div className="flex-1 min-w-0">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm">
+                      <div className="grid grid-cols-7 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                        {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                          <div key={day} className="py-3 text-center text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                            {day}
                           </div>
-                        )
+                        ))}
+                      </div>
 
-                        currentDate.setDate(currentDate.getDate() + 1)
-                      }
+                      <div className="grid grid-cols-7 auto-rows-fr">
+                        {(() => {
+                          const year = calendarMonth.getFullYear()
+                          const month = calendarMonth.getMonth()
+                          const firstDay = new Date(year, month, 1)
+                          const lastDay = new Date(year, month + 1, 0)
+                          const startDate = new Date(firstDay)
+                          startDate.setDate(startDate.getDate() - firstDay.getDay())
 
-                      return days
-                    })()}
+                          const days = []
+                          const currentDate = new Date(startDate)
+
+                          // Generate 6 weeks to ensure consistent height
+                          for (let i = 0; i < 42; i++) {
+                            const dayStatus = getDayStatus(currentDate, allocations, events)
+                            const isCurrentMonth = currentDate.getMonth() === month
+                            const isToday = currentDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]
+
+                            days.push(
+                              <div
+                                key={currentDate.toISOString()}
+                                className={`
+                                  relative aspect-square flex items-center justify-center border-b border-r border-gray-50 dark:border-gray-700/50 transition-all duration-200
+                                  ${!isCurrentMonth ? 'bg-gray-50/50 dark:bg-gray-900/50' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'}
+                                `}
+                              >
+                                <div className={`
+                                  w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full text-sm font-medium transition-all
+                                  ${isToday ? 'font-bold ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-800' : ''}
+                                  ${
+                                    isCurrentMonth
+                                      ? dayStatus === 'working'
+                                        ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
+                                        : dayStatus === 'maintenance'
+                                        ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300'
+                                        : dayStatus === 'requested'
+                                        ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                                        : 'text-gray-700 dark:text-gray-300'
+                                      : 'text-gray-300 dark:text-gray-600'
+                                  }
+                                `}>
+                                  {currentDate.getDate()}
+                                </div>
+                              </div>
+                            )
+                            currentDate.setDate(currentDate.getDate() + 1)
+                          }
+
+                          return days
+                        })()}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
