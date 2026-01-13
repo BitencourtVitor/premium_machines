@@ -5,6 +5,7 @@ import { createAuditLog } from '@/lib/auditLog'
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('API: GET /api/events')
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit') || '100')
     const machineId = searchParams.get('machine_id')

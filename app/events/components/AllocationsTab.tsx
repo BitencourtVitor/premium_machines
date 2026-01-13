@@ -10,6 +10,7 @@ interface AllocationsTabProps {
   loadActiveAllocations: () => void
   user: any
   setShowCreateModal: (show: boolean) => void
+  handleNewEvent: () => void
   handleStartDowntime: (allocation: ActiveAllocation) => void
   handleEndAllocation: (allocation: ActiveAllocation) => void
   handleEndDowntime: (downtime: ActiveDowntime) => void
@@ -23,6 +24,7 @@ export default function AllocationsTab({
   loadActiveAllocations,
   user,
   setShowCreateModal,
+  handleNewEvent,
   handleStartDowntime,
   handleEndAllocation,
   handleEndDowntime,
@@ -49,7 +51,7 @@ export default function AllocationsTab({
           </button>
           {(user?.can_register_events || user?.role === 'admin' || user?.role === 'dev') && (
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={handleNewEvent}
               className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               title="Novo Evento"
               aria-label="Criar novo evento"

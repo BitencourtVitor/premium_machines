@@ -34,11 +34,13 @@ export default function CreateEventModal({
   editingEventId
 }: CreateEventModalProps) {
   const [step, setStep] = useState<'selection' | 'form'>('selection')
+  const [validationError, setValidationError] = useState<string | null>(null)
 
   // Reset step when modal closes or editing changes
   useEffect(() => {
     if (!showCreateModal) {
       setStep('selection')
+      setValidationError(null)
     } else if (editingEventId) {
       setStep('form')
     } else if (newEvent.machine_id && newEvent.event_type === 'downtime_start') {
@@ -47,11 +49,37 @@ export default function CreateEventModal({
     }
   }, [showCreateModal, editingEventId, newEvent.machine_id, newEvent.event_type])
 
+  const validateForm = () => {
+    if (!newEvent.event_date) return 'A data do evento é obrigatória.'
+    if (!newEvent.machine_id) return 'A seleção de máquina é obrigatória.'
+
+    if (['start_allocation', 'request_allocation', 'extension_attach'].includes(newEvent.event_type)) {
+      if (!newEvent.site_id) return 'O local (jobsite) é obrigatório.'
+    }
+
+    if (newEvent.event_type === 'downtime_start') {
+      if (!newEvent.downtime_reason) return 'O motivo da manutenção é obrigatório.'
+    }
+
+    return null
+  }
+
+  const handleSave = () => {
+    const error = validateForm()
+    if (error) {
+      setValidationError(error)
+      return
+    }
+    setValidationError(null)
+    handleCreateEvent()
+  }
+
   if (!showCreateModal) return null
 
   const handleTypeSelect = (type: string) => {
     setNewEvent({ ...newEvent, event_type: type })
     setStep('form')
+    setValidationError(null)
   }
 
   const filteredMachines = filterMachinesForEvent(
@@ -246,9 +274,16 @@ export default function CreateEventModal({
                 </svg>
               </button>
             )}
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {getTitle()}
-            </h2>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                {getTitle()}
+                {editingEventId && (
+                  <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    ID: {editingEventId.slice(0, 8)}...
+                  </span>
+                )}
+              </h2>
+            </div>
           </div>
           <button
             onClick={() => setShowCreateModal(false)}
@@ -496,8 +531,17 @@ export default function CreateEventModal({
 
         {step === 'form' && (
           <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex-shrink-0">
+            {validationError && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 text-red-700 dark:text-red-300 text-sm animate-shake">
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {validationError}
+              </div>
+            )}
+            
             <button
-              onClick={handleCreateEvent}
+              onClick={handleSave}
               disabled={creating}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >

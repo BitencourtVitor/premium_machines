@@ -27,6 +27,7 @@ interface EventsTabProps {
   loadEvents: () => void
   user: any
   setShowCreateModal: (show: boolean) => void
+  handleNewEvent: () => void
   handleEditEvent: (event: AllocationEvent) => void
   handleDeleteEvent: (event: AllocationEvent) => void
   startDate: string
@@ -124,6 +125,7 @@ export default function EventsTab({
   loadEvents,
   user,
   setShowCreateModal,
+  handleNewEvent,
   handleEditEvent,
   handleDeleteEvent,
   startDate,
@@ -200,7 +202,7 @@ export default function EventsTab({
             </button>
             {(user?.can_register_events || user?.role === 'admin' || user?.role === 'dev') && (
               <button
-                onClick={() => setShowCreateModal(true)}
+                onClick={handleNewEvent}
                 className="flex items-center gap-2 px-4 py-2 text-blue-600 dark:text-blue-400 border border-blue-600 dark:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl shadow-sm transition-all bg-white dark:bg-transparent"
                 title="Novo Evento"
                 aria-label="Criar novo evento"

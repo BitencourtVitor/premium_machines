@@ -80,10 +80,13 @@ export async function PUT(
     const userId = body.updated_by
     delete updateData.updated_by
     
-    // Clean nulls for UUIDs again just in case (though frontend handles it)
+    // Clean nulls for UUIDs and optional fields again just in case (though frontend handles it)
     if (updateData.site_id === '') updateData.site_id = null
     if (updateData.extension_id === '') updateData.extension_id = null
     if (updateData.corrects_event_id === '') updateData.corrects_event_id = null
+    if (updateData.construction_type === '') updateData.construction_type = null
+    if (updateData.lot_building_number === '') updateData.lot_building_number = null
+    if (updateData.downtime_reason === '') updateData.downtime_reason = null
 
     const { data: updatedEvent, error: updateError } = await supabaseServer
       .from('allocation_events')

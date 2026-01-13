@@ -54,12 +54,16 @@ export default function EventsPage() {
 
   const loadEvents = useCallback(async () => {
     setLoadingEvents(true)
+    console.log('Loading events...')
     try {
       const response = await fetch('/api/events')
+      console.log('Events response status:', response.status)
       const data = await response.json()
 
       if (data.success) {
         setEvents(data.events)
+      } else {
+        console.error('Failed to load events:', data.message)
       }
     } catch (error) {
       console.error('Error loading events:', error)
@@ -129,24 +133,8 @@ export default function EventsPage() {
   }, [user, sessionLoading, router, loadEvents, loadMachines, loadSites, loadActiveAllocations])
 
   const handleCreateEvent = async () => {
+    // Basic safety check
     if (!newEvent.machine_id || !newEvent.event_date) {
-      alert('Preencha os campos obrigatórios')
-      return
-    }
-
-    // Validações específicas por tipo de evento
-    if (['request_allocation', 'confirm_allocation', 'start_allocation', 'end_allocation'].includes(newEvent.event_type) && !newEvent.site_id) {
-      alert('Selecione um jobsite para eventos de alocação')
-      return
-    }
-
-    if (['extension_attach', 'extension_detach'].includes(newEvent.event_type) && !newEvent.extension_id) {
-      alert('Selecione uma extensão para eventos de extensão')
-      return
-    }
-
-    if (newEvent.event_type === 'downtime_start' && !newEvent.downtime_reason) {
-      alert('Selecione um motivo para o início de downtime')
       return
     }
 
@@ -162,9 +150,9 @@ export default function EventsPage() {
         updated_by: user?.id,
       }
 
-      // Fields that must be null if empty string (UUIDs)
-      const nullableUuidFields = ['site_id', 'extension_id', 'corrects_event_id']
-      nullableUuidFields.forEach(field => {
+      // Fields that must be null if empty string (UUIDs and Enum/Text fields)
+      const nullableFields = ['site_id', 'extension_id', 'corrects_event_id', 'construction_type', 'lot_building_number', 'downtime_reason']
+      nullableFields.forEach(field => {
         if (payload[field as keyof typeof payload] === '') {
           // @ts-ignore
           payload[field as keyof typeof payload] = null
@@ -180,6 +168,8 @@ export default function EventsPage() {
       const data = await response.json()
 
       if (data.success) {
+        alert(editingEventId ? 'Evento atualizado com sucesso!' : 'Evento criado com sucesso!')
+        
         setShowCreateModal(false)
         setEditingEventId(null)
         setNewEvent({
@@ -203,9 +193,29 @@ export default function EventsPage() {
       }
     } catch (error) {
       console.error('Error saving event:', error)
+      alert('Erro ao salvar evento. Verifique sua conexão e tente novamente.')
     } finally {
       setCreating(false)
     }
+  }
+
+  const handleNewEvent = () => {
+    setEditingEventId(null)
+    setNewEvent({
+      event_type: 'start_allocation',
+      machine_id: '',
+      site_id: '',
+      extension_id: '',
+      construction_type: '',
+      lot_building_number: '',
+      event_date: new Date().toISOString().slice(0, 16),
+      downtime_reason: '',
+      downtime_description: '',
+      corrects_event_id: '',
+      correction_description: '',
+      notas: '',
+    })
+    setShowCreateModal(true)
   }
 
   const handleEditEvent = (event: AllocationEvent) => {
@@ -487,6 +497,7 @@ export default function EventsPage() {
                 loadActiveAllocations={loadActiveAllocations}
                 user={user}
                 setShowCreateModal={setShowCreateModal}
+                handleNewEvent={handleNewEvent}
                 handleStartDowntime={handleStartDowntime}
                 handleEndAllocation={handleEndAllocation}
                 handleEndDowntime={handleEndDowntime}
@@ -511,6 +522,7 @@ export default function EventsPage() {
                 loadEvents={loadEvents}
                 user={user}
                 setShowCreateModal={setShowCreateModal}
+                handleNewEvent={handleNewEvent}
                 handleEditEvent={handleEditEvent}
                 handleDeleteEvent={handleDeleteEvent}
               />
