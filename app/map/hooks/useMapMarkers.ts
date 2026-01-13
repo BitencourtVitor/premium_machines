@@ -6,7 +6,8 @@ import {
   groupNearbySites, 
   createLocationMarker, 
   createSitePanel, 
-  createSpiderfyMarker 
+  createSpiderfyMarker,
+  getClusterStatusColor
 } from '../mapUtils'
 
 interface UseMapMarkersProps {
@@ -339,21 +340,22 @@ export function useMapMarkers({
           }
         })
       } else {
-        // Grupo colapsado (cluster)
-        const count = group.sites.length
-        const colors = getThemeColors('neutral', currentIsDark)
-        
-        const el = document.createElement('div')
-        el.className = 'marker-container'
-        el.style.cursor = 'pointer'
-        el.innerHTML = `
-          <div class="relative">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 border-white" style="background-color: ${colors.bg};">
-              <span class="text-white font-bold text-lg">${count}</span>
-            </div>
-            <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-3 h-3 rotate-45" style="background-color: ${colors.bg}; border-right: 2px solid white; border-bottom: 2px solid white;"></div>
-          </div>
-        `
+            // Grupo colapsado (cluster)
+            const count = group.sites.length
+            const colors = getClusterStatusColor(group.sites, currentIsDark)
+            
+            const el = document.createElement('div')
+            el.className = 'marker-container'
+            el.style.cursor = 'pointer'
+            el.style.transition = 'all 0.3s ease' // Transição suave de cor
+            el.innerHTML = `
+              <div class="relative transition-colors duration-300">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 border-white transition-colors duration-300" style="background-color: ${colors.bg};">
+                  <span class="text-white font-bold text-lg">${count}</span>
+                </div>
+                <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-3 h-3 rotate-45 transition-colors duration-300" style="background-color: ${colors.bg}; border-right: 2px solid white; border-bottom: 2px solid white;"></div>
+              </div>
+            `
 
         el.addEventListener('click', (e) => {
           e.stopPropagation()

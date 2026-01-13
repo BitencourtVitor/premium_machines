@@ -8,7 +8,7 @@ import Sidebar from '@/app/components/Sidebar'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
 import { refreshAfterAllocation } from '@/lib/allocationEvents'
-import { AllocationEvent, ActiveAllocation, ActiveDowntime, NewEventState } from './types'
+import { AllocationEvent, ActiveAllocation, ActiveDowntime } from './types'
 import AllocationsTab from './components/AllocationsTab'
 import EventsTab from './components/EventsTab'
 import CreateEventModal from './components/CreateEventModal'
@@ -25,9 +25,11 @@ export default function EventsPage() {
   const [sites, setSites] = useState<any[]>([])
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [filterType, setFilterType] = useState<string>('')
+  const [startDate, setStartDate] = useState<string>('')
+  const [endDate, setEndDate] = useState<string>('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [extensions, setExtensions] = useState<any[]>([])
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
   
   // Novas funcionalidades: abas e alocações ativas
   const [activeTab, setActiveTab] = useState<'events' | 'allocations'>('events')
@@ -81,25 +83,13 @@ export default function EventsPage() {
 
   const loadSites = useCallback(async () => {
     try {
-      const response = await fetch('/api/sites')
+      const response = await fetch('/api/sites?archived=false')
       const data = await response.json()
       if (data.success) {
         setSites(data.sites)
       }
     } catch (error) {
       console.error('Error loading sites:', error)
-    }
-  }, [])
-
-  const loadExtensions = useCallback(async () => {
-    try {
-      const response = await fetch('/api/extensions')
-      const data = await response.json()
-      if (data.success) {
-        setExtensions(data.extensions || [])
-      }
-    } catch (error) {
-      console.error('Error loading extensions:', error)
     }
   }, [])
 
@@ -135,9 +125,8 @@ export default function EventsPage() {
     loadEvents()
     loadMachines()
     loadSites()
-    loadExtensions()
     loadActiveAllocations()
-  }, [user, sessionLoading, router, loadEvents, loadMachines, loadSites, loadExtensions, loadActiveAllocations])
+  }, [user, sessionLoading, router, loadEvents, loadMachines, loadSites, loadActiveAllocations])
 
   const handleCreateEvent = async () => {
     if (!newEvent.machine_id || !newEvent.event_date) {
@@ -161,19 +150,18 @@ export default function EventsPage() {
       return
     }
 
-    if (newEvent.event_type === 'correction' && !newEvent.corrects_event_id) {
-      alert('Informe o ID do evento a ser corrigido')
-      return
-    }
-
     setCreating(true)
     try {
-      const response = await fetch('/api/events', {
-        method: 'POST',
+      const url = editingEventId ? `/api/events/${editingEventId}` : '/api/events'
+      const method = editingEventId ? 'PUT' : 'POST'
+      
+      const response = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...newEvent,
           created_by: user?.id,
+          updated_by: user?.id,
         }),
       })
 
@@ -181,6 +169,7 @@ export default function EventsPage() {
 
       if (data.success) {
         setShowCreateModal(false)
+        setEditingEventId(null)
         setNewEvent({
           event_type: 'start_allocation',
           machine_id: '',
@@ -196,18 +185,44 @@ export default function EventsPage() {
           notas: '',
         })
         loadEvents()
+        if (activeTab === 'allocations') loadActiveAllocations()
       } else {
-        alert(data.message || 'Error creating event')
+        alert(data.message || 'Error saving event')
       }
     } catch (error) {
-      console.error('Error creating event:', error)
+      console.error('Error saving event:', error)
     } finally {
       setCreating(false)
     }
   }
 
+  const handleEditEvent = (event: AllocationEvent) => {
+    setEditingEventId(event.id)
+    setNewEvent({
+      event_type: event.event_type,
+      machine_id: event.machine?.id || '',
+      site_id: event.site?.id || '',
+      extension_id: event.extension_id || '',
+      construction_type: event.construction_type || '',
+      lot_building_number: event.lot_building_number || '',
+      event_date: event.event_date ? event.event_date.slice(0, 16) : '',
+      downtime_reason: event.downtime_reason || '',
+      downtime_description: event.downtime_description || '',
+      corrects_event_id: event.corrects_event_id || '',
+      correction_description: event.correction_description || '',
+      notas: event.notas || '',
+    })
+    setShowCreateModal(true)
+  }
+
   const handleApproveEvent = async (eventId: string) => {
-    if (!confirm('Aprovar este evento?')) return
+    const event = events.find(e => e.id === eventId)
+    if (!event) return
+
+    // Eliminar confirmação redundante para solicitação de alocação
+    if (event.event_type !== 'request_allocation') {
+      if (!confirm('Aprovar este evento?')) return
+    }
 
     try {
       const response = await fetch(`/api/events/${eventId}/approve`, {
@@ -222,6 +237,20 @@ export default function EventsPage() {
         // Disparar atualização global para todas as interfaces
         refreshAfterAllocation()
         alert(data.message || 'Evento aprovado com sucesso!')
+
+        // Transição direta para início de alocação após aprovar solicitação
+        if (event.event_type === 'request_allocation') {
+          setNewEvent({
+            ...newEvent,
+            event_type: 'start_allocation',
+            machine_id: event.machine?.id || '',
+            site_id: event.site?.id || '',
+            construction_type: event.construction_type || '',
+            lot_building_number: event.lot_building_number || '',
+            event_date: new Date().toISOString().slice(0, 16),
+          })
+          setShowCreateModal(true)
+        }
       } else {
         alert(data.message || 'Error approving event')
       }
@@ -277,7 +306,7 @@ export default function EventsPage() {
       if (data.success) {
         loadActiveAllocations()
         loadEvents()
-        alert('Evento de fim de alocação criado. Aguardando aprovação.')
+        // alert('Evento de fim de alocação criado. Aguardando aprovação.')
       } else {
         alert(data.message || 'Erro ao criar evento')
       }
@@ -311,7 +340,7 @@ export default function EventsPage() {
       if (data.success) {
         loadActiveAllocations()
         loadEvents()
-        alert('Evento de fim de downtime criado. Aguardando aprovação.')
+        // alert('Evento de fim de downtime criado. Aguardando aprovação.')
       } else {
         alert(data.message || 'Erro ao criar evento')
       }
@@ -334,10 +363,46 @@ export default function EventsPage() {
     setShowCreateModal(true)
   }
 
+  const handleDeleteEvent = async (event: AllocationEvent) => {
+    if (!confirm(`Tem certeza que deseja excluir o evento da máquina ${event.machine?.unit_number}?`)) return
+
+    try {
+      const response = await fetch(`/api/events/${event.id}?user_id=${user?.id}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        loadEvents()
+        if (activeTab === 'allocations') loadActiveAllocations()
+      } else {
+        alert(data.message || 'Erro ao excluir evento')
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error)
+      alert('Erro ao excluir evento')
+    }
+  }
+
   const filteredEvents = events.filter(event => {
     const matchesStatus = !filterStatus || event.status === filterStatus
     const matchesType = !filterType || event.event_type === filterType
-    return matchesStatus && matchesType
+    
+    let matchesDate = true
+    if (startDate || endDate) {
+      const eventDate = new Date(event.event_date)
+      if (startDate) {
+        matchesDate = matchesDate && eventDate >= new Date(startDate)
+      }
+      if (endDate) {
+        const endDateTime = new Date(endDate)
+        endDateTime.setHours(23, 59, 59, 999)
+        matchesDate = matchesDate && eventDate <= endDateTime
+      }
+    }
+    
+    return matchesStatus && matchesType && matchesDate
   })
 
 
@@ -370,7 +435,7 @@ export default function EventsPage() {
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                   }`}
                 >
-                  Alocações Ativas ({activeAllocations.length})
+                  Alocações Ativas
                   {activeTab === 'allocations' && (
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
                   )}
@@ -414,14 +479,17 @@ export default function EventsPage() {
                 setFilterStatus={setFilterStatus}
                 filterType={filterType}
                 setFilterType={setFilterType}
+                startDate={startDate}
+                setStartDate={setStartDate}
+                endDate={endDate}
+                setEndDate={setEndDate}
                 filteredEvents={filteredEvents}
                 loadingEvents={loadingEvents}
                 loadEvents={loadEvents}
                 user={user}
                 setShowCreateModal={setShowCreateModal}
-                canApprove={canApprove}
-                handleApproveEvent={handleApproveEvent}
-                handleRejectEvent={handleRejectEvent}
+                handleEditEvent={handleEditEvent}
+                handleDeleteEvent={handleDeleteEvent}
               />
             )}
           </div>
@@ -438,6 +506,7 @@ export default function EventsPage() {
         setNewEvent={setNewEvent}
         machines={machines}
         sites={sites}
+        activeAllocations={activeAllocations}
         activeDowntimes={activeDowntimes}
         creating={creating}
         handleCreateEvent={handleCreateEvent}

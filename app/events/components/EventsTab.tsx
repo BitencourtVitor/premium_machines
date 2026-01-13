@@ -3,6 +3,19 @@ import CustomDropdown from '../../components/CustomDropdown'
 import { AllocationEvent } from '../types'
 import { EVENT_STATUS_LABELS, EVENT_TYPE_LABELS, DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 import { formatDate } from '../utils'
+import { 
+  FiCalendar, 
+  FiUser, 
+  FiMapPin, 
+  FiInfo,
+  FiTool,
+  FiCheckCircle,
+  FiXCircle,
+  FiDroplet,
+  FiFileText
+} from 'react-icons/fi'
+import { GiKeyCard } from "react-icons/gi"
+import { LuPuzzle } from "react-icons/lu"
 
 interface EventsTabProps {
   filterStatus: string
@@ -14,9 +27,91 @@ interface EventsTabProps {
   loadEvents: () => void
   user: any
   setShowCreateModal: (show: boolean) => void
-  canApprove: boolean
-  handleApproveEvent: (id: string) => void
-  handleRejectEvent: (id: string) => void
+  handleEditEvent: (event: AllocationEvent) => void
+  handleDeleteEvent: (event: AllocationEvent) => void
+  startDate: string
+  setStartDate: (date: string) => void
+  endDate: string
+  setEndDate: (date: string) => void
+}
+
+const getEventConfig = (type: string) => {
+  switch (type) {
+    case 'start_allocation':
+      return { 
+        icon: GiKeyCard, 
+        color: 'blue', 
+        label: 'Alocação de Máquina',
+        bgColor: 'bg-[#2E86C1]/10 dark:bg-[#2E86C1]/20',
+        textColor: 'text-[#2E86C1]',
+        borderColor: 'border-[#2E86C1]/20 dark:border-[#2E86C1]/30'
+      }
+    case 'end_allocation':
+      return { 
+        icon: FiXCircle, 
+        color: 'red', 
+        label: 'Fim de Alocação',
+        bgColor: 'bg-red-100 dark:bg-red-900/40',
+        textColor: 'text-red-600 dark:text-red-400',
+        borderColor: 'border-red-200 dark:border-red-800'
+      }
+    case 'start_downtime':
+    case 'downtime_start':
+      return { 
+        icon: FiTool, 
+        color: 'orange', 
+        label: 'Início de Manutenção',
+        bgColor: 'bg-orange-100 dark:bg-orange-900/40',
+        textColor: 'text-orange-600 dark:text-orange-400',
+        borderColor: 'border-orange-200 dark:border-orange-800'
+      }
+    case 'end_downtime':
+    case 'downtime_end':
+      return { 
+        icon: FiCheckCircle, 
+        color: 'green', 
+        label: 'Fim de Manutenção',
+        bgColor: 'bg-green-100 dark:bg-green-900/40',
+        textColor: 'text-green-600 dark:text-green-400',
+        borderColor: 'border-green-200 dark:border-green-800'
+      }
+    case 'refueling':
+      return { 
+        icon: FiDroplet, 
+        color: 'yellow', 
+        label: 'Abastecimento',
+        bgColor: 'bg-yellow-100 dark:bg-yellow-900/40',
+        textColor: 'text-yellow-600 dark:text-yellow-400',
+        borderColor: 'border-yellow-200 dark:border-yellow-800'
+      }
+    case 'request_allocation':
+      return { 
+        icon: FiFileText, 
+        color: 'purple', 
+        label: 'Solicitação de Alocação',
+        bgColor: 'bg-purple-100 dark:bg-purple-900/40',
+        textColor: 'text-purple-600 dark:text-purple-400',
+        borderColor: 'border-purple-200 dark:border-purple-800'
+      }
+    case 'extension_attach':
+      return { 
+        icon: LuPuzzle, 
+        color: 'indigo', 
+        label: 'Alocação de Extensão',
+        bgColor: 'bg-[#F39C12]/10 dark:bg-[#F39C12]/20',
+        textColor: 'text-[#F39C12]',
+        borderColor: 'border-[#F39C12]/20 dark:border-[#F39C12]/30'
+      }
+    default:
+      return { 
+        icon: FiInfo, 
+        color: 'gray', 
+        label: EVENT_TYPE_LABELS[type] || type,
+        bgColor: 'bg-gray-100 dark:bg-gray-800',
+        textColor: 'text-gray-600 dark:text-gray-400',
+        borderColor: 'border-gray-200 dark:border-gray-700'
+      }
+  }
 }
 
 export default function EventsTab({
@@ -29,9 +124,12 @@ export default function EventsTab({
   loadEvents,
   user,
   setShowCreateModal,
-  canApprove,
-  handleApproveEvent,
-  handleRejectEvent
+  handleEditEvent,
+  handleDeleteEvent,
+  startDate,
+  setStartDate,
+  endDate,
+  setEndDate
 }: EventsTabProps) {
   return (
     <>
@@ -60,6 +158,25 @@ export default function EventsTab({
               }))
             ]}
           />
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              placeholder="Data Inicial"
+              aria-label="Data Inicial"
+            />
+            <span className="text-gray-500 dark:text-gray-400">-</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              placeholder="Data Final"
+              aria-label="Data Final"
+            />
+          </div>
         </div>
       </div>
 
@@ -75,6 +192,7 @@ export default function EventsTab({
               className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               disabled={loadingEvents}
               title="Atualizar"
+              aria-label="Atualizar lista"
             >
               <svg className={`w-5 h-5 ${loadingEvents ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -83,12 +201,14 @@ export default function EventsTab({
             {(user?.can_register_events || user?.role === 'admin' || user?.role === 'dev') && (
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                title="Nova Alocação"
+                className="flex items-center gap-2 px-4 py-2 text-blue-600 dark:text-blue-400 border border-blue-600 dark:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl shadow-sm transition-all bg-white dark:bg-transparent"
+                title="Novo Evento"
+                aria-label="Criar novo evento"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
+                <span className="font-medium">Novo Evento</span>
               </button>
             )}
           </div>
@@ -103,92 +223,96 @@ export default function EventsTab({
             <p className="text-gray-500 dark:text-gray-400">Nenhuma alocação encontrada</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200 dark:divide-gray-700 md:flex-1 md:overflow-y-auto">
-            {filteredEvents.map((event) => (
-              <div key={event.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-gray-900 dark:text-white">
+          <div className="p-4 overflow-y-auto space-y-3">
+            {filteredEvents.map((event) => {
+              const config = getEventConfig(event.event_type)
+              const Icon = config.icon
+
+              return (
+                <div 
+                  key={event.id} 
+                  className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col md:flex-row gap-4 items-start md:items-center hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                >
+                  {/* Icon Box */}
+                  <div className={`w-12 h-12 flex-shrink-0 rounded-xl flex items-center justify-center ${config.bgColor} ${config.textColor}`}>
+                    <Icon size={24} title={config.label} aria-label={config.label} />
+                  </div>
+
+                  {/* Main Content */}
+                  <div className="flex-1 min-w-0 w-full">
+                    <div className="flex items-center justify-between md:justify-start gap-3 mb-1">
+                      <span className="text-lg font-bold text-gray-900 dark:text-white">
                         {event.machine?.unit_number}
                       </span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        event.status === 'pending' ? 'event-pending' :
-                        event.status === 'approved' ? 'event-approved' : 'event-rejected'
-                      }`}>
-                        {EVENT_STATUS_LABELS[event.status]}
+                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        {config.label}
                       </span>
                     </div>
-                    <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">
-                      {EVENT_TYPE_LABELS[event.event_type]}
-                    </p>
-                    {event.site && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        {event.site.title}
-                        {event.construction_type && event.lot_building_number && (
-                          <span className="ml-2">
-                            • {event.construction_type === 'lot' ? 'Lote' : 'Prédio'} {event.lot_building_number}
-                          </span>
-                        )}
-                      </p>
-                    )}
-                    {event.downtime_reason && (
-                      <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">
-                        Motivo: {DOWNTIME_REASON_LABELS[event.downtime_reason]}
-                      </p>
-                    )}
-                    {event.extension_id && (
-                      <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">
-                        Extensão: {event.extension_id.substring(0, 8)}...
-                      </p>
-                    )}
-                    {event.corrects_event_id && (
-                      <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                        {event.event_type === 'correction' ? 'Corrige evento: ' : 'Finaliza evento: '}
-                        {event.corrects_event_id.substring(0, 8)}...
-                      </p>
-                    )}
-                    {event.correction_description && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 italic">
-                        {event.correction_description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-400 dark:text-gray-500">
-                      <span>{formatDate(event.event_date)}</span>
-                      <span>{event.created_by_user?.nome}</span>
-                      {event.approved_by_user && (
-                        <span className="text-green-600 dark:text-green-400">
-                          Aprovado por: {event.approved_by_user.nome}
-                        </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-1 gap-x-6 text-sm">
+                      <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                        <FiCalendar className="flex-shrink-0" />
+                        <span>{formatDate(event.event_date)}</span>
+                      </div>
+                      
+                      {event.site && (
+                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                          <FiMapPin className="flex-shrink-0" />
+                          <span className="truncate">{event.site.title}</span>
+                        </div>
                       )}
+
+                      <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                        <FiUser className="flex-shrink-0" />
+                        <span>{event.created_by_user?.nome}</span>
+                      </div>
                     </div>
+
+                    {(event.downtime_reason || event.notas) && (
+                      <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 flex items-start gap-2">
+                        <FiInfo className="mt-0.5 flex-shrink-0 text-gray-400" />
+                        <div className="flex flex-wrap gap-x-4">
+                          {event.downtime_reason && (
+                            <span className={`${config.textColor}`}>
+                              Motivo: {DOWNTIME_REASON_LABELS[event.downtime_reason]}
+                            </span>
+                          )}
+                          {event.notas && (
+                            <span className="italic">{event.notas}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  
-                  {canApprove && event.status === 'pending' && (
-                    <div className="flex gap-2">
+
+                  {/* Actions */}
+                  {(user?.can_register_events || user?.role === 'admin' || user?.role === 'dev') && (
+                    <div className="flex items-center gap-2 self-start md:self-center border-t md:border-t-0 border-gray-100 dark:border-gray-700 pt-3 md:pt-0 w-full md:w-auto mt-2 md:mt-0 justify-end md:justify-start">
                       <button
-                        onClick={() => handleApproveEvent(event.id)}
-                        className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
-                        title="Aprovar"
+                        onClick={() => handleEditEvent(event)}
+                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                        title="Editar"
+                        aria-label={`Editar evento da máquina ${event.machine?.unit_number}`}
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </button>
                       <button
-                        onClick={() => handleRejectEvent(event.id)}
-                        className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                        title="Rejeitar"
+                        onClick={() => handleDeleteEvent(event)}
+                        className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        title="Excluir"
+                        aria-label={`Excluir evento da máquina ${event.machine?.unit_number}`}
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
                     </div>
                   )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

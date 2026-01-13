@@ -10,6 +10,8 @@ export async function GET(request: NextRequest) {
     const machineId = searchParams.get('machine_id')
     const siteId = searchParams.get('site_id')
     const status = searchParams.get('status')
+    const startDate = searchParams.get('start_date')
+    const endDate = searchParams.get('end_date')
 
     let query = supabaseServer
       .from('allocation_events')
@@ -33,6 +35,14 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       query = query.eq('status', status)
+    }
+
+    if (startDate) {
+      query = query.gte('event_date', startDate)
+    }
+
+    if (endDate) {
+      query = query.lte('event_date', endDate)
     }
 
     const { data: events, error } = await query
@@ -100,7 +110,7 @@ export async function POST(request: NextRequest) {
         correction_description: body.correction_description || null,
         notas: body.notas || null,
         created_by: body.created_by,
-        status: 'pending',
+        status: 'approved',
       })
       .select(`
         *,

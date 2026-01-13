@@ -12,6 +12,7 @@ import MachinesTab from './components/MachinesTab'
 import MachineTypesTab from './components/MachineTypesTab'
 import CreateMachineModal from './components/CreateMachineModal'
 import CreateMachineTypeModal from './components/CreateMachineTypeModal'
+import MachineDetailsModal from '@/app/components/MachineDetailsModal'
 
 export default function MachinesPage() {
   const router = useRouter()
@@ -56,6 +57,12 @@ export default function MachinesPage() {
     icon: '',
     is_attachment: false,
   })
+
+  // Estados para Detalhes da Máquina
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
+  const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null)
+  const [loadingDetails, setLoadingDetails] = useState(false)
+  const [machineEvents, setMachineEvents] = useState<any[]>([])
 
   const handleExportExcel = () => {
     // TODO: Implementar exportação para Excel
@@ -334,6 +341,24 @@ export default function MachinesPage() {
     setShowTypeModal(true)
   }
 
+  const handleMachineClick = async (machine: Machine) => {
+    setSelectedMachine(machine)
+    setShowDetailsModal(true)
+    setLoadingDetails(true)
+    setMachineEvents([])
+    try {
+      const response = await fetch(`/api/events?machine_id=${machine.id}`)
+      const data = await response.json()
+      if (data.success) {
+        setMachineEvents(data.events)
+      }
+    } catch (error) {
+      console.error('Error loading machine details:', error)
+    } finally {
+      setLoadingDetails(false)
+    }
+  }
+
   // Por enquanto, sem filtros - mostrar todas as máquinas
   const filteredMachines = machines
 
@@ -393,11 +418,13 @@ export default function MachinesPage() {
               <MachinesTab
                 loadingMachines={loadingMachines}
                 loadMachines={loadMachines}
-                filteredMachines={filteredMachines}
+                machines={filteredMachines}
                 setShowCreateModal={setShowCreateModal}
-                handleEditMachine={handleEditMachine}
+                setEditingMachine={setEditingMachine}
+                setNewMachine={setNewMachine}
                 handleDeleteMachine={handleDeleteMachine}
                 handleExportExcel={handleExportExcel}
+                onMachineClick={handleMachineClick}
               />
             )}
 
@@ -446,6 +473,15 @@ export default function MachinesPage() {
         handleCreateType={handleCreateType}
         creatingType={creatingType}
         user={user}
+      />
+
+      {/* Machine Details Modal */}
+      <MachineDetailsModal
+        isOpen={showDetailsModal}
+        onClose={() => setShowDetailsModal(false)}
+        machine={selectedMachine}
+        loading={loadingDetails}
+        events={machineEvents}
       />
     </div>
   )

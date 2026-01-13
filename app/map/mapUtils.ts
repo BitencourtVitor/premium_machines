@@ -37,6 +37,49 @@ export const getThemeColors = (colorType: 'neutral' | 'blue' | 'red' | 'green' |
   return colors[colorType] || colors.neutral
 }
 
+// Função para determinar a cor do cluster baseada no status mais crítico
+export const getClusterStatusColor = (sites: Site[], isDark: boolean) => {
+  let hasMaintenance = false
+  let hasInactive = false
+  let hasOperational = false
+  let hasMachines = false
+
+  // Iterar sobre todos os sites do cluster
+  for (const site of sites) {
+    if (site.machines && site.machines.length > 0) {
+      hasMachines = true
+      for (const machine of site.machines) {
+        const status = machine.status
+        
+        if (status === 'maintenance') {
+          hasMaintenance = true
+          // Se encontrou manutenção (prioridade máxima), pode parar de verificar este site?
+          // Não, precisamos verificar todos para ter certeza, mas se achou maintenance já é vermelho.
+          break 
+        } else if (status === 'inactive') {
+          hasInactive = true
+        } else if (status === 'allocated' || status === 'available') {
+          hasOperational = true
+        }
+      }
+    }
+    if (hasMaintenance) break // Prioridade máxima encontrada
+  }
+
+  // Definir cor baseada na prioridade
+  if (hasMaintenance) {
+    return getThemeColors('red', isDark) // Crítico: Manutenção
+  } else if (hasInactive) {
+    return getThemeColors('yellow', isDark) // Alerta: Inativo/Problema
+  } else if (hasOperational) {
+    return getThemeColors('green', isDark) // Normal: Em operação/Disponível
+  } else if (hasMachines) {
+    return getThemeColors('blue', isDark) // Máquinas existem mas status desconhecido
+  } else {
+    return getThemeColors('neutral', isDark) // Sem máquinas
+  }
+}
+
 // Função para calcular distância geográfica entre dois pontos (em metros)
 export const getGeoDistance = (lng1: number, lat1: number, lng2: number, lat2: number) => {
   const R = 6371000 // Raio da Terra em metros
@@ -134,8 +177,17 @@ export const groupNearbySites = (sites: Site[], mapInstance: mapboxgl.Map, thres
 
 // Criar marcador com ícone map-pin do Phosphor Icons para jobsites individuais
 export const createLocationMarker = (site: Site, currentIsDark: boolean, onClick: (e?: Event) => void, isSelected: boolean = false) => {
-  const baseColorType = site.machines_count > 0 ? 'blue' : 'neutral'
-  const colors = getThemeColors(baseColorType, currentIsDark)
+  // Check if any machine is in maintenance
+  const hasMaintenance = site.machines?.some((m: any) => m.status === 'maintenance')
+  
+  let baseColorType = 'neutral'
+  if (hasMaintenance) {
+    baseColorType = 'red'
+  } else if (site.machines_count > 0) {
+    baseColorType = 'blue'
+  }
+  
+  const colors = getThemeColors(baseColorType as any, currentIsDark)
   const strokeWidth = isSelected ? 16 : 8
   const el = document.createElement('div')
   el.className = 'marker-container'

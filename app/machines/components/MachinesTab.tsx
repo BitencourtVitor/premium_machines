@@ -6,27 +6,31 @@ import { MACHINE_STATUS_LABELS, OWNERSHIP_TYPE_LABELS } from '@/lib/permissions'
 interface MachinesTabProps {
   loadingMachines: boolean
   loadMachines: () => void
-  filteredMachines: Machine[]
+  machines: Machine[]
   setShowCreateModal: (show: boolean) => void
-  handleEditMachine: (machine: Machine) => void
+  setEditingMachine: (machine: Machine | null) => void
+  setNewMachine: (machine: any) => void
   handleDeleteMachine: (machine: Machine) => void
   handleExportExcel: () => void
+  onMachineClick?: (machine: Machine) => void
 }
 
 export default function MachinesTab({
   loadingMachines,
   loadMachines,
-  filteredMachines,
+  machines,
   setShowCreateModal,
-  handleEditMachine,
+  setEditingMachine,
+  setNewMachine,
   handleDeleteMachine,
-  handleExportExcel
+  handleExportExcel,
+  onMachineClick
 }: MachinesTabProps) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2">
         <h2 className="text-base font-normal text-gray-500 dark:text-gray-400">
-          Máquinas • {filteredMachines.length}
+          Máquinas • {machines.length}
         </h2>
         <div className="flex items-center gap-2">
           <button
@@ -56,7 +60,7 @@ export default function MachinesTab({
         <div className="p-8 text-center">
           <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 dark:border-gray-400"></div>
         </div>
-      ) : filteredMachines.length === 0 ? (
+      ) : machines.length === 0 ? (
         <div className="p-8 text-center">
           <p className="text-gray-500 dark:text-gray-400">
             Nenhuma máquina cadastrada
@@ -64,7 +68,7 @@ export default function MachinesTab({
         </div>
       ) : (
         <div className="divide-y divide-gray-200 dark:divide-gray-700 md:flex-1 md:overflow-y-auto">
-          {filteredMachines.map((machine) => {
+          {machines.map((machine) => {
             // Determinar o caminho da imagem baseado no tipo de máquina
             const getMachineImagePath = () => {
               if (!machine.machine_type) return null
@@ -109,7 +113,8 @@ export default function MachinesTab({
             return (
               <div
                 key={machine.id}
-                className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                onClick={() => onMachineClick?.(machine)}
+                className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -167,8 +172,12 @@ export default function MachinesTab({
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handleEditMachine(machine)}
-                      className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditingMachine(machine)
+                        setShowCreateModal(true)
+                      }}
+                      className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
                       title="Editar"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -176,8 +185,11 @@ export default function MachinesTab({
                       </svg>
                     </button>
                     <button
-                      onClick={() => handleDeleteMachine(machine)}
-                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteMachine(machine)
+                      }}
+                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
                       title="Deletar"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

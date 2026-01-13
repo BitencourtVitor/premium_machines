@@ -72,13 +72,13 @@ export function getDefaultPermissions(role: string): RolePermissions {
 export const EVENT_TYPE_LABELS: Record<string, string> = {
   request_allocation: 'Solicitação de Alocação',
   confirm_allocation: 'Confirmação de Alocação',
-  start_allocation: 'Início de Alocação',
+  start_allocation: 'Alocação de Máquina',
   end_allocation: 'Fim de Alocação',
-  downtime_start: 'Início de Parada',
-  downtime_end: 'Fim de Parada',
-  correction: 'Correção',
-  extension_attach: 'Extensão Conectada',
+  downtime_start: 'Início de Manutenção',
+  downtime_end: 'Fim de Manutenção',
+  extension_attach: 'Alocação de Extensão para Obra',
   extension_detach: 'Extensão Desconectada',
+  refueling: 'Abastecimento de Combustível',
 }
 
 // Downtime reason labels

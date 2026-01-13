@@ -1,7 +1,10 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import CustomDropdown from '../../components/CustomDropdown'
-import { NewEventState, ActiveDowntime } from '../types'
-import { EVENT_TYPE_LABELS, DOWNTIME_REASON_LABELS } from '@/lib/permissions'
+import { NewEventState, ActiveDowntime, ActiveAllocation } from '../types'
+import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
+import { filterMachinesForEvent } from '../utils'
+import { GiKeyCard } from "react-icons/gi"
+import { LuPuzzle } from "react-icons/lu"
 
 interface CreateEventModalProps {
   showCreateModal: boolean
@@ -10,9 +13,11 @@ interface CreateEventModalProps {
   setNewEvent: (event: NewEventState) => void
   machines: any[]
   sites: any[]
+  activeAllocations: ActiveAllocation[]
   activeDowntimes: ActiveDowntime[]
   creating: boolean
   handleCreateEvent: () => void
+  editingEventId?: string | null
 }
 
 export default function CreateEventModal({
@@ -22,21 +27,217 @@ export default function CreateEventModal({
   setNewEvent,
   machines,
   sites,
+  activeAllocations,
   activeDowntimes,
   creating,
-  handleCreateEvent
+  handleCreateEvent,
+  editingEventId
 }: CreateEventModalProps) {
+  const [step, setStep] = useState<'selection' | 'form'>('selection')
+
+  // Reset step when modal closes or editing changes
+  useEffect(() => {
+    if (!showCreateModal) {
+      setStep('selection')
+    } else if (editingEventId) {
+      setStep('form')
+    } else if (newEvent.machine_id && newEvent.event_type === 'downtime_start') {
+      // Direct open for downtime start
+      setStep('form')
+    }
+  }, [showCreateModal, editingEventId, newEvent.machine_id, newEvent.event_type])
+
   if (!showCreateModal) return null
 
+  const handleTypeSelect = (type: string) => {
+    setNewEvent({ ...newEvent, event_type: type })
+    setStep('form')
+  }
+
+  const filteredMachines = filterMachinesForEvent(
+    newEvent.event_type,
+    machines,
+    activeAllocations,
+    activeDowntimes
+  )
+
+  const getAvailableCount = (type: string) => {
+    return filterMachinesForEvent(type, machines, activeAllocations, activeDowntimes).length
+  }
+
+  // Helpers for auto-filling and feedback
+  const activeAlloc = activeAllocations.find(a => a.machine_id === newEvent.machine_id)
+  const activeDowntime = activeDowntimes.find(d => d.machine_id === newEvent.machine_id)
+  
+  // Logic for Extension Allocation Feedback: Machines at selected site
+  const machinesAtSite = newEvent.site_id 
+    ? activeAllocations
+        .filter(a => a.site_id === newEvent.site_id)
+        .map(a => `${a.machine_unit_number}`)
+    : []
+
+  const renderSelection = () => {
+    const counts = {
+      start_allocation: getAvailableCount('start_allocation'),
+      end_allocation: getAvailableCount('end_allocation'),
+      request_allocation: getAvailableCount('request_allocation'),
+      downtime_start: getAvailableCount('downtime_start'),
+      downtime_end: getAvailableCount('downtime_end'),
+      refueling: getAvailableCount('refueling'),
+      extension_attach: getAvailableCount('extension_attach')
+    }
+
+    const Button = ({ type, label, desc, color, icon, count, customStyle }: any) => {
+      // Default classes based on color prop
+      const defaultClasses = {
+        button: `hover:bg-${color}-50 dark:hover:bg-${color}-900/20 hover:border-${color}-200 dark:hover:border-${color}-800`,
+        iconBox: `bg-${color}-100 dark:bg-${color}-900/40 text-${color}-600 dark:text-${color}-400 group-hover:bg-${color}-200 dark:group-hover:bg-${color}-800`
+      }
+
+      // Use custom styles if provided, otherwise default
+      const buttonClass = customStyle?.button || defaultClasses.button
+      const iconBoxClass = customStyle?.iconBox || defaultClasses.iconBox
+
+      return (
+        <button
+          onClick={() => handleTypeSelect(type)}
+          disabled={count === 0}
+          className={`w-full flex items-center p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl transition-all group shadow-sm disabled:opacity-50 disabled:cursor-not-allowed text-left mb-3 ${buttonClass}`}
+        >
+          <div className={`p-2 rounded-lg mr-3 transition-colors ${iconBoxClass}`}>
+            {icon}
+          </div>
+          <div className="flex-1">
+            <div className="flex justify-between items-center">
+              <span className="block font-semibold text-gray-900 dark:text-white text-sm">{label}</span>
+              {count === 0 && <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">0</span>}
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{desc}</span>
+          </div>
+        </button>
+      )
+    }
+
+    return (
+      <div className="flex flex-col md:flex-row gap-6 p-2">
+        {/* Section 1: Eventos de Alocação */}
+        <div className="flex-1">
+          <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-1 border-b border-gray-100 dark:border-gray-700 pb-2">
+            Eventos de Alocação
+          </h3>
+          <div className="mt-3">
+            <Button 
+              type="request_allocation" 
+              label="Solicitação de Alocação" 
+              desc="Solicitar máquina para obra" 
+              color="purple" 
+              count={counts.request_allocation}
+              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
+            />
+            <Button 
+              type="start_allocation" 
+              label="Alocação de Máquina" 
+              desc="Iniciar nova alocação" 
+              color="blue" 
+              count={counts.start_allocation}
+              customStyle={{
+                button: "hover:bg-[#2E86C1]/10 dark:hover:bg-[#2E86C1]/20 hover:border-[#2E86C1]/30",
+                iconBox: "bg-[#2E86C1]/10 dark:bg-[#2E86C1]/20 text-[#2E86C1] group-hover:bg-[#2E86C1]/20"
+              }}
+              icon={<GiKeyCard className="w-5 h-5" aria-label="Ícone de servidor" title="Alocação de Máquina" />}
+            />
+            <Button 
+              type="extension_attach" 
+              label="Alocação de Extensão" 
+              desc="Vincular extensão a uma obra" 
+              color="indigo" 
+              count={counts.extension_attach}
+              customStyle={{
+                button: "hover:bg-[#F39C12]/10 dark:hover:bg-[#F39C12]/20 hover:border-[#F39C12]/30",
+                iconBox: "bg-[#F39C12]/10 dark:bg-[#F39C12]/20 text-[#F39C12] group-hover:bg-[#F39C12]/20"
+              }}
+              icon={<LuPuzzle className="w-5 h-5" aria-label="Ícone de quebra-cabeça" title="Alocação de Extensão" />}
+            />
+            <Button 
+              type="end_allocation" 
+              label="Fim de Alocação" 
+              desc="Finalizar alocação existente" 
+              color="red" 
+              count={counts.end_allocation}
+              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            />
+          </div>
+        </div>
+
+        {/* Section 2: Demais Eventos */}
+        <div className="flex-1">
+          <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-1 border-b border-gray-100 dark:border-gray-700 pb-2">
+            Demais Eventos
+          </h3>
+          <div className="mt-3">
+            <Button 
+              type="refueling" 
+              label="Abastecimento de Combustível" 
+              desc="Registrar abastecimento" 
+              color="yellow" 
+              count={counts.refueling}
+              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>}
+            />
+            <Button 
+              type="downtime_start" 
+              label="Início de Manutenção" 
+              desc="Registrar parada" 
+              color="orange" 
+              count={counts.downtime_start}
+              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>}
+            />
+            <Button 
+              type="downtime_end" 
+              label="Fim de Manutenção" 
+              desc="Finalizar manutenção" 
+              color="green" 
+              count={counts.downtime_end}
+              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const getTitle = () => {
+    if (step === 'selection') return 'Novo Evento'
+    switch (newEvent.event_type) {
+      case 'start_allocation': return 'Alocação de Máquina'
+      case 'end_allocation': return 'Fim de Alocação'
+      case 'request_allocation': return 'Solicitar Alocação'
+      case 'downtime_start': return 'Início de Manutenção'
+      case 'downtime_end': return 'Fim de Manutenção'
+      case 'refueling': return 'Abastecimento de Combustível'
+      case 'extension_attach': return 'Alocação de Extensão'
+      default: return 'Novo Evento'
+    }
+  }
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 sm:p-6">
+      <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full ${step === 'selection' ? 'max-w-4xl' : 'max-w-lg'} max-h-[90vh] overflow-hidden flex flex-col transition-all duration-300`}>
         <div className="bg-white dark:bg-gray-800 flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {newEvent.event_type === 'request_allocation' ? 'Solicitar Alocação' :
-             newEvent.event_type === 'confirm_allocation' ? 'Confirmar Alocação' :
-             'Novo Evento'}
-          </h2>
+          <div className="flex items-center gap-3">
+             {step === 'form' && !editingEventId && (
+              <button 
+                onClick={() => setStep('selection')}
+                className="mr-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {getTitle()}
+            </h2>
+          </div>
           <button
             onClick={() => setShowCreateModal(false)}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
@@ -48,271 +249,257 @@ export default function CreateEventModal({
         </div>
 
         <div className="p-6 space-y-4 flex-1 overflow-y-auto">
-          <CustomDropdown
-            label="Tipo de Evento *"
-            value={newEvent.event_type}
-            onChange={(value) => setNewEvent({ ...newEvent, event_type: value })}
-            options={Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => ({
-              value,
-              label: label as string
-            }))}
-            placeholder="Selecione o tipo de evento"
-            required
-          />
-
-          <CustomDropdown
-            label="Máquina *"
-            value={newEvent.machine_id}
-            onChange={(value) => setNewEvent({ ...newEvent, machine_id: value })}
-            options={[
-              { value: '', label: 'Selecione...' },
-              ...machines.map((machine) => ({
-                value: machine.id,
-                label: `${machine.unit_number} - ${machine.machine_type?.nome}`
-              }))
-            ]}
-            placeholder="Selecione uma máquina"
-            required
-          />
-
-          {['request_allocation', 'confirm_allocation', 'start_allocation', 'end_allocation'].includes(newEvent.event_type) && (
+          {step === 'selection' ? renderSelection() : (
             <>
-              <CustomDropdown
-                label="Jobsite *"
-                value={newEvent.site_id}
-                onChange={(value) => setNewEvent({ ...newEvent, site_id: value })}
-                options={[
-                  { value: '', label: 'Selecione...' },
-                  ...sites.map((site) => ({
-                    value: site.id,
-                    label: site.title
-                  }))
-                ]}
-                placeholder="Selecione um jobsite"
-                required
-              />
-
-              <CustomDropdown
-                label="Tipo de Construção"
-                value={newEvent.construction_type || ''}
-                onChange={(value) => setNewEvent({ ...newEvent, construction_type: value || '' })}
-                options={[
-                  { value: '', label: 'Selecione...' },
-                  { value: 'lot', label: 'Lote' },
-                  { value: 'building', label: 'Prédio/Edifício' }
-                ]}
-                placeholder="Selecione o tipo de construção"
-              />
-
-              {newEvent.construction_type && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Número do {newEvent.construction_type === 'lot' ? 'Lote' : 'Prédio'}
-                  </label>
-                  <input
-                    type="text"
-                    value={newEvent.lot_building_number}
-                    onChange={(e) => setNewEvent({ ...newEvent, lot_building_number: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    placeholder={`Número do ${newEvent.construction_type === 'lot' ? 'lote' : 'prédio'}`}
-                  />
-                </div>
-              )}
-            </>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Data/Hora do Evento *
-            </label>
-            <input
-              type="datetime-local"
-              value={newEvent.event_date}
-              onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-          </div>
-
-          {['downtime_start'].includes(newEvent.event_type) && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Motivo da Parada *
-                </label>
+              {/* Special Case: Extension Attach shows Site FIRST */}
+              {newEvent.event_type === 'extension_attach' && (
                 <CustomDropdown
-                  value={newEvent.downtime_reason || ''}
-                  onChange={(value) => setNewEvent({ ...newEvent, downtime_reason: value || '' })}
+                  label="Jobsite *"
+                  value={newEvent.site_id}
+                  onChange={(value) => setNewEvent({ ...newEvent, site_id: value })}
                   options={[
                     { value: '', label: 'Selecione...' },
-                    ...Object.entries(DOWNTIME_REASON_LABELS).map(([value, label]) => ({
-                      value,
-                      label: label as string
+                    ...sites.map((site) => ({
+                      value: site.id,
+                      label: site.title
                     }))
                   ]}
-                  placeholder="Selecione o motivo da parada"
+                  placeholder="Selecione um jobsite"
                   required
                 />
-              </div>
+              )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Descrição
-                </label>
-                <textarea
-                  value={newEvent.downtime_description}
-                  onChange={(e) => setNewEvent({ ...newEvent, downtime_description: e.target.value })}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="Descreva o motivo da parada..."
-                />
-              </div>
-            </>
-          )}
-
-          {['downtime_end'].includes(newEvent.event_type) && (
-            <>
+              {/* Machine Selection (Label varies) */}
               <CustomDropdown
-                label="Máquina *"
+                label={newEvent.event_type === 'extension_attach' ? "Extensão *" : (newEvent.event_type === 'request_allocation' ? "Máquina (Tipo) *" : "Máquina *")}
                 value={newEvent.machine_id}
                 onChange={(value) => setNewEvent({ ...newEvent, machine_id: value })}
                 options={[
                   { value: '', label: 'Selecione...' },
-                  ...machines.map((machine) => ({
+                  ...filteredMachines.map((machine) => ({
                     value: machine.id,
                     label: `${machine.unit_number} - ${machine.machine_type?.nome}`
                   }))
                 ]}
-                placeholder="Selecione uma máquina"
+                placeholder={newEvent.event_type === 'extension_attach' ? "Selecione a extensão" : "Selecione uma máquina"}
                 required
               />
 
-              <CustomDropdown
-                label="Downtime Ativo *"
-                value={newEvent.corrects_event_id}
-                onChange={(value) => {
-                  const selectedDowntime = activeDowntimes.find(d => d.downtime_event_id === value)
-                  setNewEvent({
-                    ...newEvent,
-                    corrects_event_id: value,
-                    machine_id: selectedDowntime?.machine_id || '',
-                    site_id: selectedDowntime?.site_id || '',
-                  })
-                }}
-                options={[
-                  { value: '', label: 'Selecione...' },
-                  ...activeDowntimes.map((downtime) => ({
-                    value: downtime.downtime_event_id,
-                    label: `${downtime.machine_unit_number} - ${downtime.downtime_reason} (${new Date(downtime.downtime_start).toLocaleDateString('pt-BR')})`
-                  }))
-                ]}
-                placeholder="Selecione o downtime a ser finalizado"
-                required
-              />
-
-              {newEvent.machine_id && newEvent.corrects_event_id && (
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                    Finalizando downtime da máquina <span className="font-bold">{machines.find(m => m.id === newEvent.machine_id)?.unit_number}</span>
-                  </p>
-                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    Site: {sites.find(s => s.id === newEvent.site_id)?.title || 'Não identificado'}
-                  </p>
+              {/* Feedback Info Boxes */}
+              
+              {/* End Allocation: Show current allocation info */}
+              {newEvent.event_type === 'end_allocation' && activeAlloc && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                   <p className="text-sm text-red-800 dark:text-red-200">
+                     <span className="font-semibold">Alocado em:</span> {activeAlloc.site_title}
+                   </p>
+                   {activeAlloc.construction_type && (
+                      <p className="text-xs text-red-600 dark:text-red-300 mt-1">
+                        Tipo: {activeAlloc.construction_type === 'lot' ? 'Lote' : 'Prédio'} {activeAlloc.lot_building_number}
+                      </p>
+                   )}
                 </div>
               )}
 
-              {activeDowntimes.length === 0 && (
+              {/* Start Maintenance: Show current status */}
+              {newEvent.event_type === 'downtime_start' && activeAlloc && (
+                <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                   <p className="text-sm text-orange-800 dark:text-orange-200">
+                     <span className="font-semibold">Status Atual:</span> Alocado em {activeAlloc.site_title}
+                   </p>
+                </div>
+              )}
+
+              {/* End Maintenance: Show maintenance info */}
+              {newEvent.event_type === 'downtime_end' && activeDowntime && (
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                   <p className="text-sm text-green-800 dark:text-green-200">
+                     <span className="font-semibold">Em manutenção em:</span> {activeDowntime.site_title}
+                   </p>
+                   <p className="text-xs text-green-600 dark:text-green-300 mt-1">
+                     Motivo: {DOWNTIME_REASON_LABELS[activeDowntime.downtime_reason] || activeDowntime.downtime_reason}
+                   </p>
+                </div>
+              )}
+
+              {/* Refueling: Show location info */}
+              {newEvent.event_type === 'refueling' && activeAlloc && (
                 <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                    ⚠️ Nenhum downtime ativo encontrado
-                  </p>
-                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                    Primeiro registre um evento de &quot;Início de Downtime&quot; antes de tentar finalizar.
-                  </p>
+                   <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                     <span className="font-semibold">Local de Registro:</span> {activeAlloc.site_title}
+                   </p>
                 </div>
               )}
-            </>
-          )}
 
-          {['extension_attach', 'extension_detach'].includes(newEvent.event_type) && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Extensão *
-              </label>
-              <input
-                type="text"
-                value={newEvent.extension_id}
-                onChange={(e) => setNewEvent({ ...newEvent, extension_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="ID da extensão (UUID)"
-                required
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Informe o ID (UUID) da extensão. Em breve, haverá um seletor aqui.
-              </p>
-            </div>
-          )}
+              {/* Extension Attach: Show machines at site feedback */}
+              {newEvent.event_type === 'extension_attach' && newEvent.site_id && (
+                <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+                   <p className="text-sm text-indigo-800 dark:text-indigo-200 font-semibold mb-1">
+                     Máquinas alocadas neste local:
+                   </p>
+                   {machinesAtSite.length > 0 ? (
+                     <ul className="list-disc list-inside text-xs text-indigo-700 dark:text-indigo-300">
+                       {machinesAtSite.map((m, i) => <li key={i}>{m}</li>)}
+                     </ul>
+                   ) : (
+                     <p className="text-xs text-indigo-600 dark:text-indigo-400 italic">Nenhuma máquina alocada.</p>
+                   )}
+                </div>
+              )}
 
-          {['correction'].includes(newEvent.event_type) && (
-            <>
+              {/* Standard Site Selection (Only for request/start) */}
+              {['request_allocation', 'start_allocation'].includes(newEvent.event_type) && (
+                <>
+                  <CustomDropdown
+                    label="Jobsite *"
+                    value={newEvent.site_id}
+                    onChange={(value) => setNewEvent({ ...newEvent, site_id: value })}
+                    options={[
+                      { value: '', label: 'Selecione...' },
+                      ...sites.map((site) => ({
+                        value: site.id,
+                        label: site.title
+                      }))
+                    ]}
+                    placeholder="Selecione um jobsite"
+                    required
+                  />
+
+                  <CustomDropdown
+                    label="Tipo de Construção"
+                    value={newEvent.construction_type || ''}
+                    onChange={(value) => setNewEvent({ ...newEvent, construction_type: value || '' })}
+                    options={[
+                      { value: '', label: 'Selecione...' },
+                      { value: 'lot', label: 'Lote' },
+                      { value: 'building', label: 'Prédio/Edifício' }
+                    ]}
+                    placeholder="Selecione o tipo de construção"
+                  />
+
+                  {newEvent.construction_type && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Número do {newEvent.construction_type === 'lot' ? 'Lote' : 'Prédio'}
+                      </label>
+                      <input
+                        type="text"
+                        value={newEvent.lot_building_number}
+                        onChange={(e) => setNewEvent({ ...newEvent, lot_building_number: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder={`Número do ${newEvent.construction_type === 'lot' ? 'lote' : 'prédio'}`}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  ID do Evento a Corrigir *
+                  {newEvent.event_type === 'request_allocation' ? "Data/Hora de Necessidade *" : "Data/Hora do Evento *"}
                 </label>
                 <input
-                  type="text"
-                  value={newEvent.corrects_event_id}
-                  onChange={(e) => setNewEvent({ ...newEvent, corrects_event_id: e.target.value })}
+                  type="datetime-local"
+                  value={newEvent.event_date}
+                  onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="Cole o ID do evento a ser corrigido"
+                />
+                {newEvent.event_type === 'request_allocation' && (
+                  <p className="text-xs text-gray-500 mt-1">Informe quando a máquina será necessária na obra.</p>
+                )}
+              </div>
+
+              {['downtime_start'].includes(newEvent.event_type) && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Motivo da Parada *
+                    </label>
+                    <CustomDropdown
+                      value={newEvent.downtime_reason || ''}
+                      onChange={(value) => setNewEvent({ ...newEvent, downtime_reason: value || '' })}
+                      options={[
+                        { value: '', label: 'Selecione...' },
+                        ...Object.entries(DOWNTIME_REASON_LABELS).map(([value, label]) => ({
+                          value,
+                          label: label as string
+                        }))
+                      ]}
+                      placeholder="Selecione o motivo da parada"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Descrição
+                    </label>
+                    <textarea
+                      value={newEvent.downtime_description}
+                      onChange={(e) => setNewEvent({ ...newEvent, downtime_description: e.target.value })}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="Descreva o motivo da parada..."
+                    />
+                  </div>
+                </>
+              )}
+              
+              {['downtime_end'].includes(newEvent.event_type) && (
+                <CustomDropdown
+                  label="Downtime Ativo *"
+                  value={newEvent.corrects_event_id}
+                  onChange={(value) => {
+                    setNewEvent({ ...newEvent, corrects_event_id: value })
+                  }}
+                  options={[
+                    { value: '', label: 'Selecione...' },
+                    ...activeDowntimes
+                      .filter(d => d.machine_id === newEvent.machine_id)
+                      .map((d) => ({
+                        value: d.downtime_event_id,
+                        label: `${d.downtime_reason} - ${new Date(d.downtime_start).toLocaleDateString()}`
+                      }))
+                  ]}
+                  placeholder="Selecione o downtime a finalizar"
                   required
                 />
-              </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Descrição da Correção *
+                  Notas/Observações
                 </label>
                 <textarea
-                  value={newEvent.correction_description}
-                  onChange={(e) => setNewEvent({ ...newEvent, correction_description: e.target.value })}
-                  rows={3}
+                  value={newEvent.notas}
+                  onChange={(e) => setNewEvent({ ...newEvent, notas: e.target.value })}
+                  rows={2}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="Descreva a correção que está sendo aplicada..."
-                  required
+                  placeholder="Observações adicionais..."
                 />
               </div>
             </>
           )}
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Notas
-            </label>
-            <textarea
-              value={newEvent.notas}
-              onChange={(e) => setNewEvent({ ...newEvent, notas: e.target.value })}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              placeholder="Observações adicionais..."
-            />
+        {step === 'form' && (
+          <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 flex-shrink-0">
+            <button
+              onClick={handleCreateEvent}
+              disabled={creating}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {creating ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Criando...</span>
+                </>
+              ) : (
+                <span>Criar Evento</span>
+              )}
+            </button>
           </div>
-        </div>
-
-        <div className="sticky bottom-0 bg-white dark:bg-gray-800 flex gap-3 p-4 border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={() => setShowCreateModal(false)}
-            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleCreateEvent}
-            disabled={creating}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
-            {creating ? 'Criando...' : 'Criar Evento'}
-          </button>
-        </div>
+        )}
       </div>
     </div>
   )

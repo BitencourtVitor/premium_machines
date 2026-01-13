@@ -17,6 +17,7 @@ export interface AllocationEvent {
   corrects_event_id?: string
   correction_description?: string
   rejection_reason?: string
+  notas?: string
 }
 
 export interface ActiveAllocation {

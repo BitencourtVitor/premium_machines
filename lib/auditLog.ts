@@ -1,6 +1,6 @@
 import { supabaseServer } from './supabase-server'
 
-type AuditAction = 'insert' | 'update' | 'delete'
+type AuditAction = 'insert' | 'update' | 'delete' | 'error'
 
 interface AuditLogParams {
   entidade: string

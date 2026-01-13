@@ -2,6 +2,7 @@ import React from 'react'
 import { ActiveAllocation, ActiveDowntime } from '../types'
 import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 import { formatDate } from '../utils'
+import { FiCalendar, FiMapPin, FiTool, FiAlertTriangle, FiCheckCircle, FiPlay, FiStopCircle, FiXCircle, FiRefreshCw } from 'react-icons/fi'
 
 interface AllocationsTabProps {
   activeAllocations: ActiveAllocation[]
@@ -33,7 +34,7 @@ export default function AllocationsTab({
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2">
         <div>
           <h2 className="text-base font-normal text-gray-500 dark:text-gray-400">
-            Máquinas Alocadas • {activeAllocations.length}
+            Máquinas Alocadas
           </h2>
         </div>
         <div className="flex items-center gap-2">
@@ -42,16 +43,16 @@ export default function AllocationsTab({
             className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             disabled={loadingAllocations}
             title="Atualizar"
+            aria-label="Atualizar lista"
           >
-            <svg className={`w-5 h-5 ${loadingAllocations ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <FiRefreshCw className={`w-5 h-5 ${loadingAllocations ? 'animate-spin' : ''}`} />
           </button>
           {(user?.can_register_events || user?.role === 'admin' || user?.role === 'dev') && (
             <button
               onClick={() => setShowCreateModal(true)}
               className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
               title="Novo Evento"
+              aria-label="Criar novo evento"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -69,95 +70,113 @@ export default function AllocationsTab({
         <div className="p-8 text-center">
           <p className="text-gray-500 dark:text-gray-400">Nenhuma máquina alocada</p>
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">
-            Crie um evento de &quot;Início de Alocação&quot; para começar
+            Crie um evento de &quot;Alocação de Máquina&quot; para começar
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-gray-200 dark:divide-gray-700 md:flex-1 md:overflow-y-auto">
+        <div className="p-4 overflow-y-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {activeAllocations.map((allocation) => (
-            <div key={allocation.allocation_event_id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="font-medium text-gray-900 dark:text-white">
+            <div key={allocation.allocation_event_id} className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-lg text-gray-900 dark:text-white">
                       {allocation.machine_unit_number}
                     </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
                       allocation.is_in_downtime 
                         ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                         : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                     }`}>
+                      {allocation.is_in_downtime ? <FiAlertTriangle size={12} /> : <FiCheckCircle size={12} />}
                       {allocation.is_in_downtime ? 'Em Downtime' : 'Operando'}
                     </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      allocation.machine_ownership === 'owned'
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                        : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                    }`}>
-                      {allocation.machine_ownership === 'owned' ? 'Própria' : 'Alugada'}
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  {/* Machine Type & Ownership */}
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                    <FiTool className="text-gray-400 flex-shrink-0" />
+                    <span>
+                      {allocation.machine_type}
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                         ({allocation.machine_ownership === 'owned' ? 'Própria' : 'Alugada'})
+                      </span>
                     </span>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                    {allocation.machine_type}
-                    {allocation.machine_supplier_name && (
-                      <span className="text-gray-400 dark:text-gray-500"> • {allocation.machine_supplier_name}</span>
-                    )}
-                  </p>
-                  <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                    📍 {allocation.site_title}
-                    {allocation.construction_type && allocation.lot_building_number && (
-                      <span className="ml-2">
-                        • {allocation.construction_type === 'lot' ? 'Lote' : 'Prédio'} {allocation.lot_building_number}
-                      </span>
-                    )}
-                  </p>
-                  {allocation.is_in_downtime && allocation.current_downtime_reason && (
-                    <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
-                      ⚠️ {DOWNTIME_REASON_LABELS[allocation.current_downtime_reason] || allocation.current_downtime_reason}
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                    Alocada desde: {formatDate(allocation.allocation_start)}
-                  </p>
-                </div>
-                
-                {(user?.can_register_events || user?.role === 'admin' || user?.role === 'dev') && (
-                  <div className="flex flex-col gap-1 ml-2">
-                    {!allocation.is_in_downtime && (
-                      <>
-                        <button
-                          onClick={() => handleStartDowntime(allocation)}
-                          className="px-3 py-1 text-xs text-yellow-600 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700 rounded-lg hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors"
-                          title="Iniciar Downtime"
-                        >
-                          Parada
-                        </button>
-                        <button
-                          onClick={() => handleEndAllocation(allocation)}
-                          className="px-3 py-1 text-xs text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                          disabled={creating}
-                          title="Encerrar Alocação"
-                        >
-                          Encerrar
-                        </button>
-                      </>
-                    )}
-                    {allocation.is_in_downtime && (
-                      <button
-                        onClick={() => {
-                          const downtime = activeDowntimes.find(d => d.machine_id === allocation.machine_id)
-                          if (downtime) handleEndDowntime(downtime)
-                        }}
-                        className="px-3 py-1 text-xs text-green-600 dark:text-green-400 border border-green-300 dark:border-green-700 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
-                        disabled={creating}
-                        title="Finalizar Downtime"
-                      >
-                        Retomar
-                      </button>
-                    )}
+
+                  {/* Location */}
+                  <div className="flex items-start gap-2 text-sm text-blue-600 dark:text-blue-400">
+                    <FiMapPin className="text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium">{allocation.site_title}</p>
+                      {(allocation.construction_type || allocation.lot_building_number) && (
+                        <p className="text-xs text-blue-500/80">
+                          {allocation.construction_type === 'lot' ? 'Lote' : 'Prédio'} {allocation.lot_building_number}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                )}
+
+                  {/* Downtime Reason */}
+                  {allocation.is_in_downtime && allocation.current_downtime_reason && (
+                    <div className="flex items-start gap-2 text-sm text-yellow-600 dark:text-yellow-400">
+                      <FiAlertTriangle className="text-yellow-500 flex-shrink-0 mt-0.5" />
+                      <p>
+                        {DOWNTIME_REASON_LABELS[allocation.current_downtime_reason] || allocation.current_downtime_reason}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Allocation Start */}
+                  <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                    <FiCalendar className="text-gray-400 flex-shrink-0" />
+                    <span>Desde: {formatDate(allocation.allocation_start)}</span>
+                  </div>
+                </div>
               </div>
+              
+              {/* Actions */}
+              {(user?.can_register_events || user?.role === 'admin' || user?.role === 'dev') && (
+                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-600 flex justify-end gap-2">
+                  {!allocation.is_in_downtime && (
+                    <>
+                      <button
+                        onClick={() => handleStartDowntime(allocation)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/40 rounded-lg transition-colors"
+                        title="Iniciar Downtime"
+                      >
+                        <FiStopCircle />
+                        Parada
+                      </button>
+                      <button
+                        onClick={() => handleEndAllocation(allocation)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors"
+                        disabled={creating}
+                        title="Encerrar Alocação"
+                      >
+                        <FiXCircle />
+                        Encerrar
+                      </button>
+                    </>
+                  )}
+                  {allocation.is_in_downtime && (
+                    <button
+                      onClick={() => {
+                        const downtime = activeDowntimes.find(d => d.machine_id === allocation.machine_id)
+                        if (downtime) handleEndDowntime(downtime)
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 rounded-lg transition-colors"
+                      disabled={creating}
+                      title="Finalizar Downtime"
+                    >
+                      <FiPlay />
+                      Retomar
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

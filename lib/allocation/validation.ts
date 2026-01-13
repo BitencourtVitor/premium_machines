@@ -101,6 +101,17 @@ export async function validateEvent(event: Partial<AllocationEvent>): Promise<{
         }
       }
       break
+
+    case 'material_entry':
+    case 'product_exit':
+    case 'refueling':
+      if (!state.current_site_id) {
+        return { 
+          valid: false, 
+          reason: 'Máquina não está alocada. Este evento só pode ser registrado para máquinas em operação.' 
+        }
+      }
+      break
   }
 
   return { valid: true }
