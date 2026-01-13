@@ -155,14 +155,26 @@ export default function EventsPage() {
       const url = editingEventId ? `/api/events/${editingEventId}` : '/api/events'
       const method = editingEventId ? 'PUT' : 'POST'
       
+      // Clean empty strings to null for UUID fields to avoid database errors
+      const payload = {
+        ...newEvent,
+        created_by: user?.id,
+        updated_by: user?.id,
+      }
+
+      // Fields that must be null if empty string (UUIDs)
+      const nullableUuidFields = ['site_id', 'extension_id', 'corrects_event_id']
+      nullableUuidFields.forEach(field => {
+        if (payload[field as keyof typeof payload] === '') {
+          // @ts-ignore
+          payload[field as keyof typeof payload] = null
+        }
+      })
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newEvent,
-          created_by: user?.id,
-          updated_by: user?.id,
-        }),
+        body: JSON.stringify(payload),
       })
 
       const data = await response.json()
