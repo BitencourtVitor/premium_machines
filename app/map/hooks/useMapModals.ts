@@ -104,6 +104,8 @@ export function useMapModals({ selectedSite, setSelectedSite }: UseMapModalsProp
 
     const handleOpenSiteDetails = (event: CustomEvent) => {
       const siteId = event.detail
+      if (!siteId) return
+      setSiteDetails(null) // Limpar dados anteriores
       loadSiteDetails(siteId)
       setShowSiteDetailsModal(true)
     }

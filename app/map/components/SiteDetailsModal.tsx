@@ -104,13 +104,32 @@ export default function SiteDetailsModal({
       .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
   }, [events, selectedMachineId])
 
+  // Fechar com ESC
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    if (isOpen) window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [isOpen, onClose])
+
   const isCurrentMonthSelected = 
     calendarMonth.getMonth() === new Date().getMonth() && 
     calendarMonth.getFullYear() === new Date().getFullYear()
 
+  // Validar se deve renderizar
+  if (!isOpen) return null
+  if (!site && !loading) return null
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-6">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div 
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-6"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div>
