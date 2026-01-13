@@ -216,15 +216,18 @@ export default function CreateEventModal({
 
   const getTitle = () => {
     if (step === 'selection') return 'Novo Evento'
+    
+    const prefix = editingEventId ? 'Editar ' : ''
+    
     switch (newEvent.event_type) {
-      case 'start_allocation': return 'Alocação de Máquina'
-      case 'end_allocation': return 'Fim de Alocação'
-      case 'request_allocation': return 'Solicitar Alocação'
-      case 'downtime_start': return 'Início de Manutenção'
-      case 'downtime_end': return 'Fim de Manutenção'
-      case 'refueling': return 'Abastecimento de Combustível'
-      case 'extension_attach': return 'Alocação de Extensão'
-      default: return 'Novo Evento'
+      case 'start_allocation': return `${prefix}Alocação de Máquina`
+      case 'end_allocation': return `${prefix}Fim de Alocação`
+      case 'request_allocation': return `${prefix}Solicitação de Alocação`
+      case 'downtime_start': return `${prefix}Início de Manutenção`
+      case 'downtime_end': return `${prefix}Fim de Manutenção`
+      case 'refueling': return `${prefix}Abastecimento de Combustível`
+      case 'extension_attach': return `${prefix}Alocação de Extensão`
+      default: return `${prefix}Evento`
     }
   }
 
@@ -501,10 +504,10 @@ export default function CreateEventModal({
               {creating ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Criando...</span>
+                  <span>{editingEventId ? 'Atualizando...' : 'Criando...'}</span>
                 </>
               ) : (
-                <span>Criar Evento</span>
+                <span>{editingEventId ? 'Atualizar Evento' : 'Criar Evento'}</span>
               )}
             </button>
           </div>
