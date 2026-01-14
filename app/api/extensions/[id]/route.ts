@@ -14,12 +14,11 @@ export async function GET(
 ) {
   try {
     const { data: extension, error } = await supabaseServer
-      .from('machine_extensions')
+      .from('machines')
       .select(`
         *,
-        extension_type:extension_types(id, nome),
-        supplier:suppliers(id, nome),
-        current_machine:machines(id, unit_number)
+        machine_type:machine_types(id, nome, is_attachment),
+        supplier:suppliers(id, nome)
       `)
       .eq('id', params.id)
       .single()
@@ -38,6 +37,7 @@ export async function GET(
       success: true,
       extension: {
         ...extension,
+        extension_type: extension.machine_type,
         calculated_state: state,
       }
     })
@@ -64,7 +64,7 @@ export async function PUT(
 
     // Verificar se a extensão existe
     const { data: existing, error: fetchError } = await supabaseServer
-      .from('machine_extensions')
+      .from('machines')
       .select('*')
       .eq('id', params.id)
       .single()
@@ -79,7 +79,7 @@ export async function PUT(
     // Verificar se unit_number já existe em outra extensão
     if (body.unit_number) {
       const { data: duplicate } = await supabaseServer
-        .from('machine_extensions')
+        .from('machines')
         .select('id')
         .eq('unit_number', body.unit_number)
         .neq('id', params.id)
@@ -94,10 +94,10 @@ export async function PUT(
     }
 
     const { data: extension, error } = await supabaseServer
-      .from('machine_extensions')
+      .from('machines')
       .update({
         unit_number: body.unit_number,
-        extension_type_id: body.extension_type_id,
+        machine_type_id: body.machine_type_id || existing.machine_type_id,
         ownership_type: body.ownership_type,
         supplier_id: body.ownership_type === 'rented' ? body.supplier_id : null,
         billing_type: body.ownership_type === 'rented' ? body.billing_type : null,
@@ -108,7 +108,7 @@ export async function PUT(
       .eq('id', params.id)
       .select(`
         *,
-        extension_type:extension_types(id, nome),
+        machine_type:machine_types(id, nome, is_attachment),
         supplier:suppliers(id, nome)
       `)
       .single()
@@ -123,7 +123,7 @@ export async function PUT(
 
     // Log action
     await createAuditLog({
-      entidade: 'machine_extensions',
+      entidade: 'machines',
       entidade_id: extension.id,
       acao: 'update',
       dados_antes: existing,
@@ -166,13 +166,13 @@ export async function DELETE(
 
     // Get data for logging
     const { data: extensionData } = await supabaseServer
-      .from('machine_extensions')
+      .from('machines')
       .select('*')
       .eq('id', params.id)
       .single()
 
     const { error } = await supabaseServer
-      .from('machine_extensions')
+      .from('machines')
       .update({ ativo: false })
       .eq('id', params.id)
 
@@ -195,7 +195,7 @@ export async function DELETE(
     }
 
     await createAuditLog({
-      entidade: 'machine_extensions',
+      entidade: 'machines',
       entidade_id: params.id,
       acao: 'delete', // Soft delete
       dados_antes: extensionData,

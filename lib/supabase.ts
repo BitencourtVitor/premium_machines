@@ -61,6 +61,7 @@ export interface MachineType {
   descricao?: string
   icon?: string
   created_at: string
+  is_attachment?: boolean
 }
 
 export interface Machine {

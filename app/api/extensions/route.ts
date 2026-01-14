@@ -19,20 +19,15 @@ export async function GET(request: NextRequest) {
     const includeState = searchParams.get('include_state') === 'true'
 
     let query = supabaseServer
-      .from('machine_extensions')
+      .from('machines')
       .select(`
         *,
-        extension_type:extension_types(id, nome),
-        supplier:suppliers(id, nome),
-        current_machine:machines(id, unit_number)
+        machine_type:machine_types(id, nome, is_attachment),
+        supplier:suppliers(id, nome)
       `)
       .eq('ativo', true)
 
-    if (status) {
-      query = query.eq('status', status)
-    }
-
-    const { data: extensions, error } = await query.order('unit_number', { ascending: true })
+    const { data: machines, error } = await query.order('unit_number', { ascending: true })
 
     if (error) {
       console.error('Erro ao buscar extensões:', error)
@@ -42,10 +37,23 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const allExtensions = (machines || []).filter(
+      (m: any) => m.machine_type?.is_attachment
+    )
+
+    const filteredByStatus = status
+      ? allExtensions.filter((e: any) => e.status === status)
+      : allExtensions
+
+    const mapped = filteredByStatus.map((m: any) => ({
+      ...m,
+      extension_type: m.machine_type,
+    }))
+
     // Se solicitado, incluir estado calculado dos eventos
-    if (includeState && extensions) {
+    if (includeState && mapped.length > 0) {
       const extensionsWithState = await Promise.all(
-        extensions.map(async (extension) => {
+        mapped.map(async (extension) => {
           try {
             const state = await calculateExtensionState(extension.id)
             return {
@@ -60,7 +68,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, extensions: extensionsWithState })
     }
 
-    return NextResponse.json({ success: true, extensions })
+    return NextResponse.json({ success: true, extensions: mapped })
   } catch (error) {
     console.error('Erro:', error)
     return NextResponse.json(

@@ -72,7 +72,7 @@ export const getClusterStatusColor = (sites: Site[], isDark: boolean) => {
   } else if (hasInactive) {
     return getThemeColors('yellow', isDark) // Alerta: Inativo/Problema
   } else if (hasOperational) {
-    return getThemeColors('green', isDark) // Normal: Em operação/Disponível
+    return getThemeColors('blue', isDark) // Normal: Em operação/Disponível
   } else if (hasMachines) {
     return getThemeColors('blue', isDark) // Máquinas existem mas status desconhecido
   } else {
@@ -238,7 +238,7 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
       ${!site.is_headquarters ? `
         <div style="border-top: 1px solid ${currentIsDark ? '#374151' : '#e5e7eb'}; padding-top: 12px;">
           <p style="font-size: 12px; font-weight: 500; color: ${currentIsDark ? '#d1d5db' : '#374151'}; margin-bottom: 8px;">
-            Máquinas (${site.machines_count})
+            Máquinas
           </p>
           ${site.machines?.length > 0 ? `
             <div style="max-height: 120px; overflow-y: auto; gap: 4px; display: flex; flex-direction: column;">
@@ -274,48 +274,4 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
   return el
 }
 
-// Criar marcador com ícone circle do Phosphor Icons para jobsites no spiderfy
-export const createSpiderfyMarker = (site: Site, currentIsDark: boolean, onClick: (e?: Event) => void, isSelected: boolean = false) => {
-  const baseColorType = site.machines_count > 0 ? 'blue' : 'neutral'
-  const colors = getThemeColors(baseColorType, currentIsDark)
-  const strokeWidth = isSelected ? 21 : 11
-  const el = document.createElement('div')
-  el.className = 'marker-container'
-  el.style.cursor = 'pointer'
-  el.style.width = '24px'
-  el.style.height = '24px'
-  el.style.zIndex = isSelected ? '1002' : '1000'
-  el.innerHTML = `
-    <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-      <svg width="24" height="24" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); overflow: visible;">
-        <circle cx="128" cy="128" r="112" fill="${colors.bg}" stroke="white" stroke-width="${strokeWidth}"/>
-      </svg>
-    </div>
-  `
-
-  el.addEventListener('click', onClick as EventListener)
-  return el
-}
-
-// Criar marcador em formato de pin/cone para obras (usado no spiderfy)
-export const createSitePinMarker = (site: Site, currentIsDark: boolean, onClick: (e?: Event) => void) => {
-  const colors = getThemeColors(site.machines_count > 0 ? 'blue' : 'neutral', currentIsDark)
-  const el = document.createElement('div')
-  el.className = 'marker-container'
-  el.style.cursor = 'pointer'
-  el.style.width = '28px'
-  el.style.height = '36px'
-  el.style.zIndex = '1000'
-  el.innerHTML = `
-    <div class="relative w-full h-full flex items-center justify-center">
-      <div class="relative">
-        <div class="w-7 h-7 rounded-full flex items-center justify-center shadow-md border-2 border-white" style="background-color: ${colors.bg};">
-        </div>
-        <div class="absolute -bottom-0.5 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[7px] border-r-[7px] border-t-[9px] border-l-transparent border-r-transparent" style="border-top-color: ${colors.bg}; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));"></div>
-      </div>
-    </div>
-  `
-
-  el.addEventListener('click', onClick as EventListener)
-  return el
-}
+// spiderfy-specific marker creators removidos

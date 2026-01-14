@@ -8,11 +8,8 @@ import Sidebar from '@/app/components/Sidebar'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
 import { useAllocationDataRefresh } from '@/lib/allocationEvents'
-import {
-  MACHINE_STATUS_LABELS,
-  EVENT_STATUS_LABELS,
-  OWNERSHIP_TYPE_LABELS
-} from '@/lib/permissions'
+import { EVENT_STATUS_LABELS } from '@/lib/permissions'
+import { formatDate, getEventConfig } from '@/app/events/utils'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -34,6 +31,7 @@ export default function DashboardPage() {
   const [recentEvents, setRecentEvents] = useState<any[]>([])
   const [expandedStats, setExpandedStats] = useState(false)
   const [expandedEvents, setExpandedEvents] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
 
   const loadStats = useCallback(async () => {
     setLoadingStats(true)
@@ -90,6 +88,14 @@ export default function DashboardPage() {
       </div>
     )
   }
+
+  const itemsPerPage = 5
+  const totalPages = Math.max(1, Math.ceil(recentEvents.length / itemsPerPage))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const paginatedEvents = recentEvents.slice(
+    (safeCurrentPage - 1) * itemsPerPage,
+    safeCurrentPage * itemsPerPage
+  )
 
   return (
     <div className="min-h-screen md:h-screen md:max-h-screen bg-gray-50 dark:bg-gray-900 pb-safe-content md:pb-0 md:flex md:flex-col md:overflow-hidden">
@@ -197,9 +203,9 @@ export default function DashboardPage() {
             </div>
 
             {/* Detailed Stats & Recent Events */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:gap-6">
               {/* Machine Stats */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden lg:flex-1 mb-6 lg:mb-0">
                 <button
                   onClick={() => setExpandedStats(!expandedStats)}
                   className="w-full text-left p-4 flex items-center justify-between"
@@ -237,7 +243,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Recent Events */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden lg:flex-1">
                 <button
                   onClick={() => setExpandedEvents(!expandedEvents)}
                   className="w-full text-left p-4 flex items-center justify-between"
@@ -252,35 +258,81 @@ export default function DashboardPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <div className={`overflow-hidden transition-all duration-250 ease-in-out ${expandedEvents ? 'max-h-96' : 'max-h-0'}`}>
+                <div className={`overflow-hidden transition-all duration-250 ease-in-out ${expandedEvents ? 'max-h-[28rem]' : 'max-h-0'}`}>
                   <div className="px-4 pb-4">
                     {recentEvents.length === 0 ? (
                       <p className="text-gray-500 dark:text-gray-400 text-center py-4">
-                        No recent events
+                        Nenhum evento recente
                       </p>
                     ) : (
-                      <div className="space-y-2">
-                        {recentEvents.slice(0, 5).map((event: any) => (
-                          <div
-                            key={event.id}
-                            className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                {event.machine?.unit_number || 'N/A'}
-                              </span>
-                              <span className={`text-xs px-2 py-1 rounded-full ${
-                                event.status === 'pending' ? 'event-pending' :
-                                event.status === 'approved' ? 'event-approved' : 'event-rejected'
-                              }`}>
-                                {EVENT_STATUS_LABELS[event.status]}
-                              </span>
+                      <div className="space-y-3">
+                        <div className="space-y-3 max-h-[22rem] overflow-y-auto pr-1">
+                          {paginatedEvents.map((event: any) => {
+                            const config = getEventConfig(event.event_type)
+                            const Icon = config.icon
+
+                            return (
+                              <div
+                                key={event.id}
+                                className="bg-gray-50 dark:bg-gray-800/70 rounded-xl p-3 border border-gray-100 dark:border-gray-700 hover:bg-gray-100/80 dark:hover:bg-gray-700 transition-colors flex items-start gap-3"
+                              >
+                                <div className={`w-10 h-10 flex-shrink-0 rounded-lg flex items-center justify-center ${config.bgColor} ${config.textColor}`}>
+                                  <Icon size={20} aria-label={config.label} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                                      {event.machine?.unit_number || 'N/A'}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                                    <span>
+                                      {config.label}
+                                    </span>
+                                    <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+                                    <span>
+                                      {formatDate(event.event_date)}
+                                    </span>
+                                    {event.site?.title && (
+                                      <>
+                                        <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+                                        <span className="truncate max-w-[10rem]">
+                                          {event.site.title}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              Página {safeCurrentPage} de {totalPages}
+                            </span>
+                            <div className="flex gap-1">
+                              {Array.from({ length: totalPages }, (_, index) => {
+                                const pageNumber = index + 1
+
+                                return (
+                                  <button
+                                    key={pageNumber}
+                                    onClick={() => setCurrentPage(pageNumber)}
+                                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                                      safeCurrentPage === pageNumber
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                    }`}
+                                  >
+                                    {pageNumber}
+                                  </button>
+                                )
+                              })}
                             </div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                              {event.site?.title || 'No site'}
-                            </p>
                           </div>
-                        ))}
+                        )}
                       </div>
                     )}
                   </div>
@@ -288,47 +340,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-              <button
-                onClick={() => router.push('/map')}
-                className="p-4 bg-blue-600 dark:bg-blue-700 text-white rounded-lg shadow hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex flex-col items-center gap-2"
-              >
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                </svg>
-                <span className="text-sm font-medium">View Map</span>
-              </button>
-              <button
-                onClick={() => router.push('/machines')}
-                className="p-4 bg-green-600 dark:bg-green-700 text-white rounded-lg shadow hover:bg-green-700 dark:hover:bg-green-600 transition-colors flex flex-col items-center gap-2"
-              >
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span className="text-sm font-medium">Machines</span>
-              </button>
-              <button
-                onClick={() => router.push('/events')}
-                className="p-4 bg-orange-600 dark:bg-orange-700 text-white rounded-lg shadow hover:bg-orange-700 dark:hover:bg-orange-600 transition-colors flex flex-col items-center gap-2"
-              >
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span className="text-sm font-medium">Events</span>
-              </button>
-              <button
-                onClick={() => router.push('/sites')}
-                className="p-4 bg-purple-600 dark:bg-purple-700 text-white rounded-lg shadow hover:bg-purple-700 dark:hover:bg-purple-600 transition-colors flex flex-col items-center gap-2"
-              >
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span className="text-sm font-medium">Jobsites</span>
-              </button>
-            </div>
+            {/* Quick Actions removidos conforme solicitação */}
           </div>
         </main>
       </div>

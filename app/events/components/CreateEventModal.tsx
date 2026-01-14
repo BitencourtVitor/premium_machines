@@ -5,6 +5,7 @@ import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 import { filterMachinesForEvent } from '../utils'
 import { GiKeyCard } from "react-icons/gi"
 import { LuPuzzle } from "react-icons/lu"
+import { PiGasCanBold } from "react-icons/pi"
 
 interface CreateEventModalProps {
   showCreateModal: boolean
@@ -13,6 +14,7 @@ interface CreateEventModalProps {
   setNewEvent: (event: NewEventState) => void
   machines: any[]
   sites: any[]
+  extensions: any[]
   activeAllocations: ActiveAllocation[]
   activeDowntimes: ActiveDowntime[]
   creating: boolean
@@ -27,6 +29,7 @@ export default function CreateEventModal({
   setNewEvent,
   machines,
   sites,
+  extensions,
   activeAllocations,
   activeDowntimes,
   creating,
@@ -51,10 +54,19 @@ export default function CreateEventModal({
 
   const validateForm = () => {
     if (!newEvent.event_date) return 'A data do evento é obrigatória.'
-    if (!newEvent.machine_id) return 'A seleção de máquina é obrigatória.'
+    
+    if (!newEvent.machine_id) {
+      return newEvent.event_type === 'extension_attach' 
+        ? 'A seleção de extensão é obrigatória.' 
+        : 'A seleção de máquina é obrigatória.'
+    }
 
     if (['start_allocation', 'request_allocation', 'extension_attach'].includes(newEvent.event_type)) {
       if (!newEvent.site_id) return 'O local (jobsite) é obrigatório.'
+      
+      if (newEvent.construction_type && !newEvent.lot_building_number) {
+        return 'O número do lote/prédio é obrigatório quando o tipo de construção é selecionado.'
+      }
     }
 
     if (newEvent.event_type === 'downtime_start') {
@@ -90,15 +102,46 @@ export default function CreateEventModal({
   )
 
   // Ensure selected machine is in the list when editing
-  const machinesToDisplay = [...filteredMachines]
-  if (editingEventId && newEvent.machine_id) {
-    const selectedMachine = machines.find(m => m.id === newEvent.machine_id)
-    if (selectedMachine && !machinesToDisplay.find(m => m.id === selectedMachine.id)) {
-      machinesToDisplay.unshift(selectedMachine)
+  let machinesToDisplay: any[] = []
+
+  if (newEvent.event_type === 'extension_attach') {
+    // Para alocação de extensão, mostrar apenas extensões disponíveis
+    // Agora tratamos extensões como máquinas independentes neste fluxo
+    machinesToDisplay = (extensions || []).filter(e => e.status === 'available')
+    
+    if (editingEventId && newEvent.machine_id) {
+      const selectedExtension = extensions.find(e => e.id === newEvent.machine_id)
+      if (selectedExtension && !machinesToDisplay.find(e => e.id === selectedExtension.id)) {
+        machinesToDisplay.unshift(selectedExtension)
+      }
+    }
+  } else {
+    machinesToDisplay = [...filteredMachines]
+    
+    if (editingEventId && newEvent.machine_id) {
+      const selectedMachine = machines.find(m => m.id === newEvent.machine_id)
+      if (selectedMachine && !machinesToDisplay.find(m => m.id === selectedMachine.id)) {
+        machinesToDisplay.unshift(selectedMachine)
+      }
+    }
+  }
+
+  const availableExtensions = (extensions || []).filter((ext) => ext.status === 'available')
+  const extensionsToDisplay = [...availableExtensions]
+  if (editingEventId && newEvent.extension_id) {
+    const selectedExtension = extensions.find((e) => e.id === newEvent.extension_id)
+    if (selectedExtension && !extensionsToDisplay.find((e) => e.id === selectedExtension.id)) {
+      extensionsToDisplay.unshift(selectedExtension)
     }
   }
 
   const getAvailableCount = (type: string) => {
+    if (type === 'extension_attach') {
+      return extensions.length
+    }
+    if (type === 'refueling') {
+      return machines.length
+    }
     return filterMachinesForEvent(type, machines, activeAllocations, activeDowntimes).length
   }
 
@@ -135,10 +178,13 @@ export default function CreateEventModal({
       const buttonClass = customStyle?.button || defaultClasses.button
       const iconBoxClass = customStyle?.iconBox || defaultClasses.iconBox
 
+      const shouldDisable =
+        ['end_allocation', 'downtime_start', 'downtime_end'].includes(type) && count === 0
+
       return (
         <button
           onClick={() => handleTypeSelect(type)}
-          disabled={count === 0}
+          disabled={shouldDisable}
           className={`w-full flex items-center p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl transition-all group shadow-sm disabled:opacity-50 disabled:cursor-not-allowed text-left mb-3 ${buttonClass}`}
         >
           <div className={`p-2 rounded-lg mr-3 transition-colors ${iconBoxClass}`}>
@@ -218,7 +264,7 @@ export default function CreateEventModal({
               desc="Registrar abastecimento" 
               color="yellow" 
               count={counts.refueling}
-              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>}
+              icon={<PiGasCanBold className="w-5 h-5" aria-label="Abastecimento de Combustível" title="Abastecimento de Combustível" />}
             />
             <Button 
               type="downtime_start" 
@@ -300,35 +346,69 @@ export default function CreateEventModal({
             <>
               {/* Special Case: Extension Attach shows Site FIRST */}
               {newEvent.event_type === 'extension_attach' && (
-                <CustomDropdown
-                  label="Jobsite *"
-                  value={newEvent.site_id}
-                  onChange={(value) => setNewEvent({ ...newEvent, site_id: value })}
-                  options={[
-                    { value: '', label: 'Selecione...' },
-                    ...sites.map((site) => ({
-                      value: site.id,
-                      label: site.title
-                    }))
-                  ]}
-                  placeholder="Selecione um jobsite"
-                  required
-                />
+                <>
+                  <CustomDropdown
+                    label="Jobsite *"
+                    value={newEvent.site_id}
+                    onChange={(value) => setNewEvent({ ...newEvent, site_id: value })}
+                    options={[
+                      { value: '', label: 'Selecione...' },
+                      ...sites.map((site) => ({
+                        value: site.id,
+                        label: site.title,
+                        description: site.address
+                      }))
+                    ]}
+                    placeholder="Selecione um jobsite"
+                    required
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <CustomDropdown
+                      label="Tipo de Construção"
+                      value={newEvent.construction_type || ''}
+                      onChange={(value) => setNewEvent({ ...newEvent, construction_type: value as any, lot_building_number: value ? newEvent.lot_building_number : '' })}
+                      options={[
+                        { value: '', label: 'Nenhum' },
+                        { value: 'lot', label: 'Lote' },
+                        { value: 'building', label: 'Prédio' }
+                      ]}
+                      placeholder="Selecione..."
+                    />
+                    {newEvent.construction_type && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Número *
+                        </label>
+                        <input
+                          type="text"
+                          value={newEvent.lot_building_number || ''}
+                          onChange={(e) => setNewEvent({ ...newEvent, lot_building_number: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Ex: 123"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
 
-              {/* Machine Selection (Label varies) */}
+              {/* Machine/Extension Selection */}
               <CustomDropdown
-                label={newEvent.event_type === 'extension_attach' ? "Extensão *" : (newEvent.event_type === 'request_allocation' ? "Máquina (Tipo) *" : "Máquina *")}
+                label={
+                  newEvent.event_type === 'request_allocation' ? "Máquina (Tipo) *" : 
+                  newEvent.event_type === 'extension_attach' ? "Extensão *" : "Máquina *"
+                }
                 value={newEvent.machine_id}
                 onChange={(value) => setNewEvent({ ...newEvent, machine_id: value })}
                 options={[
                   { value: '', label: 'Selecione...' },
-                  ...machinesToDisplay.map((machine) => ({
-                    value: machine.id,
-                    label: `${machine.unit_number} - ${machine.machine_type?.nome}`
+                  ...machinesToDisplay.map((item) => ({
+                    value: item.id,
+                    label: `${item.unit_number} - ${item.machine_type?.nome || item.extension_type?.nome || ''}`
                   }))
                 ]}
-                placeholder={newEvent.event_type === 'extension_attach' ? "Selecione a extensão" : "Selecione uma máquina"}
+                placeholder={newEvent.event_type === 'extension_attach' ? "Selecione uma extensão" : "Selecione uma máquina"}
                 required
               />
 
@@ -378,21 +458,7 @@ export default function CreateEventModal({
                 </div>
               )}
 
-              {/* Extension Attach: Show machines at site feedback */}
-              {newEvent.event_type === 'extension_attach' && newEvent.site_id && (
-                <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
-                   <p className="text-sm text-indigo-800 dark:text-indigo-200 font-semibold mb-1">
-                     Máquinas alocadas neste local:
-                   </p>
-                   {machinesAtSite.length > 0 ? (
-                     <ul className="list-disc list-inside text-xs text-indigo-700 dark:text-indigo-300">
-                       {machinesAtSite.map((m, i) => <li key={i}>{m}</li>)}
-                     </ul>
-                   ) : (
-                     <p className="text-xs text-indigo-600 dark:text-indigo-400 italic">Nenhuma máquina alocada.</p>
-                   )}
-                </div>
-              )}
+
 
               {/* Standard Site Selection (Only for request/start) */}
               {['request_allocation', 'start_allocation'].includes(newEvent.event_type) && (
@@ -405,39 +471,42 @@ export default function CreateEventModal({
                       { value: '', label: 'Selecione...' },
                       ...sites.map((site) => ({
                         value: site.id,
-                        label: site.title
+                        label: site.title,
+                        description: site.address
                       }))
                     ]}
                     placeholder="Selecione um jobsite"
                     required
                   />
 
-                  <CustomDropdown
-                    label="Tipo de Construção"
-                    value={newEvent.construction_type || ''}
-                    onChange={(value) => setNewEvent({ ...newEvent, construction_type: value || '' })}
-                    options={[
-                      { value: '', label: 'Selecione...' },
-                      { value: 'lot', label: 'Lote' },
-                      { value: 'building', label: 'Prédio/Edifício' }
-                    ]}
-                    placeholder="Selecione o tipo de construção"
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <CustomDropdown
+                      label="Tipo de Construção"
+                      value={newEvent.construction_type || ''}
+                      onChange={(value) => setNewEvent({ ...newEvent, construction_type: value as any, lot_building_number: value ? newEvent.lot_building_number : '' })}
+                      options={[
+                        { value: '', label: 'Nenhum' },
+                        { value: 'lot', label: 'Lote' },
+                        { value: 'building', label: 'Prédio' }
+                      ]}
+                      placeholder="Selecione..."
+                    />
 
-                  {newEvent.construction_type && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Número do {newEvent.construction_type === 'lot' ? 'Lote' : 'Prédio'}
-                      </label>
-                      <input
-                        type="text"
-                        value={newEvent.lot_building_number}
-                        onChange={(e) => setNewEvent({ ...newEvent, lot_building_number: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                        placeholder={`Número do ${newEvent.construction_type === 'lot' ? 'lote' : 'prédio'}`}
-                      />
-                    </div>
-                  )}
+                    {newEvent.construction_type && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Número *
+                        </label>
+                        <input
+                          type="text"
+                          value={newEvent.lot_building_number || ''}
+                          onChange={(e) => setNewEvent({ ...newEvent, lot_building_number: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder={`Número do ${newEvent.construction_type === 'lot' ? 'lote' : 'prédio'}`}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
 

@@ -1,30 +1,39 @@
 import { NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+import { getActiveAllocations } from '@/lib/allocation/queries'
 
 export async function GET() {
   try {
-    // Get machines stats
+    // Get machines stats based on allocation engine (events)
     const { data: machines, error: machinesError } = await supabaseServer
       .from('machines')
-      .select('id, status, ownership_type')
-      .eq('ativo', true)
+      .select('id, ownership_type, ativo')
 
     if (machinesError) {
       console.error('Error fetching machines:', machinesError)
     }
 
-    const machinesList = machines || []
+    const machinesList = (machines || []).filter(m => m.ativo)
     const totalMachines = machinesList.length
-    const allocatedMachines = machinesList.filter(m => m.status === 'allocated').length
-    const availableMachines = machinesList.filter(m => m.status === 'available').length
-    const maintenanceMachines = machinesList.filter(m => m.status === 'maintenance').length
+
+    // Use active allocations to determine allocated/maintenance
+    const activeAllocations = await getActiveAllocations()
+    const allocatedMachineIds = new Set(activeAllocations.map(a => a.machine_id))
+    const maintenanceMachineIds = new Set(
+      activeAllocations.filter(a => a.is_in_downtime).map(a => a.machine_id)
+    )
+
+    const allocatedMachines = machinesList.filter(m => allocatedMachineIds.has(m.id)).length
+    const maintenanceMachines = machinesList.filter(m => maintenanceMachineIds.has(m.id)).length
+    const availableMachines = totalMachines - allocatedMachines
+
     const ownedMachines = machinesList.filter(m => m.ownership_type === 'owned').length
     const rentedMachines = machinesList.filter(m => m.ownership_type === 'rented').length
 
     // Get sites stats
     const { data: sites, error: sitesError } = await supabaseServer
       .from('sites')
-      .select('id, ativo')
+      .select('id, ativo, is_headquarters')
 
     if (sitesError) {
       console.error('Error fetching sites:', sitesError)
@@ -32,7 +41,7 @@ export async function GET() {
 
     const sitesList = sites || []
     const totalSites = sitesList.length
-    const activeSites = sitesList.filter(s => s.ativo).length
+    const activeSites = sitesList.filter(s => s.ativo && !s.is_headquarters).length
 
     // Get pending events
     const { data: pendingEvents, error: eventsError } = await supabaseServer
@@ -46,7 +55,7 @@ export async function GET() {
 
     const pendingCount = pendingEvents?.length || 0
 
-    // Get recent events
+    // Get recent events ordered by event date (most recent first)
     const { data: recentEvents, error: recentError } = await supabaseServer
       .from('allocation_events')
       .select(`
@@ -58,8 +67,9 @@ export async function GET() {
         machine:machines(id, unit_number),
         site:sites(id, title)
       `)
+      .order('event_date', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(10)
+      .limit(50)
 
     if (recentError) {
       console.error('Error fetching recent events:', recentError)

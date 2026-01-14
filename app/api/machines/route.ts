@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+import { getActiveAllocations } from '@/lib/allocation/queries'
 import { createAuditLog } from '@/lib/auditLog'
 
 export async function GET(request: NextRequest) {
@@ -20,7 +21,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Error fetching machines' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, machines })
+    // Enriquecer com estado de alocação calculado pelos eventos
+    const activeAllocations = await getActiveAllocations()
+    const allocationsByMachine = new Map<string, typeof activeAllocations>()
+    for (const alloc of activeAllocations) {
+      const list = allocationsByMachine.get(alloc.machine_id) || []
+      list.push(alloc)
+      allocationsByMachine.set(alloc.machine_id, list as any)
+    }
+
+    const machinesWithState = (machines || []).map((machine: any) => {
+      const machineAllocs = allocationsByMachine.get(machine.id) || []
+      const activeAllocation = machineAllocs[0]
+
+      let status = 'available'
+      let current_site = machine.current_site || null
+
+      if (activeAllocation) {
+        status = activeAllocation.is_in_downtime ? 'maintenance' : 'allocated'
+        current_site = {
+          id: activeAllocation.site_id,
+          title: activeAllocation.site_title,
+        }
+      }
+
+      return {
+        ...machine,
+        status,
+        current_site,
+      }
+    })
+
+    return NextResponse.json({ success: true, machines: machinesWithState })
   } catch (error) {
     console.error('Error:', error)
     return NextResponse.json({ success: false, message: 'Internal error' }, { status: 500 })

@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 interface CustomDropdownOption {
   value: string
   label: string
+  description?: string
 }
 
 interface CustomDropdownProps {
@@ -44,7 +45,8 @@ export default function CustomDropdown({
 
   const filteredOptions = isSearchable && searchTerm
     ? options.filter(opt => 
-        opt.label.toLowerCase().includes(searchTerm.toLowerCase())
+        opt.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (opt.description && opt.description.toLowerCase().includes(searchTerm.toLowerCase()))
       )
     : options
 
@@ -200,7 +202,18 @@ export default function CustomDropdown({
                         : 'text-gray-900 dark:text-white'
                     }`}
                   >
-                    {option.label}
+                    <div className="flex flex-col">
+                      <span className="font-medium">{option.label}</span>
+                      {option.description && (
+                        <span className={`text-xs mt-0.5 ${
+                          value === option.value 
+                            ? 'text-blue-600 dark:text-blue-400' 
+                            : 'text-gray-500 dark:text-gray-400'
+                        }`}>
+                          {option.description}
+                        </span>
+                      )}
+                    </div>
                   </button>
                 ))}
               </div>

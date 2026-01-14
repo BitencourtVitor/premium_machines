@@ -46,7 +46,7 @@ export default function SitesPage() {
     setLoadingSites(true)
     try {
       const archivedParam = showArchivedSites ? 'true' : 'false'
-      const response = await fetch(`/api/sites?archived=${archivedParam}`)
+      const response = await fetch(`/api/sites?archived=${archivedParam}&with_machines=true`)
       const data = await response.json()
 
       if (data.success) {

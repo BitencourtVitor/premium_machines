@@ -1,13 +1,13 @@
 import { supabaseServer } from '../supabase-server'
 import { ActiveAllocation, ActiveDowntime, SiteAllocationSummary } from './types'
-import { calculateMachineAllocationState } from './stateCalculation'
+import { calculateMachineAllocationState, calculateStateFromEvents } from './stateCalculation'
 
 /**
  * Retorna todas as alocações ativas no sistema
- * Uma alocação está ativa se há um start_allocation aprovado sem end_allocation correspondente
+ * Otimizado para fazer poucas queries ao banco de dados (bulk fetch)
  */
 export async function getActiveAllocations(): Promise<ActiveAllocation[]> {
-  // Buscar todas as máquinas ativas
+  // 1. Buscar todas as máquinas ativas
   const { data: machines, error: machinesError } = await supabaseServer
     .from('machines')
     .select(`
@@ -27,12 +27,44 @@ export async function getActiveAllocations(): Promise<ActiveAllocation[]> {
     return []
   }
 
+  // 2. Buscar TODOS os eventos aprovados de uma vez
+  // Isso evita o problema de N+1 queries que causava timeout
+  const { data: allEvents, error: eventsError } = await supabaseServer
+    .from('allocation_events')
+    .select(`
+      *,
+      site:sites(id, title),
+      extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment))
+    `)
+    .eq('status', 'approved')
+    .order('event_date', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  if (eventsError) {
+    throw new Error(`Erro ao buscar eventos: ${eventsError.message}`)
+  }
+
+  // 3. Agrupar eventos por machine_id para processamento rápido
+  const eventsByMachine = new Map<string, any[]>()
+  if (allEvents) {
+    for (const event of allEvents) {
+      if (!event.machine_id) continue
+      
+      if (!eventsByMachine.has(event.machine_id)) {
+        eventsByMachine.set(event.machine_id, [])
+      }
+      eventsByMachine.get(event.machine_id)?.push(event)
+    }
+  }
+
   const activeAllocations: ActiveAllocation[] = []
 
-  // Calcular estado de cada máquina
+  // 4. Calcular estado de cada máquina em memória
   for (const machine of machines) {
     try {
-      const state = await calculateMachineAllocationState(machine.id)
+      // Usar os eventos já carregados em memória
+      const machineEvents = eventsByMachine.get(machine.id) || []
+      const state = calculateStateFromEvents(machine.id, machineEvents)
 
       // Se a máquina está alocada, adicionar à lista
       if (state.current_site_id && state.current_allocation_event_id) {
@@ -79,15 +111,20 @@ export async function getActiveAllocations(): Promise<ActiveAllocation[]> {
     }
   }
 
-  // Buscar informações adicionais de downtime se necessário
+  // 5. Otimização final: Preencher downtime reasons usando os eventos já carregados (se possível)
+  // ou buscar apenas os necessários se não estiverem no payload inicial (mas estão, pois selecionamos *)
+  
+  // Criar mapa de eventos por ID para busca rápida de reason
+  const eventsById = new Map<string, any>()
+  if (allEvents) {
+    for (const event of allEvents) {
+      eventsById.set(event.id, event)
+    }
+  }
+
   for (const allocation of activeAllocations) {
     if (allocation.current_downtime_event_id) {
-      const { data: downtimeEvent } = await supabaseServer
-        .from('allocation_events')
-        .select('downtime_reason')
-        .eq('id', allocation.current_downtime_event_id)
-        .single()
-
+      const downtimeEvent = eventsById.get(allocation.current_downtime_event_id)
       if (downtimeEvent) {
         allocation.current_downtime_reason = downtimeEvent.downtime_reason
       }
@@ -129,6 +166,141 @@ export async function getSiteAllocationSummary(siteId: string): Promise<SiteAllo
     machines_working: allocations.filter(a => !a.is_in_downtime).length,
     allocations,
   }
+}
+
+/**
+ * Retorna o histórico completo de máquinas que já passaram pelo site
+ * Independente se estão ativas ou não no momento
+ */
+export async function getHistoricalSiteAllocations(siteId: string): Promise<ActiveAllocation[]> {
+  // 1. Buscar eventos relevantes de alocação para este site
+  // Inclui:
+  // - start_allocation: alocações de máquinas
+  // - extension_attach: alocações de extensões
+  const { data: events, error: eventsError } = await supabaseServer
+    .from('allocation_events')
+    .select(`
+      id,
+      event_type,
+      machine_id,
+      extension_id,
+      site_id,
+      machine:machines(
+        id,
+        unit_number,
+        ownership_type,
+        machine_type:machine_types(id, nome, is_attachment),
+        supplier:suppliers(id, nome)
+      ),
+      extension:machines(
+        id,
+        unit_number,
+        ownership_type,
+        machine_type:machine_types(id, nome, is_attachment),
+        supplier:suppliers(id, nome)
+      )
+    `)
+    .eq('site_id', siteId)
+    .in('event_type', ['start_allocation', 'extension_attach'])
+    .eq('status', 'approved')
+    .order('event_date', { ascending: false })
+
+  if (eventsError) {
+    throw new Error(`Erro ao buscar histórico de eventos: ${eventsError.message}`)
+  }
+
+  if (!events || events.length === 0) {
+    return []
+  }
+
+  // 2. Filtrar itens únicos (máquinas e extensões)
+  const uniqueItems = new Map<string, any>()
+  
+  for (const event of events as any[]) {
+    // Máquinas (start_allocation normal ou extensão tratada como máquina independente)
+    if (event.event_type === 'start_allocation' && event.machine && event.machine_id) {
+      const key = `machine:${event.machine_id}`
+      if (!uniqueItems.has(key)) {
+        uniqueItems.set(key, {
+          kind: 'machine',
+          event_id: event.id,
+          machine: event.machine,
+        })
+      }
+    }
+
+    // Extensões anexadas a uma máquina (lógica antiga)
+    if (event.event_type === 'extension_attach' && event.extension && event.extension.id) {
+      const key = `extension:${event.extension.id}`
+      if (!uniqueItems.has(key)) {
+        uniqueItems.set(key, {
+          kind: 'extension',
+          event_id: event.id,
+          machine: event.extension,
+        })
+      }
+    }
+
+    // Extensões tratadas como máquinas independentes (lógica nova)
+    if (event.event_type === 'extension_attach' && !event.extension && event.machine && event.machine_id) {
+      const key = `machine:${event.machine_id}`
+      if (!uniqueItems.has(key)) {
+        uniqueItems.set(key, {
+          kind: 'machine',
+          event_id: event.id,
+          machine: event.machine,
+        })
+      }
+    }
+  }
+
+  // 3. Mapear para o formato ActiveAllocation (adaptado para histórico)
+  const historicalAllocations: ActiveAllocation[] = []
+  
+  const items = Array.from(uniqueItems.values())
+  for (const data of items) {
+    const { machine, event_id } = data
+    
+    historicalAllocations.push({
+      allocation_event_id: event_id,
+      machine_id: machine.id,
+      machine_unit_number: machine.unit_number,
+      machine_type: (() => {
+        const type = machine.machine_type;
+        if (Array.isArray(type)) {
+          return (type[0] as any)?.nome || '';
+        }
+        return (type as any)?.nome || '';
+      })(),
+      machine_ownership: machine.ownership_type,
+      machine_supplier_id: (() => {
+        const supplier = machine.supplier;
+        if (Array.isArray(supplier)) {
+          return (supplier[0] as any)?.id || null;
+        }
+        return (supplier as any)?.id || null;
+      })(),
+      machine_supplier_name: (() => {
+        const supplier = machine.supplier;
+        if (Array.isArray(supplier)) {
+          return (supplier[0] as any)?.nome || null;
+        }
+        return (supplier as any)?.nome || null;
+      })(),
+      site_id: siteId,
+      site_title: '',
+      construction_type: null,
+      lot_building_number: null,
+      allocation_start: '',
+      is_in_downtime: false,
+      current_downtime_event_id: null,
+      current_downtime_reason: null,
+      current_downtime_start: null,
+      attached_extensions: [],
+    })
+  }
+
+  return historicalAllocations
 }
 
 /**

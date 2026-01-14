@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import SessionTimeoutWatcher from './components/SessionTimeoutWatcher'
 
 export const metadata: Metadata = {
   title: 'Premium Machines',
@@ -71,6 +72,7 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning className="bg-gray-50 dark:bg-gray-900 transition-colors duration-250 ease-in-out">
+        <SessionTimeoutWatcher />
         {children}
       </body>
     </html>

@@ -11,7 +11,6 @@ jest.mock('react-icons/fi', () => ({
   FiTool: () => <div data-testid="icon-tool" />,
   FiCheckCircle: () => <div data-testid="icon-check-circle" />,
   FiXCircle: () => <div data-testid="icon-x-circle" />,
-  FiDroplet: () => <div data-testid="icon-droplet" />,
   FiFileText: () => <div data-testid="icon-file-text" />,
 }))
 
@@ -21,6 +20,10 @@ jest.mock('react-icons/gi', () => ({
 
 jest.mock('react-icons/lu', () => ({
   LuPuzzle: () => <div data-testid="icon-puzzle" />,
+}))
+
+jest.mock('react-icons/pi', () => ({
+  PiGasCanBold: () => <div data-testid="icon-gas-can" />,
 }))
 
 // Mock permissions utils

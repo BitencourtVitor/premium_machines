@@ -1,6 +1,8 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import MachineImage from '@/app/components/MachineImage'
 import { AllocationEvent } from '@/app/events/types'
+import { getEventConfig, formatDate } from '@/app/events/utils'
+import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 
 interface SiteDetailsModalProps {
   isOpen: boolean
@@ -21,30 +23,35 @@ export default function SiteDetailsModal({
 }: SiteDetailsModalProps) {
   const [calendarMonth, setCalendarMonth] = useState(new Date())
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [activeTab, setActiveTab] = useState<'calendar' | 'history'>('calendar')
 
   // Selecionar a primeira máquina automaticamente ao abrir
   useEffect(() => {
     if (isOpen && allocations.length > 0 && !selectedMachineId) {
       setSelectedMachineId(allocations[0].machine_id)
+      setSelectedDate(null)
     }
   }, [isOpen, allocations, selectedMachineId])
 
-  // Helper function for day status based on selected machine events
-  const getDayStatus = (date: Date, machineId: string | null, allEvents: any[]) => {
-    if (!machineId) return 'not-allocated'
+  const getEntityEvents = useCallback((allEvents: any[], entityId: string | null) => {
+    if (!entityId) return []
+    return allEvents.filter(e => 
+      e.machine_id === entityId ||
+      e.machine?.id === entityId ||
+      e.extension_id === entityId ||
+      e.extension?.id === entityId
+    )
+  }, [])
+
+  const getDayStatus = useCallback((date: Date, entityId: string | null, allEvents: any[]) => {
+    if (!entityId) return 'not-allocated'
 
     const dateStr = date.toISOString().split('T')[0]
     
-    // Filtrar eventos apenas da máquina selecionada
-    const machineEvents = allEvents.filter(e => e.machine_id === machineId || e.machine?.id === machineId)
+    const entityEvents = getEntityEvents(allEvents, entityId)
     
-    // Verificar se há alocação ativa nesta data
-    // Uma máquina está alocada se existe um start_allocation <= data 
-    // E (não existe end_allocation OU end_allocation > data)
-    
-    // Vamos ordenar eventos por data para processar cronologicamente
-    const sortedEvents = [...machineEvents].sort((a, b) => 
+    const sortedEvents = [...entityEvents].sort((a, b) => 
       new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
     )
 
@@ -52,33 +59,28 @@ export default function SiteDetailsModal({
     let isInDowntime = false
     let lastAllocationStart = null
 
-    // Simular o estado até a data alvo
     for (const event of sortedEvents) {
       const eventDateStr = new Date(event.event_date).toISOString().split('T')[0]
-      
-      if (eventDateStr > dateStr) break // Parar se passar da data
+      if (eventDateStr > dateStr) break
 
-      if (event.event_type === 'start_allocation' && event.status === 'approved') {
+      if (event.status !== 'approved') continue
+
+      if (event.event_type === 'start_allocation' || event.event_type === 'extension_attach') {
         isAllocated = true
-        isInDowntime = false // Reset downtime on new allocation just in case
+        isInDowntime = false
         lastAllocationStart = eventDateStr
-      } else if (event.event_type === 'end_allocation' && event.status === 'approved') {
-        // Se o fim é exatamente hoje, ainda conta como alocado? Normalmente fim é inclusivo ou exclusivo?
-        // Vamos assumir que end_allocation marca o fim, então se eventDateStr <= dateStr, não está mais alocado
-        // Mas se o evento foi HOJE, ela trabalhou hoje? Depende da hora, mas para dia inteiro, vamos considerar que encerrou.
-        // Se o end_allocation for no dia X, dia X ainda pode ter trabalho? 
-        // Geralmente "fim de alocação" é o último dia. Vamos considerar que no dia do fim ela ainda estava lá?
-        // Se end_allocation é 15/01, dia 15 ela estava lá? Sim. Dia 16 não.
-        if (eventDateStr < dateStr) { 
-           isAllocated = false
+      } else if (event.event_type === 'end_allocation' || event.event_type === 'extension_detach') {
+        if (eventDateStr < dateStr) {
+          isAllocated = false
         } else if (eventDateStr === dateStr) {
-           // No dia do fim, ela ainda conta como alocada
-           isAllocated = true
+          isAllocated = true
         }
-      } else if (event.event_type === 'downtime_start' && event.status === 'approved') {
+      } else if (event.event_type === 'downtime_start') {
         if (isAllocated) isInDowntime = true
-      } else if (event.event_type === 'downtime_end' && event.status === 'approved') {
-        if (isAllocated) isInDowntime = false
+      } else if (event.event_type === 'downtime_end') {
+        if (isAllocated && eventDateStr < dateStr) {
+          isInDowntime = false
+        }
       }
     }
 
@@ -94,15 +96,32 @@ export default function SiteDetailsModal({
     }
 
     return 'working'
+  }, [getEntityEvents])
+
+  const getAllocationStatusToday = (machineId: string) => {
+    const status = getDayStatus(new Date(), machineId, events)
+    const isActive = status === 'working' || status === 'maintenance'
+
+    return {
+      isActive,
+      label: isActive ? 'Ativa' : 'Encerrada',
+      className: isActive
+        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+        : 'bg-gray-100 text-gray-600 dark:bg-gray-700/50 dark:text-gray-300'
+    }
   }
+
+  const todayStatus = useMemo(() => {
+    if (!selectedMachineId) return null
+    return getDayStatus(new Date(), selectedMachineId, events)
+  }, [selectedMachineId, events, getDayStatus])
 
   // Filtrar eventos para o histórico
   const machineHistoryEvents = useMemo(() => {
     if (!selectedMachineId) return []
-    return events
-      .filter(e => e.machine_id === selectedMachineId || e.machine?.id === selectedMachineId)
+    return getEntityEvents(events, selectedMachineId)
       .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
-  }, [events, selectedMachineId])
+  }, [events, selectedMachineId, getEntityEvents])
 
   // Fechar com ESC
   useEffect(() => {
@@ -143,6 +162,7 @@ export default function SiteDetailsModal({
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+            aria-label="Fechar modal"
           >
             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -162,7 +182,7 @@ export default function SiteDetailsModal({
               <div className="p-6 border-r border-gray-200 dark:border-gray-700 overflow-y-auto bg-gray-50/50 dark:bg-gray-800/50">
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                    Máquinas
+                    Alocações realizadas
                   </h3>
                   <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium rounded-full">
                     {allocations.length}
@@ -170,11 +190,12 @@ export default function SiteDetailsModal({
                 </div>
 
                 {allocations.length === 0 ? (
-                  <p className="text-gray-500 dark:text-gray-400">Nenhuma máquina alocada nesta obra</p>
+                  <p className="text-gray-500 dark:text-gray-400">Nenhuma alocação registrada nesta obra</p>
                 ) : (
                   <div className="space-y-3">
                     {allocations.map((allocation) => {
                       const isSelected = selectedMachineId === allocation.machine_id
+                      const allocationStatus = getAllocationStatusToday(allocation.machine_id)
                       
                       // Determinar o caminho da imagem baseada no tipo de máquina
                       const getMachineImagePath = () => {
@@ -225,11 +246,9 @@ export default function SiteDetailsModal({
                                 {allocation.machine_unit_number}
                               </span>
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                allocation.is_in_downtime
-                                  ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                  : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                allocationStatus.className
                               }`}>
-                                {allocation.is_in_downtime ? 'Downtime' : 'Ativa'}
+                                {allocationStatus.label}
                               </span>
                             </div>
                             <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
@@ -280,13 +299,20 @@ export default function SiteDetailsModal({
                   /* Visualização do Calendário */
                   <>
                     <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
-                      <div className="flex flex-col">
+                      <div className="flex flex-col gap-1">
                         <span className="text-sm text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">
                           Visualização Mensal
                         </span>
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white capitalize">
                           {calendarMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                         </h3>
+                        {selectedMachineId && (todayStatus === 'working' || todayStatus === 'maintenance') && (
+                          <span className="inline-flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300">
+                            <span className="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
+                            {todayStatus === 'working' && 'Status hoje: Alocada'}
+                            {todayStatus === 'maintenance' && 'Status hoje: Em manutenção'}
+                          </span>
+                        )}
                       </div>
                       
                       <div className={`flex items-center bg-gray-50 dark:bg-gray-700/50 rounded-xl p-1.5 shadow-sm border ${isCurrentMonthSelected ? 'border-blue-200 ring-1 ring-blue-100 dark:border-blue-800 dark:ring-blue-900/30' : 'border-gray-100 dark:border-gray-600'}`}>
@@ -322,32 +348,98 @@ export default function SiteDetailsModal({
                     </div>
 
                     <div className="flex-1 p-6 flex flex-col xl:flex-row gap-8 overflow-y-auto">
-                      {/* Lado Esquerdo: Legenda */}
-                      <div className="xl:w-64 flex-shrink-0">
-                        <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">
-                          Legenda
-                        </h4>
-                        <div className="space-y-3 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-2xl border border-gray-100 dark:border-gray-700">
-                          <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-colors">
-                            <div className="w-3 h-3 bg-green-500 rounded-full ring-2 ring-green-100 dark:ring-green-900/30"></div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Em Funcionamento</span>
-                          </div>
-                          <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-colors">
-                            <div className="w-3 h-3 bg-orange-500 rounded-full ring-2 ring-orange-100 dark:ring-orange-900/30"></div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Em Manutenção</span>
-                          </div>
-                          <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white dark:hover:bg-gray-700 transition-colors">
-                            <div className="w-3 h-3 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Não Alocado</span>
-                          </div>
-                        </div>
+                      {/* Lado Esquerdo: Legenda ou Detalhes do Dia */}
+                      <div className="xl:w-64 flex-shrink-0 flex flex-col gap-6">
+                        {selectedDate ? (
+                          <div className="flex flex-col h-full">
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
+                                {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                              </h4>
+                              <button 
+                                onClick={() => setSelectedDate(null)}
+                                className="text-xs text-blue-600 hover:underline"
+                              >
+                                Voltar
+                              </button>
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                              {(() => {
+                                const dayEvents = events.filter(e => {
+                                  const eDate = new Date(e.event_date).toISOString().split('T')[0]
+                                  const sDate = selectedDate.toISOString().split('T')[0]
+                                  return (e.machine_id === selectedMachineId || e.machine?.id === selectedMachineId) && eDate === sDate
+                                }).sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
 
-                        {!selectedMachineId && (
-                           <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-2xl border border-yellow-100 dark:border-yellow-800">
-                             <p className="text-xs text-yellow-700 dark:text-yellow-200">
-                               Selecione uma máquina à esquerda para visualizar sua distribuição no calendário.
-                             </p>
-                           </div>
+                                if (dayEvents.length === 0) {
+                                  // Verificar status do dia para mensagem contextual
+                                  const status = getDayStatus(selectedDate, selectedMachineId, events)
+                                  return (
+                                    <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-xl text-center">
+                                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                                        {status === 'working' ? 'Máquina em operação neste dia.' : 
+                                         status === 'maintenance' ? 'Máquina em manutenção neste dia.' :
+                                         'Nenhum evento registrado.'}
+                                      </p>
+                                    </div>
+                                  )
+                                }
+
+                                return dayEvents.map(event => {
+                                  const config = getEventConfig(event.event_type)
+                                  const Icon = config.icon
+                                  return (
+                                    <div key={event.id} className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                                      <div className="flex items-start gap-3">
+                                        <div className={`p-2 rounded-lg ${config.bgColor} ${config.textColor}`}>
+                                          <Icon size={16} />
+                                        </div>
+                                        <div>
+                                          <p className="text-xs font-bold text-gray-900 dark:text-white">
+                                            {config.label}
+                                          </p>
+                                          <p className="text-[10px] text-gray-500 mt-0.5">
+                                            {new Date(event.event_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })
+                              })()}
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div>
+                              <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">
+                                Legenda
+                              </h4>
+                              <div className="space-y-2 bg-gray-50 dark:bg-gray-700/30 p-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full ring-2 ring-green-100 dark:ring-green-900/30"></div>
+                                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Em funcionamento</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 bg-orange-500 rounded-full ring-2 ring-orange-100 dark:ring-orange-900/30"></div>
+                                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Em manutenção</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2.5 h-2.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Não alocado</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {!selectedMachineId && (
+                              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-2xl border border-yellow-100 dark:border-yellow-800">
+                                <p className="text-xs text-yellow-700 dark:text-yellow-200">
+                                  Selecione uma máquina à esquerda para visualizar sua distribuição no calendário.
+                                </p>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
 
@@ -395,8 +487,6 @@ export default function SiteDetailsModal({
                                             ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
                                             : dayStatus === 'maintenance'
                                             ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300'
-                                            : dayStatus === 'requested'
-                                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
                                             : 'text-gray-700 dark:text-gray-300'
                                           : 'text-gray-300 dark:text-gray-600'
                                       }
@@ -426,42 +516,12 @@ export default function SiteDetailsModal({
                         <p>Nenhum evento registrado para esta máquina.</p>
                       </div>
                     ) : (
-                      <div className="space-y-6">
+                      <div className="space-y-4">
                         {machineHistoryEvents.map((event, index) => {
                           const isLast = index === machineHistoryEvents.length - 1
+                          const config = getEventConfig(event.event_type)
+                          const Icon = config.icon
                           
-                          // Configuração visual baseada no tipo de evento
-                          let icon = (
-                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                             </svg>
-                          )
-                          let colorClass = "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                          let title = "Evento"
-
-                          switch(event.event_type) {
-                            case 'start_allocation':
-                              icon = <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                              colorClass = "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              title = "Início de Alocação"
-                              break
-                            case 'end_allocation':
-                              icon = <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /></svg>
-                              colorClass = "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-                              title = "Fim de Alocação"
-                              break
-                            case 'downtime_start':
-                              icon = <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                              colorClass = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                              title = "Início de Manutenção"
-                              break
-                            case 'downtime_end':
-                              icon = <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                              colorClass = "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              title = "Fim de Manutenção"
-                              break
-                          }
-
                           return (
                             <div key={event.id} className="relative flex gap-4">
                               {/* Linha conectora */}
@@ -470,30 +530,30 @@ export default function SiteDetailsModal({
                               )}
                               
                               {/* Ícone */}
-                              <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ring-4 ring-white dark:ring-gray-800 ${colorClass}`}>
-                                {icon}
+                              <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ring-4 ring-white dark:ring-gray-800 ${config.bgColor} ${config.textColor}`}>
+                                <Icon size={20} />
                               </div>
 
                               {/* Conteúdo */}
                               <div className="flex-1 pt-1 pb-6">
                                 <div className="flex items-center justify-between mb-1">
                                   <h4 className="text-base font-semibold text-gray-900 dark:text-white">
-                                    {title}
+                                    {config.label}
                                   </h4>
                                   <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
-                                    {new Date(event.event_date).toLocaleDateString('pt-BR')}
+                                    {formatDate(event.event_date)}
                                   </span>
                                 </div>
                                 
                                 <div className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/30 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
                                   {event.downtime_reason && (
                                     <div className="mb-1">
-                                      <span className="font-medium">Motivo:</span> {event.downtime_reason}
+                                      <span className="font-medium">Motivo:</span> {DOWNTIME_REASON_LABELS[event.downtime_reason] || event.downtime_reason}
                                     </div>
                                   )}
                                   {event.downtime_description && (
                                     <div className="italic text-gray-500 dark:text-gray-400">
-                                      "{event.downtime_description}"
+                                      &quot;{event.downtime_description}&quot;
                                     </div>
                                   )}
                                   {event.notas && (

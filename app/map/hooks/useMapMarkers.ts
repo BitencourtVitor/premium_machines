@@ -6,7 +6,6 @@ import {
   groupNearbySites, 
   createLocationMarker, 
   createSitePanel, 
-  createSpiderfyMarker,
   getClusterStatusColor
 } from '../mapUtils'
 
@@ -15,15 +14,8 @@ interface UseMapMarkersProps {
   sites: Site[]
   selectedSite: Site | null
   setSelectedSite: (site: Site | null) => void
-  spiderfiedGroup: string | null
-  setSpiderfiedGroup: (id: string | null) => void
   markersRef: React.MutableRefObject<mapboxgl.Marker[]>
   headquartersMarkerRef: React.MutableRefObject<mapboxgl.Marker | null>
-  spiderLinesRef: React.MutableRefObject<HTMLDivElement[]>
-  spiderMoveHandlersRef: React.MutableRefObject<(() => void)[]>
-  lastAnimatedSpiderfyRef: React.MutableRefObject<string | null>
-  originalGroupsRef: React.MutableRefObject<Map<string, { center: { lng: number; lat: number }; sites: Site[]; id: string }>>
-  previousSitesIdsRef: React.MutableRefObject<string>
 }
 
 export function useMapMarkers({
@@ -31,32 +23,9 @@ export function useMapMarkers({
   sites,
   selectedSite,
   setSelectedSite,
-  spiderfiedGroup,
-  setSpiderfiedGroup,
   markersRef,
-  headquartersMarkerRef,
-  spiderLinesRef,
-  spiderMoveHandlersRef,
-  lastAnimatedSpiderfyRef,
-  originalGroupsRef,
-  previousSitesIdsRef
+  headquartersMarkerRef
 }: UseMapMarkersProps) {
-
-  // Limpar linhas do spider e event handlers
-  const clearSpiderLines = useCallback(() => {
-    spiderLinesRef.current.forEach(line => line.remove())
-    spiderLinesRef.current = []
-    
-    // Remover event handlers de movimento, zoom e render
-    if (mapRef.current) {
-      spiderMoveHandlersRef.current.forEach(handler => {
-        mapRef.current?.off('move', handler)
-        mapRef.current?.off('zoom', handler)
-        mapRef.current?.off('render', handler)
-      })
-    }
-    spiderMoveHandlersRef.current = []
-  }, [mapRef, spiderLinesRef, spiderMoveHandlersRef])
 
   const updateMarkers = useCallback(() => {
     const mapInstance = mapRef.current
@@ -78,18 +47,9 @@ export function useMapMarkers({
     const headquarters = validSites.find(site => site.is_headquarters)
     const regularSites = validSites.filter(site => !site.is_headquarters)
 
-    // Detectar se os sites mudaram (não apenas zoom)
-    const currentSitesIds = regularSites.map(s => s.id).sort().join(',')
-    if (previousSitesIdsRef.current !== currentSitesIds) {
-      // Sites mudaram, limpar grupos originais para recalcular
-      originalGroupsRef.current.clear()
-      previousSitesIdsRef.current = currentSitesIds
-    }
-
     // Remover todos os marcadores anteriores
     markersRef.current.forEach(marker => marker.remove())
     markersRef.current = []
-    clearSpiderLines()
 
     if (headquartersMarkerRef.current) {
       headquartersMarkerRef.current.remove()
@@ -172,24 +132,12 @@ export function useMapMarkers({
       }))
     }
 
-    // Se há um grupo expandido, verificar se ele ainda existe nos grupos recalculados
-    if (spiderfiedGroup) {
-      const expandedGroup = groups.find(g => g.id === spiderfiedGroup)
-      if (!expandedGroup || expandedGroup.sites.length === 1) {
-        setSpiderfiedGroup(null)
-      } else {
-        originalGroupsRef.current.set(expandedGroup.id, { ...expandedGroup, sites: [...expandedGroup.sites] })
-      }
-    }
-
     groups.forEach(group => {
       if (group.sites.length === 1) {
         // Site individual - marcador com ícone de location
         const site = group.sites[0]
         const isSelected = selectedSite?.id === site.id
         const el = createLocationMarker(site, currentIsDark, () => {
-          lastAnimatedSpiderfyRef.current = null 
-          setSpiderfiedGroup(null)
           setSelectedSite(site)
         }, isSelected)
 
@@ -211,134 +159,6 @@ export function useMapMarkers({
             .addTo(mapInstance)
           markersRef.current.push(panelMarker)
         }
-      } else if (spiderfiedGroup === group.id) {
-        // ============================================================
-        // SPIDERFY EXPANDIDO
-        // ============================================================
-        const groupToUse = group
-        const groupCenter = groupToUse.center
-        
-        const shouldAnimate = lastAnimatedSpiderfyRef.current !== group.id
-        
-        const spiderRadius = 60 // pixels de deslocamento do centro
-        const lineDuration = shouldAnimate ? 200 : 0 
-        const lineDelay = shouldAnimate ? 30 : 0 
-        const markerDelay = shouldAnimate ? 50 : 0 
-
-        lastAnimatedSpiderfyRef.current = group.id
-
-        const spiderData = groupToUse.sites.map((site, index) => {
-          const siteLng = Number(site.longitude)
-          const siteLat = Number(site.latitude)
-          
-          const centerPoint = mapInstance.project([groupCenter.lng, groupCenter.lat])
-          const sitePoint = mapInstance.project([siteLng, siteLat])
-          
-          let angle = Math.atan2(sitePoint.y - centerPoint.y, sitePoint.x - centerPoint.x)
-          if (Math.abs(sitePoint.x - centerPoint.x) < 5 && Math.abs(sitePoint.y - centerPoint.y) < 5) {
-             angle = (index / groupToUse.sites.length) * Math.PI * 2 - Math.PI / 2
-          }
-
-          const targetX = centerPoint.x + Math.cos(angle) * spiderRadius
-          const targetY = centerPoint.y + Math.sin(angle) * spiderRadius
-          
-          const targetLngLat = mapInstance.unproject([targetX, targetY])
-          
-          return {
-            site,
-            centerPoint,
-            targetPoint: { x: targetX, y: targetY },
-            targetLngLat,
-            angle
-          }
-        })
-
-        spiderData.forEach((data, index) => {
-          const { site, centerPoint, targetPoint, targetLngLat } = data
-          
-          const lineEl = document.createElement('div')
-          lineEl.className = 'spider-line'
-          lineEl.style.position = 'absolute'
-          lineEl.style.top = '0'
-          lineEl.style.left = '0'
-          lineEl.style.width = '100%'
-          lineEl.style.height = '100%'
-          lineEl.style.pointerEvents = 'none'
-          lineEl.style.zIndex = '900' 
-          
-          const createLineSvg = (p1: {x: number, y: number}, p2: {x: number, y: number}) => {
-             return `
-              <svg width="100%" height="100%" style="position: absolute; top: 0; left: 0;">
-                <line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" 
-                      stroke="${currentIsDark ? '#9CA3AF' : '#6B7280'}" 
-                      stroke-width="2" 
-                      stroke-dasharray="4 2" />
-              </svg>
-            `
-          }
-
-          if (shouldAnimate) {
-             lineEl.innerHTML = createLineSvg(centerPoint, centerPoint) 
-             setTimeout(() => {
-               lineEl.innerHTML = createLineSvg(centerPoint, targetPoint)
-               lineEl.style.transition = `all ${lineDuration}ms ease-out`
-             }, index * lineDelay)
-          } else {
-             lineEl.innerHTML = createLineSvg(centerPoint, targetPoint)
-          }
-
-          const canvas = mapInstance.getCanvasContainer()
-          canvas.appendChild(lineEl)
-          spiderLinesRef.current.push(lineEl)
-          
-          const updateLine = () => {
-             const currentCenter = mapInstance.project([groupCenter.lng, groupCenter.lat])
-             const currentTarget = mapInstance.project(targetLngLat)
-             lineEl.innerHTML = createLineSvg(currentCenter, currentTarget)
-          }
-          
-          spiderMoveHandlersRef.current.push(updateLine)
-          mapInstance.on('move', updateLine)
-          mapInstance.on('zoom', updateLine) 
-          mapInstance.on('render', updateLine) 
-
-          const isSelected = selectedSite?.id === site.id
-          
-          const el = createSpiderfyMarker(site, currentIsDark, () => {
-             setSelectedSite(site)
-          }, isSelected)
-
-          if (shouldAnimate) {
-             el.style.opacity = '0'
-             el.style.transform = 'scale(0)'
-             el.style.transition = 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-          }
-
-          const marker = new mapboxgl.Marker(el)
-            .setLngLat(targetLngLat)
-            .addTo(mapInstance)
-            
-          markersRef.current.push(marker)
-          
-          if (shouldAnimate) {
-             setTimeout(() => {
-               el.style.opacity = '1'
-               el.style.transform = 'scale(1)'
-             }, index * lineDelay + markerDelay)
-          }
-
-          if (isSelected) {
-            const panelEl = createSitePanel(site, currentIsDark)
-            const markerPoint = mapInstance.project(targetLngLat)
-            const offsetPoint = [markerPoint.x, markerPoint.y + 120] as [number, number]
-            const offsetLngLat = mapInstance.unproject(offsetPoint)
-
-            const panelMarker = new mapboxgl.Marker(panelEl)
-              .setLngLat(offsetLngLat)
-              .addTo(mapInstance)
-            markersRef.current.push(panelMarker)
-          }
-        })
       } else {
             // Grupo colapsado (cluster)
             const count = group.sites.length
@@ -359,13 +179,12 @@ export function useMapMarkers({
 
         el.addEventListener('click', (e) => {
           e.stopPropagation()
-          lastAnimatedSpiderfyRef.current = null 
-          setSpiderfiedGroup(group.id)
-          // Centralizar no grupo com zoom suave
-          mapInstance.flyTo({
-             center: [group.center.lng, group.center.lat],
-             zoom: Math.max(mapInstance.getZoom(), 10), // Garantir zoom mínimo
-             speed: 1.2
+          const currentZoom = mapInstance.getZoom()
+          const targetZoom = Math.min(currentZoom + 2, 18)
+          mapInstance.easeTo({
+            center: [group.center.lng, group.center.lat],
+            zoom: targetZoom,
+            duration: 600
           })
         })
 
@@ -381,18 +200,10 @@ export function useMapMarkers({
     mapRef, 
     sites, 
     selectedSite, 
-    spiderfiedGroup, 
     markersRef, 
     headquartersMarkerRef, 
-    spiderLinesRef, 
-    spiderMoveHandlersRef, 
-    lastAnimatedSpiderfyRef, 
-    originalGroupsRef, 
-    previousSitesIdsRef, 
-    clearSpiderLines, 
-    setSelectedSite, 
-    setSpiderfiedGroup
+    setSelectedSite
   ])
 
-  return { updateMarkers, clearSpiderLines }
+  return { updateMarkers }
 }

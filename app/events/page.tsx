@@ -23,6 +23,7 @@ export default function EventsPage() {
   const [events, setEvents] = useState<AllocationEvent[]>([])
   const [machines, setMachines] = useState<any[]>([])
   const [sites, setSites] = useState<any[]>([])
+  const [extensions, setExtensions] = useState<any[]>([])
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [filterType, setFilterType] = useState<string>('')
   const [startDate, setStartDate] = useState<string>('')
@@ -37,6 +38,15 @@ export default function EventsPage() {
   const [activeDowntimes, setActiveDowntimes] = useState<ActiveDowntime[]>([])
   const [loadingAllocations, setLoadingAllocations] = useState(false)
   
+  const getLocalDateTimeForInput = (date: Date = new Date()) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+  }
+
   const [newEvent, setNewEvent] = useState({
     event_type: 'start_allocation',
     machine_id: '',
@@ -44,7 +54,7 @@ export default function EventsPage() {
     extension_id: '',
     construction_type: '',
     lot_building_number: '',
-    event_date: new Date().toISOString().slice(0, 16),
+    event_date: getLocalDateTimeForInput(),
     downtime_reason: '',
     downtime_description: '',
     corrects_event_id: '',
@@ -97,6 +107,18 @@ export default function EventsPage() {
     }
   }, [])
 
+  const loadExtensions = useCallback(async () => {
+    try {
+      const response = await fetch('/api/extensions?status=available')
+      const data = await response.json()
+      if (data.success) {
+        setExtensions(data.extensions)
+      }
+    } catch (error) {
+      console.error('Error loading extensions:', error)
+    }
+  }, [])
+
   const loadActiveAllocations = useCallback(async () => {
     setLoadingAllocations(true)
     try {
@@ -129,13 +151,23 @@ export default function EventsPage() {
     loadEvents()
     loadMachines()
     loadSites()
+    loadExtensions()
     loadActiveAllocations()
-  }, [user, sessionLoading, router, loadEvents, loadMachines, loadSites, loadActiveAllocations])
+  }, [user, sessionLoading, router, loadEvents, loadMachines, loadSites, loadExtensions, loadActiveAllocations])
 
   const handleCreateEvent = async () => {
     // Basic safety check
-    if (!newEvent.machine_id || !newEvent.event_date) {
+    if (!newEvent.event_date) {
       return
+    }
+
+    const convertLocalToUtcIso = (local: string) => {
+      const [datePart, timePart] = local.split('T')
+      if (!datePart || !timePart) return local
+      const [year, month, day] = datePart.split('-').map(Number)
+      const [hour, minute] = timePart.split(':').map(Number)
+      const localDate = new Date(year, month - 1, day, hour, minute)
+      return localDate.toISOString()
     }
 
     setCreating(true)
@@ -144,20 +176,24 @@ export default function EventsPage() {
       const method = editingEventId ? 'PUT' : 'POST'
       
       // Clean empty strings to null for UUID fields to avoid database errors
-      const payload = {
+      const payload: any = {
         ...newEvent,
         created_by: user?.id,
         updated_by: user?.id,
       }
 
       // Fields that must be null if empty string (UUIDs and Enum/Text fields)
-      const nullableFields = ['site_id', 'extension_id', 'corrects_event_id', 'construction_type', 'lot_building_number', 'downtime_reason']
+      const nullableFields = ['site_id', 'machine_id', 'extension_id', 'corrects_event_id', 'construction_type', 'lot_building_number', 'downtime_reason']
       nullableFields.forEach(field => {
         if (payload[field as keyof typeof payload] === '') {
           // @ts-ignore
           payload[field as keyof typeof payload] = null
         }
       })
+
+      if (payload.event_date) {
+        payload.event_date = convertLocalToUtcIso(String(payload.event_date))
+      }
 
       const response = await fetch(url, {
         method,
@@ -179,7 +215,7 @@ export default function EventsPage() {
           extension_id: '',
           construction_type: '',
           lot_building_number: '',
-          event_date: new Date().toISOString().slice(0, 16),
+          event_date: getLocalDateTimeForInput(),
           downtime_reason: '',
           downtime_description: '',
           corrects_event_id: '',
@@ -208,7 +244,7 @@ export default function EventsPage() {
       extension_id: '',
       construction_type: '',
       lot_building_number: '',
-      event_date: new Date().toISOString().slice(0, 16),
+      event_date: getLocalDateTimeForInput(),
       downtime_reason: '',
       downtime_description: '',
       corrects_event_id: '',
@@ -221,14 +257,11 @@ export default function EventsPage() {
   const handleEditEvent = (event: AllocationEvent) => {
     setEditingEventId(event.id)
     
-    // Adjust date to local time for input
+    // Ajustar data para o formato esperado pelo input datetime-local (horário local)
     let localDateString = ''
     if (event.event_date) {
       const date = new Date(event.event_date)
-      // Subtract timezone offset to get the correct local time string
-      // getTimezoneOffset() returns positive minutes for zones behind UTC (e.g., 180 for UTC-3)
-      const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000))
-      localDateString = localDate.toISOString().slice(0, 16)
+      localDateString = getLocalDateTimeForInput(date)
     }
 
     setNewEvent({
@@ -280,7 +313,7 @@ export default function EventsPage() {
             site_id: event.site?.id || '',
             construction_type: event.construction_type || '',
             lot_building_number: event.lot_building_number || '',
-            event_date: new Date().toISOString().slice(0, 16),
+            event_date: getLocalDateTimeForInput(),
           })
           setShowCreateModal(true)
         }
@@ -391,7 +424,7 @@ export default function EventsPage() {
       event_type: 'downtime_start',
       machine_id: allocation.machine_id,
       site_id: allocation.site_id,
-      event_date: new Date().toISOString().slice(0, 16),
+      event_date: getLocalDateTimeForInput(),
     })
     setShowCreateModal(true)
   }
@@ -541,6 +574,7 @@ export default function EventsPage() {
         setNewEvent={setNewEvent}
         machines={machines}
         sites={sites}
+        extensions={extensions}
         activeAllocations={activeAllocations}
         activeDowntimes={activeDowntimes}
         creating={creating}

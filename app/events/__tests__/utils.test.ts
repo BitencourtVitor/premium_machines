@@ -1,5 +1,63 @@
-import { filterMachinesForEvent } from '../utils'
+import { filterMachinesForEvent, getEventConfig, formatDate } from '../utils'
 import { ActiveAllocation, ActiveDowntime } from '../types'
+
+describe('formatDate', () => {
+  it('should format date correctly', () => {
+    // Using a fixed date for testing
+    const date = '2023-01-01T12:00:00'
+    const formatted = formatDate(date)
+    // The exact output depends on the locale, but we can check the structure
+    // Since the implementation uses 'en-US', we expect MM/DD/YYYY, HH:MM AM/PM
+    expect(formatted).toMatch(/\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2} [AP]M/)
+  })
+})
+
+describe('getEventConfig', () => {
+  it('should return correct config for start_allocation', () => {
+    const config = getEventConfig('start_allocation')
+    expect(config).toEqual(expect.objectContaining({
+      label: 'Alocação de Máquina',
+      color: 'blue',
+      textColor: 'text-[#2E86C1]'
+    }))
+  })
+
+  it('should return correct config for end_allocation', () => {
+    const config = getEventConfig('end_allocation')
+    expect(config).toEqual(expect.objectContaining({
+      label: 'Fim de Alocação',
+      color: 'red',
+      textColor: 'text-red-600 dark:text-red-400'
+    }))
+  })
+
+  it('should return correct config for downtime_start', () => {
+    const config = getEventConfig('downtime_start')
+    expect(config).toEqual(expect.objectContaining({
+      label: 'Início de Manutenção',
+      color: 'orange',
+      textColor: 'text-orange-600 dark:text-orange-400'
+    }))
+  })
+
+  it('should return correct config for downtime_end', () => {
+    const config = getEventConfig('downtime_end')
+    expect(config).toEqual(expect.objectContaining({
+      label: 'Fim de Manutenção',
+      color: 'green',
+      textColor: 'text-green-600 dark:text-green-400'
+    }))
+  })
+
+  it('should return default config for unknown type', () => {
+    const config = getEventConfig('unknown_type')
+    expect(config).toEqual(expect.objectContaining({
+      label: 'unknown_type',
+      color: 'gray',
+      bgColor: 'bg-gray-100 dark:bg-gray-800'
+    }))
+  })
+})
 
 describe('filterMachinesForEvent', () => {
   const machines = [

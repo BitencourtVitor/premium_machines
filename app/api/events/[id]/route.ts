@@ -14,7 +14,7 @@ export async function GET(
         *,
         machine:machines(id, unit_number),
         site:sites(id, title),
-        extension:machine_extensions(id, unit_number),
+        extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),
         created_by_user:users!allocation_events_created_by_fkey(id, nome)
       `)
@@ -96,7 +96,7 @@ export async function PUT(
         *,
         machine:machines(id, unit_number),
         site:sites(id, title),
-        extension:machine_extensions(id, unit_number),
+        extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),
         created_by_user:users!allocation_events_created_by_fkey(id, nome)
       `)

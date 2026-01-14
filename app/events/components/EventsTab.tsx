@@ -1,8 +1,8 @@
-import React from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import CustomDropdown from '../../components/CustomDropdown'
 import { AllocationEvent } from '../types'
 import { EVENT_STATUS_LABELS, EVENT_TYPE_LABELS, DOWNTIME_REASON_LABELS } from '@/lib/permissions'
-import { formatDate } from '../utils'
+import { formatDate, getEventConfig } from '../utils'
 import { 
   FiCalendar, 
   FiUser, 
@@ -11,8 +11,8 @@ import {
   FiTool,
   FiCheckCircle,
   FiXCircle,
-  FiDroplet,
-  FiFileText
+  FiFileText,
+  FiFilter
 } from 'react-icons/fi'
 import { GiKeyCard } from "react-icons/gi"
 import { LuPuzzle } from "react-icons/lu"
@@ -36,85 +36,6 @@ interface EventsTabProps {
   setEndDate: (date: string) => void
 }
 
-const getEventConfig = (type: string) => {
-  switch (type) {
-    case 'start_allocation':
-      return { 
-        icon: GiKeyCard, 
-        color: 'blue', 
-        label: 'Alocação de Máquina',
-        bgColor: 'bg-[#2E86C1]/10 dark:bg-[#2E86C1]/20',
-        textColor: 'text-[#2E86C1]',
-        borderColor: 'border-[#2E86C1]/20 dark:border-[#2E86C1]/30'
-      }
-    case 'end_allocation':
-      return { 
-        icon: FiXCircle, 
-        color: 'red', 
-        label: 'Fim de Alocação',
-        bgColor: 'bg-red-100 dark:bg-red-900/40',
-        textColor: 'text-red-600 dark:text-red-400',
-        borderColor: 'border-red-200 dark:border-red-800'
-      }
-    case 'start_downtime':
-    case 'downtime_start':
-      return { 
-        icon: FiTool, 
-        color: 'orange', 
-        label: 'Início de Manutenção',
-        bgColor: 'bg-orange-100 dark:bg-orange-900/40',
-        textColor: 'text-orange-600 dark:text-orange-400',
-        borderColor: 'border-orange-200 dark:border-orange-800'
-      }
-    case 'end_downtime':
-    case 'downtime_end':
-      return { 
-        icon: FiCheckCircle, 
-        color: 'green', 
-        label: 'Fim de Manutenção',
-        bgColor: 'bg-green-100 dark:bg-green-900/40',
-        textColor: 'text-green-600 dark:text-green-400',
-        borderColor: 'border-green-200 dark:border-green-800'
-      }
-    case 'refueling':
-      return { 
-        icon: FiDroplet, 
-        color: 'yellow', 
-        label: 'Abastecimento',
-        bgColor: 'bg-yellow-100 dark:bg-yellow-900/40',
-        textColor: 'text-yellow-600 dark:text-yellow-400',
-        borderColor: 'border-yellow-200 dark:border-yellow-800'
-      }
-    case 'request_allocation':
-      return { 
-        icon: FiFileText, 
-        color: 'purple', 
-        label: 'Solicitação de Alocação',
-        bgColor: 'bg-purple-100 dark:bg-purple-900/40',
-        textColor: 'text-purple-600 dark:text-purple-400',
-        borderColor: 'border-purple-200 dark:border-purple-800'
-      }
-    case 'extension_attach':
-      return { 
-        icon: LuPuzzle, 
-        color: 'indigo', 
-        label: 'Alocação de Extensão',
-        bgColor: 'bg-[#F39C12]/10 dark:bg-[#F39C12]/20',
-        textColor: 'text-[#F39C12]',
-        borderColor: 'border-[#F39C12]/20 dark:border-[#F39C12]/30'
-      }
-    default:
-      return { 
-        icon: FiInfo, 
-        color: 'gray', 
-        label: EVENT_TYPE_LABELS[type] || type,
-        bgColor: 'bg-gray-100 dark:bg-gray-800',
-        textColor: 'text-gray-600 dark:text-gray-400',
-        borderColor: 'border-gray-200 dark:border-gray-700'
-      }
-  }
-}
-
 export default function EventsTab({
   filterStatus,
   setFilterStatus,
@@ -133,54 +54,23 @@ export default function EventsTab({
   endDate,
   setEndDate
 }: EventsTabProps) {
+  const [showFilter, setShowFilter] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setShowFilter(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
+
   return (
     <>
-      {/* Search Bar */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4 flex-shrink-0">
-        <div className="flex gap-2 items-end flex-wrap">
-          <CustomDropdown
-            value={filterStatus}
-            onChange={(value) => setFilterStatus(value)}
-            options={[
-              { value: '', label: 'Todos Status' },
-              ...Object.entries(EVENT_STATUS_LABELS).map(([value, label]) => ({
-                value,
-                label: label as string
-              }))
-            ]}
-          />
-          <CustomDropdown
-            value={filterType}
-            onChange={(value) => setFilterType(value)}
-            options={[
-              { value: '', label: 'Todos Tipos' },
-              ...Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => ({
-                value,
-                label: label as string
-              }))
-            ]}
-          />
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-              placeholder="Data Inicial"
-              aria-label="Data Inicial"
-            />
-            <span className="text-gray-500 dark:text-gray-400">-</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-              placeholder="Data Final"
-              aria-label="Data Final"
-            />
-          </div>
-        </div>
-      </div>
 
       {/* Events List */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
@@ -200,6 +90,81 @@ export default function EventsTab({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
+
+            <div className="relative" ref={filterRef}>
+              <button
+                onClick={() => setShowFilter(!showFilter)}
+                className={`p-2 rounded-lg transition-colors ${
+                  showFilter || filterStatus || startDate || endDate
+                    ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400'
+                    : 'text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+                title="Filtrar"
+              >
+                <FiFilter className="w-5 h-5" />
+              </button>
+
+              {showFilter && (
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-4 z-50">
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Filtros</h3>
+                    
+                    <CustomDropdown
+                      label="Status"
+                      value={filterStatus}
+                      onChange={setFilterStatus}
+                      options={[
+                        { value: '', label: 'Todos' },
+                        ...Object.entries(EVENT_STATUS_LABELS).map(([value, label]) => ({
+                          value,
+                          label: label as string
+                        }))
+                      ]}
+                    />
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Período
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs"
+                            placeholder="Início"
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs"
+                            placeholder="Fim"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {(filterStatus || startDate || endDate) && (
+                      <button
+                        onClick={() => {
+                          setFilterStatus('')
+                          setStartDate('')
+                          setEndDate('')
+                        }}
+                        className="w-full py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      >
+                        Limpar Filtros
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {(user?.can_register_events || user?.role === 'admin' || user?.role === 'dev') && (
               <button
                 onClick={handleNewEvent}

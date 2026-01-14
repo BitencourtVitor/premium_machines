@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 import { createAuditLog } from '@/lib/auditLog'
+import { getActiveAllocations } from '@/lib/allocation/queries'
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,21 +44,49 @@ export async function GET(request: NextRequest) {
 
     // If machines are requested, fetch them for each site
     if (withMachines && sites) {
-      const sitesWithMachines = await Promise.all(
-        sites.map(async (site) => {
-          const { data: machines } = await supabaseServer
-            .from('machines')
-            .select('id, unit_number, status, ownership_type')
-            .eq('current_site_id', site.id)
-            .eq('ativo', true)
+      // Fetch all active allocations (calculated from events) to ensure real-time accuracy
+      const activeAllocations = await getActiveAllocations()
+      
+      const sitesWithMachines = sites.map((site) => {
+        // Filter allocations for this site
+        const siteAllocations = activeAllocations.filter(a => a.site_id === site.id)
+        
+        // Map to machine objects
+        const machinesMap = new Map()
+        
+        siteAllocations.forEach(alloc => {
+            // Add the main machine
+            machinesMap.set(alloc.machine_id, {
+                id: alloc.machine_id,
+                unit_number: alloc.machine_unit_number,
+                status: alloc.is_in_downtime ? 'maintenance' : 'allocated',
+                ownership_type: alloc.machine_ownership,
+                // Add extra fields if needed by frontend
+                machine_type: alloc.machine_type
+            })
 
-          return {
-            ...site,
-            machines_count: machines?.length || 0,
-            machines: machines || [],
-          }
+            // Add attached extensions
+            alloc.attached_extensions.forEach(ext => {
+                if (!machinesMap.has(ext.extension_id)) {
+                    machinesMap.set(ext.extension_id, {
+                        id: ext.extension_id,
+                        unit_number: ext.extension_unit_number,
+                        status: 'allocated', // Extensions attached are working
+                        ownership_type: 'owned', // Default or unknown
+                        machine_type: ext.extension_type
+                    })
+                }
+            })
         })
-      )
+
+        const machines = Array.from(machinesMap.values())
+
+        return {
+          ...site,
+          machines_count: machines.length,
+          machines: machines,
+        }
+      })
 
       return NextResponse.json({ success: true, sites: sitesWithMachines })
     }

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSiteAllocationSummary } from '@/lib/allocationService'
+import { getSiteAllocationSummary, getHistoricalSiteAllocations } from '@/lib/allocationService'
 
 /**
  * GET /api/sites/[id]/allocations
  * 
- * Retorna o resumo de alocações ativas em um site específico.
- * Inclui todas as máquinas alocadas, extensões conectadas e status de downtime.
+ * Retorna o resumo de alocações em um site específico.
+ * Se ?history=true, retorna TODAS as máquinas que já passaram pelo site.
+ * Caso contrário, retorna apenas as alocações ATIVAS.
  */
 export async function GET(
   request: NextRequest,
@@ -13,12 +14,24 @@ export async function GET(
 ) {
   try {
     const siteId = params.id
+    const { searchParams } = new URL(request.url)
+    const showHistory = searchParams.get('history') === 'true'
 
     if (!siteId) {
       return NextResponse.json(
         { success: false, message: 'ID do site é obrigatório' },
         { status: 400 }
       )
+    }
+
+    if (showHistory) {
+      const historicalAllocations = await getHistoricalSiteAllocations(siteId)
+      
+      return NextResponse.json({
+        success: true,
+        site_id: siteId,
+        allocations: historicalAllocations
+      })
     }
 
     const summary = await getSiteAllocationSummary(siteId)

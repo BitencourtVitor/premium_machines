@@ -91,6 +91,9 @@ export function useMapInitialization({
     mapRef.current.addControl(new mapboxgl.FullscreenControl(), 'top-right')
 
     mapRef.current.on('load', onMapLoad)
+    mapRef.current.on('error', (e) => {
+      console.error('Mapbox error:', e)
+    })
     mapRef.current.on('zoom', onZoomUpdate)
     mapRef.current.on('zoomend', onZoomEnd)
     mapRef.current.on('moveend', onMoveEnd)

@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
         *,
         machine:machines(id, unit_number),
         site:sites(id, title),
-        extension:machine_extensions(id, unit_number),
+        extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),
         created_by_user:users!allocation_events_created_by_fkey(id, nome),
         approved_by_user:users!allocation_events_approved_by_fkey(id, nome)
@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: events, error } = await query
+      .order('event_date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(limit)
 
@@ -67,9 +68,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // Validações básicas
-    if (!body.event_type || !body.machine_id || !body.event_date || !body.created_by) {
+    const requiresMachineId = body.event_type !== 'extension_attach'
+    if (!body.event_type || (requiresMachineId && !body.machine_id) || !body.event_date || !body.created_by) {
       return NextResponse.json(
-        { success: false, message: 'Campos obrigatórios: event_type, machine_id, event_date, created_by' },
+        { success: false, message: 'Campos obrigatórios: event_type, event_date, created_by e machine_id (exceto para extensão)' },
         { status: 400 }
       )
     }
@@ -117,7 +119,7 @@ export async function POST(request: NextRequest) {
         *,
         machine:machines(id, unit_number),
         site:sites(id, title),
-        extension:machine_extensions(id, unit_number),
+        extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),
         created_by_user:users!allocation_events_created_by_fkey(id, nome)
       `)

@@ -202,9 +202,10 @@ CREATE TABLE IF NOT EXISTS allocation_events (
         'extension_detach'
     )),
     -- Referências principais
-    machine_id UUID NOT NULL REFERENCES machines(id) ON DELETE RESTRICT,
+    machine_id UUID REFERENCES machines(id) ON DELETE RESTRICT,
     site_id UUID REFERENCES sites(id) ON DELETE RESTRICT,
-    extension_id UUID REFERENCES machine_extensions(id) ON DELETE SET NULL,
+    -- Quando event_type = 'extension_attach' ou 'extension_detach', extension_id referencia uma máquina cujo tipo possui is_attachment = true
+    extension_id UUID REFERENCES machines(id) ON DELETE SET NULL,
     supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,
     -- Localização específica dentro do site
     construction_type VARCHAR(20) CHECK (construction_type IN ('lot', 'building')),

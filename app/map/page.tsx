@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import mapboxgl from 'mapbox-gl'
 import Header from '@/app/components/Header'
 import Sidebar from '@/app/components/Sidebar'
 import BottomNavigation from '@/app/components/BottomNavigation'
@@ -28,22 +27,16 @@ export default function MapPage() {
   
   // Refs
   const mapContainer = useRef<HTMLDivElement>(null)
-  const map = useRef<mapboxgl.Map | null>(null)
-  const markersRef = useRef<mapboxgl.Marker[]>([])
-  const spiderLinesRef = useRef<HTMLDivElement[]>([])
-  const spiderMoveHandlersRef = useRef<(() => void)[]>([])
-  const headquartersMarkerRef = useRef<mapboxgl.Marker | null>(null)
-  const lastAnimatedSpiderfyRef = useRef<string | null>(null)
-  const originalGroupsRef = useRef<Map<string, { center: { lng: number; lat: number }; sites: Site[]; id: string }>>(new Map())
-  const previousSitesIdsRef = useRef<string>('')
+  const map = useRef<any>(null)
+  const markersRef = useRef<any[]>([])
+  const headquartersMarkerRef = useRef<any | null>(null)
   const updateMarkersRef = useRef<(() => void) | null>(null)
   
   // State
-  const [spiderfiedGroup, setSpiderfiedGroup] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [mapLoaded, setMapLoaded] = useState(false)
+  const [markersInitialized, setMarkersInitialized] = useState(false)
   const [sites, setSites] = useState<Site[]>([])
-  const [selectedMachine, setSelectedMachine] = useState<any | null>(null)
   const [selectedSite, setSelectedSite] = useState<Site | null>(null)
   const [mapStyle, setMapStyle] = useState<'map' | 'satellite'>('map')
 
@@ -66,20 +59,13 @@ export default function MapPage() {
     loadingMachineDetails
   } = useMapModals({ selectedSite, setSelectedSite })
 
-  const { updateMarkers, clearSpiderLines } = useMapMarkers({
+  const { updateMarkers } = useMapMarkers({
     mapRef: map,
     sites,
     selectedSite,
     setSelectedSite,
-    spiderfiedGroup,
-    setSpiderfiedGroup,
     markersRef,
-    headquartersMarkerRef,
-    spiderLinesRef,
-    spiderMoveHandlersRef,
-    lastAnimatedSpiderfyRef,
-    originalGroupsRef,
-    previousSitesIdsRef
+    headquartersMarkerRef
   })
 
   // Load Sites
@@ -101,7 +87,6 @@ export default function MapPage() {
 
   // Map Event Handlers
   const handleMapLoad = useCallback(() => {
-    setLoading(false)
     setMapLoaded(true)
     if (map.current) {
       map.current.resize()
@@ -186,11 +171,10 @@ export default function MapPage() {
     }
   }, [])
 
-  const handleClick = useCallback((e: mapboxgl.MapMouseEvent) => {
+  const handleClick = useCallback((e: any) => {
     const target = e.originalEvent.target as HTMLElement
     if (!target.closest('.marker-container')) {
-      lastAnimatedSpiderfyRef.current = null
-      setSpiderfiedGroup(null)
+      setSelectedSite(null)
     }
   }, [])
 
@@ -218,8 +202,10 @@ export default function MapPage() {
     }
 
     if (user.role === 'admin' || user.role === 'dev') {
-      loadSites()
-      setLoading(false)
+      setLoading(true)
+      loadSites().finally(() => {
+        setLoading(false)
+      })
       return
     }
 
@@ -231,8 +217,10 @@ export default function MapPage() {
       return
     }
 
-    loadSites()
-    setLoading(false)
+    setLoading(true)
+    loadSites().finally(() => {
+      setLoading(false)
+    })
   }, [user, sessionLoading, router, loadSites])
 
   // Refresh data on allocation changes
@@ -249,14 +237,19 @@ export default function MapPage() {
   useEffect(() => {
     if (!map.current || !mapLoaded) return
     
-    if (map.current.isStyleLoaded()) {
+    const runUpdate = () => {
       updateMarkers()
+      setMarkersInitialized(true)
+    }
+    
+    if (map.current.isStyleLoaded()) {
+      runUpdate()
     } else {
       map.current.once('style.load', () => {
-        updateMarkers()
+        runUpdate()
       })
     }
-  }, [sites, mapLoaded, spiderfiedGroup, selectedSite, updateMarkers, isDark])
+  }, [sites, mapLoaded, selectedSite, updateMarkers, isDark])
 
   // Cleanup
   useEffect(() => {
@@ -284,9 +277,12 @@ export default function MapPage() {
             <div ref={mapContainer} className="map-container w-full h-full" />
 
             {/* Loading Overlay */}
-            {loading && (
-              <div className="absolute inset-0 bg-gray-50 dark:bg-gray-900 flex items-center justify-center z-10">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-gray-400"></div>
+            {(loading || !mapLoaded || !markersInitialized) && (
+              <div className="absolute inset-0 bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center z-50">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 dark:border-blue-400 mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-400 font-medium animate-pulse">
+                  {loading ? 'Carregando dados...' : (!mapLoaded ? 'Inicializando mapa...' : 'Gerando marcadores...')}
+                </p>
               </div>
             )}
 

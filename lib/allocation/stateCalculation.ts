@@ -2,27 +2,10 @@ import { supabaseServer } from '../supabase-server'
 import { MachineAllocationState, ExtensionState } from './types'
 
 /**
- * Calcula o estado atual de uma máquina a partir dos eventos aprovados
- * Esta é a função fundamental que deriva o estado dos eventos
+ * Calcula o estado atual de uma máquina a partir de uma lista de eventos já carregada
+ * Função pura, sem acesso ao banco de dados
  */
-export async function calculateMachineAllocationState(machineId: string): Promise<MachineAllocationState> {
-  // Buscar todos os eventos aprovados para esta máquina, ordenados cronologicamente
-  const { data: events, error } = await supabaseServer
-    .from('allocation_events')
-    .select(`
-      *,
-      site:sites(id, title),
-      extension:machine_extensions(id, unit_number, extension_type:extension_types(nome))
-    `)
-    .eq('machine_id', machineId)
-    .eq('status', 'approved')
-    .order('event_date', { ascending: true })
-    .order('created_at', { ascending: true })
-
-  if (error) {
-    throw new Error(`Erro ao buscar eventos: ${error.message}`)
-  }
-
+export function calculateStateFromEvents(machineId: string, events: any[]): MachineAllocationState {
   // Estado inicial
   const state: MachineAllocationState = {
     machine_id: machineId,
@@ -107,6 +90,7 @@ export async function calculateMachineAllocationState(machineId: string): Promis
         break
 
       case 'extension_attach':
+        // Lógica antiga: Máquina Pai anexando uma extensão
         if (event.extension_id) {
           // Verificar se a extensão já está na lista
           const existingIndex = state.attached_extensions.findIndex(e => e.extension_id === event.extension_id)
@@ -114,11 +98,24 @@ export async function calculateMachineAllocationState(machineId: string): Promis
             state.attached_extensions.push({
               extension_id: event.extension_id,
               extension_unit_number: event.extension?.unit_number || '',
-              extension_type: event.extension?.extension_type?.nome || '',
+              extension_type: event.extension?.machine_type?.nome || '',
               attach_event_id: event.id,
               attached_at: event.event_date,
             })
           }
+        } 
+        // Lógica nova: Extensão sendo alocada (tratada como máquina independente)
+        else if (event.site_id) {
+          state.current_site_id = event.site_id
+          state.current_site_title = event.site?.title || null
+          state.current_allocation_event_id = event.id
+          state.construction_type = event.construction_type
+          state.lot_building_number = event.lot_building_number
+          state.allocation_start = event.event_date
+          state.status = 'allocated'
+          state.is_in_downtime = false
+          state.current_downtime_event_id = null
+          state.downtime_start = null
         }
         break
 
@@ -133,6 +130,31 @@ export async function calculateMachineAllocationState(machineId: string): Promis
   }
 
   return state
+}
+
+/**
+ * Calcula o estado atual de uma máquina a partir dos eventos aprovados
+ * Esta é a função fundamental que deriva o estado dos eventos
+ */
+export async function calculateMachineAllocationState(machineId: string): Promise<MachineAllocationState> {
+  // Buscar todos os eventos aprovados para esta máquina, ordenados cronologicamente
+  const { data: events, error } = await supabaseServer
+    .from('allocation_events')
+    .select(`
+      *,
+      site:sites(id, title),
+      extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment))
+    `)
+    .eq('machine_id', machineId)
+    .eq('status', 'approved')
+    .order('event_date', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    throw new Error(`Erro ao buscar eventos: ${error.message}`)
+  }
+
+  return calculateStateFromEvents(machineId, events || [])
 }
 
 /**
