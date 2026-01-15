@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Header from '@/app/components/Header'
 import Sidebar from '@/app/components/Sidebar'
@@ -16,6 +16,7 @@ import { useMapInitialization } from './hooks/useMapInitialization'
 import { useMapMarkers } from './hooks/useMapMarkers'
 import { useMapModals } from './hooks/useMapModals'
 import { useThemeDetector } from './hooks/useThemeDetector'
+import { useDebounce } from '@/app/hooks/useDebounce'
 
 // Mapbox token will be set from env
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
@@ -39,6 +40,37 @@ export default function MapPage() {
   const [sites, setSites] = useState<Site[]>([])
   const [selectedSite, setSelectedSite] = useState<Site | null>(null)
   const [mapStyle, setMapStyle] = useState<'map' | 'satellite'>('map')
+  const [searchQuery, setSearchQuery] = useState('')
+  const debouncedSearchQuery = useDebounce(searchQuery, 300)
+
+  // Filter sites based on search query
+  const filteredSites = useMemo(() => {
+    if (!debouncedSearchQuery) return sites
+    
+    const query = debouncedSearchQuery.toLowerCase().trim()
+    if (!query) return sites
+
+    return sites.filter(site => {
+      // 1. Jobsite Name
+      if (site.title?.toLowerCase().includes(query)) return true
+      
+      // 2. Address
+      if (site.address?.toLowerCase().includes(query)) return true
+      
+      // 3. Machines/Extensions
+      if (site.machines && Array.isArray(site.machines)) {
+         return site.machines.some((machine: any) => {
+            const unitNumber = machine.unit_number?.toLowerCase() || ''
+            const typeName = typeof machine.machine_type === 'object' ? machine.machine_type?.nome : machine.machine_type
+            const typeStr = String(typeName || '').toLowerCase()
+            
+            return unitNumber.includes(query) || typeStr.includes(query)
+         })
+      }
+      
+      return false
+    })
+  }, [sites, debouncedSearchQuery])
 
   // Detect theme
   const isDark = useThemeDetector()
@@ -61,7 +93,7 @@ export default function MapPage() {
 
   const { updateMarkers } = useMapMarkers({
     mapRef: map,
-    sites,
+    sites: filteredSites,
     selectedSite,
     setSelectedSite,
     markersRef,
@@ -287,7 +319,7 @@ export default function MapPage() {
             )}
 
             {/* Controls */}
-            <MapControls mapStyle={mapStyle} toggleMapStyle={toggleMapStyle} />
+            <MapControls mapStyle={mapStyle} toggleMapStyle={toggleMapStyle} onSearch={setSearchQuery} />
           </div>
         </main>
       </div>
