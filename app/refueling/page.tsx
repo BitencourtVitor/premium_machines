@@ -53,7 +53,7 @@ interface RefuelingTemplate {
   is_active: boolean
   notes?: string | null
   machine?: { id: string; unit_number: string } | null
-  site?: { id: string; title: string } | null
+  site?: { id: string; title: string; address?: string } | null
   supplier?: { id: string; nome: string } | null
 }
 
@@ -764,12 +764,12 @@ export default function RefuelingPage() {
     }
 
     const tabHeader = (
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2 overflow-hidden">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center justify-between md:justify-start md:gap-2 overflow-hidden w-full md:w-auto">
           <h2 className="text-base font-normal text-gray-500 dark:text-gray-400 whitespace-nowrap">
             Cronograma Semanal
           </h2>
-          <span className="text-gray-300 dark:text-gray-600">|</span>
+          <span className="hidden md:block text-gray-300 dark:text-gray-600">|</span>
           <div className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 overflow-hidden">
             <HiOutlineCalendarDays className="w-4 h-4 text-gray-400 flex-shrink-0" />
             <span className="truncate tracking-tight">
@@ -783,7 +783,7 @@ export default function RefuelingPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-center">
+        <div className="flex items-center gap-2 justify-center md:justify-end w-full md:w-auto">
           <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700/50 p-1 rounded-xl">
             <button
               onClick={() => setWeekOffset(prev => prev - 1)}
@@ -877,99 +877,102 @@ export default function RefuelingPage() {
                       </span>
                     </div>
 
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <svg className="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                              </svg>
-                              <span className="truncate">{event.site?.title || 'Sem jobsite'}</span>
-                            </div>
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <svg className="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span className="truncate">{event.site?.title || 'Sem jobsite'}</span>
+                      </div>
 
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <HiOutlineCalendarDays className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                              <span className="font-medium text-gray-700 dark:text-gray-300">
-                                {getDayOfWeekLabel(event.event_date)}
-                              </span>
-                              <span>{formatDate(event.event_date)}</span>
-                            </div>
-                          </div>
-                        </div>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <HiOutlineCalendarDays className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span className="font-medium text-gray-700 dark:text-gray-300">
+                          {getDayOfWeekLabel(event.event_date)}
+                        </span>
+                        <span>{formatDate(event.event_date)}</span>
+                      </div>
+                    </div>
+                  </div>
 
-                        <div className="flex flex-row md:flex-col items-center md:items-end gap-3 flex-shrink-0 min-w-[140px] justify-end">
-                          <div className="flex items-center gap-2 relative h-10">
-                            {isPending ? (
-                              <>
-                                <Transition
-                                  as="div"
-                                  show={pendingConfirmationId === event.id}
-                                  enter="transition-all duration-300 ease-out"
-                                  enterFrom="opacity-0 scale-95 translate-x-4"
-                                  enterTo="opacity-100 scale-100 translate-x-0"
-                                  leave="transition-all duration-200 ease-in"
-                                  leaveFrom="opacity-100 scale-100 translate-x-0"
-                                  leaveTo="opacity-0 scale-95 translate-x-4"
-                                  className="absolute right-0"
-                                >
-                                  <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm whitespace-nowrap">
-                                    <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 px-1.5 uppercase tracking-wider">Tem certeza?</span>
-                                    <div className="flex items-center gap-1">
-                                      <button
-                                        onClick={() => handleApproveEvent(event.id)}
-                                        disabled={isConfirming}
-                                        className="p-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md transition-all active:scale-95 disabled:opacity-50 shadow-sm"
-                                      title="Efetivar"
-                                    >
-                                      {isConfirming ? (
-                                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                      ) : (
-                                        <HiCheck className="w-4 h-4" />
-                                      )}
-                                    </button>
-                                    <button
-                                      onClick={() => setPendingConfirmationId(null)}
-                                      disabled={isConfirming}
-                                      className="p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md transition-all active:scale-95 disabled:opacity-50 shadow-sm"
-                                      title="Cancelar"
-                                    >
-                                      <HiXMark className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </Transition>
-
-                              <Transition
-                                as="div"
-                                show={pendingConfirmationId !== event.id}
-                                enter="transition-all duration-300 ease-out"
-                                enterFrom="opacity-0 scale-95 -translate-x-4"
-                                enterTo="opacity-100 scale-100 translate-x-0"
-                                leave="transition-all duration-200 ease-in"
-                                leaveFrom="opacity-100 scale-100 translate-x-0"
-                                leaveTo="opacity-0 scale-95 -translate-x-4"
-                                className="absolute right-0"
-                              >
+                  <div className="flex flex-col items-center md:items-end gap-3 flex-shrink-0 w-full md:w-auto mt-3 md:mt-0 pb-1 md:pb-0">
+                    <div className="flex items-center gap-2 relative h-11 w-full md:w-[240px]">
+                      {isPending ? (
+                        <div className="relative w-full h-full">
+                          <Transition
+                            as="div"
+                            show={pendingConfirmationId === event.id}
+                            enter="transition-all duration-300 ease-out transform-gpu"
+                            enterFrom="opacity-0 translate-y-4 md:translate-y-0 md:scale-95"
+                            enterTo="opacity-100 translate-y-0 md:scale-100"
+                            leave="transition-all duration-200 ease-in transform-gpu"
+                            leaveFrom="opacity-100 translate-y-0 md:scale-100"
+                            leaveTo="opacity-0 translate-y-4 md:translate-y-0 md:scale-95"
+                            className="absolute inset-0 w-full h-full z-10"
+                          >
+                            <div className="flex items-center justify-between gap-1.5 bg-gray-100 dark:bg-gray-800/90 p-1 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm w-full h-full">
+                              <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 px-2 uppercase tracking-tighter whitespace-nowrap">TEM CERTEZA?</span>
+                              <div className="flex items-center gap-1 h-full">
                                 <button
-                                  onClick={() => setPendingConfirmationId(event.id)}
+                                  onClick={() => handleApproveEvent(event.id)}
                                   disabled={isConfirming}
-                                  className={`
-                                    flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm whitespace-nowrap
-                                    ${isConfirming 
-                                      ? 'bg-blue-100 text-blue-400 cursor-not-allowed' 
-                                      : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95 hover:shadow-md'
-                                    }
-                                  `}
+                                  className="flex items-center justify-center gap-1.5 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all active:scale-95 disabled:opacity-50 shadow-sm h-full min-w-[65px] flex-1 md:flex-none"
+                                  title="Sim"
                                 >
                                   {isConfirming ? (
-                                    <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                   ) : (
-                                    <HiOutlineCheckCircle className="w-5 h-5" />
+                                    <>
+                                      <HiCheck className="w-4 h-4" />
+                                      <span className="text-xs font-bold">Sim</span>
+                                    </>
                                   )}
-                                  {isConfirming ? 'Efetivando...' : 'Efetivar'}
                                 </button>
-                              </Transition>
-                              </>
-                            ) : (
+                                <button
+                                  onClick={() => setPendingConfirmationId(null)}
+                                  disabled={isConfirming}
+                                  className="flex items-center justify-center bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all active:scale-95 disabled:opacity-50 shadow-sm h-full w-9 md:w-9 flex-none"
+                                  title="Não"
+                                >
+                                  <HiXMark className="w-5 h-5" />
+                                </button>
+                              </div>
+                            </div>
+                          </Transition>
+
+                          <Transition
+                            as="div"
+                            show={pendingConfirmationId !== event.id}
+                            enter="transition-all duration-300 ease-out transform-gpu"
+                            enterFrom="opacity-0 -translate-y-4 md:translate-y-0 md:scale-105"
+                            enterTo="opacity-100 translate-y-0 md:scale-100"
+                            leave="transition-all duration-200 ease-in transform-gpu"
+                            leaveFrom="opacity-100 translate-y-0 md:scale-100"
+                            leaveTo="opacity-0 -translate-y-4 md:translate-y-0 md:scale-105"
+                            className="absolute inset-0 w-full h-full"
+                          >
+                            <button
+                              onClick={() => setPendingConfirmationId(event.id)}
+                              disabled={isConfirming}
+                              className={`
+                                flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm whitespace-nowrap w-full h-full
+                                ${isConfirming 
+                                  ? 'bg-blue-100 text-blue-400 cursor-not-allowed' 
+                                  : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95 hover:shadow-md'
+                                }
+                              `}
+                            >
+                              {isConfirming ? (
+                                <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <HiOutlineCheckCircle className="w-5 h-5" />
+                              )}
+                              {isConfirming ? 'Efetivando...' : 'Efetivar'}
+                            </button>
+                          </Transition>
+                        </div>
+                      ) : (
                               <div className="flex items-center">
                                 <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg text-xs font-bold border border-green-100 dark:border-green-800/30 uppercase tracking-wider">
                                   <HiCheck className="w-4 h-4" />
@@ -1284,14 +1287,24 @@ export default function RefuelingPage() {
                         {template.machine?.unit_number || 'Sem unit'}
                       </span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <svg className="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span className="truncate">{template.site?.title || 'Sem jobsite definido'}</span>
+                    <div className="flex flex-col gap-3 md:gap-4 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <svg className="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span className="truncate font-medium text-gray-700 dark:text-gray-300">
+                            {(template.site as any)?.address || template.site?.title || 'Sem jobsite'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 min-w-0 ml-6 md:ml-0 md:before:content-['•'] md:before:text-gray-300 dark:md:before:text-gray-600">
+                          <span className="truncate text-xs md:text-sm md:ml-1.5">
+                            {template.site?.title || 'Sem título'}
+                          </span>
+                        </div>
                       </div>
+                      
                       <div className="flex items-center gap-1.5 min-w-0">
                         <div className="flex-shrink-0 text-gray-400">
                           {React.cloneElement(supplierIcon.icon as React.ReactElement, { className: 'w-4 h-4' })}
@@ -1302,7 +1315,7 @@ export default function RefuelingPage() {
                   </div>
                   
                   <div className="flex flex-row md:flex-col items-center md:items-end gap-2 md:gap-1 flex-shrink-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-row md:flex-col items-center gap-2 md:gap-1">
                       <span className="px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
                         {dayLabel} • {template.time_of_day}
                       </span>
@@ -1317,13 +1330,13 @@ export default function RefuelingPage() {
                       </span>
                     </div>
                     
-                    <div className="flex items-center gap-2 mt-2 md:mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-2 md:mt-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => handleOpenEditTemplate(template)}
-                        className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
                         title="Editar"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                       </button>
@@ -1333,10 +1346,10 @@ export default function RefuelingPage() {
                             await handleDeleteTemplate(template.id)
                           }
                         }}
-                        className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                         title="Excluir"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>

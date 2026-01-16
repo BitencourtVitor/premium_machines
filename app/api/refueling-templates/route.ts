@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     let query = supabaseServer.from('refueling_templates').select(`
       *,
       machine:machines(id, unit_number),
-      site:sites(id, title)
+      site:sites(id, title, address)
     `)
 
     if (activeOnly) {
