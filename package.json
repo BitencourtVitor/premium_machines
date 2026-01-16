@@ -21,7 +21,8 @@
     "react-dom": "^18.3.0",
     "react-icons": "^5.5.0",
     "react-map-gl": "^7.1.7",
-    "recharts": "^3.6.0"
+    "recharts": "^3.6.0",
+    "supabase": "^2.72.7"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

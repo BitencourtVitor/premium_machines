@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { PiGasCanBold } from 'react-icons/pi'
 
 interface UserPermissions {
   can_view_dashboard: boolean
@@ -143,6 +144,12 @@ export default function Sidebar() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       ),
+    },
+    {
+      href: '/refueling',
+      label: 'Refueling',
+      requiredPermission: 'can_register_events' as keyof UserPermissions,
+      icon: <PiGasCanBold className="w-5 h-5" aria-label="Refueling" />,
     },
     {
       href: '/events',
