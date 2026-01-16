@@ -904,11 +904,11 @@ export default function RefuelingPage() {
                             as="div"
                             show={pendingConfirmationId === event.id}
                             enter="transition-all duration-300 ease-out transform-gpu"
-                            enterFrom="opacity-0 translate-y-4 md:translate-y-0 md:scale-95"
-                            enterTo="opacity-100 translate-y-0 md:scale-100"
+                            enterFrom="opacity-0 translate-y-4 md:translate-y-0 md:translate-x-4"
+                            enterTo="opacity-100 translate-y-0 md:translate-x-0"
                             leave="transition-all duration-200 ease-in transform-gpu"
-                            leaveFrom="opacity-100 translate-y-0 md:scale-100"
-                            leaveTo="opacity-0 translate-y-4 md:translate-y-0 md:scale-95"
+                            leaveFrom="opacity-100 translate-y-0 md:translate-x-0"
+                            leaveTo="opacity-0 translate-y-4 md:translate-y-0 md:translate-x-4"
                             className="absolute inset-0 w-full h-full z-10"
                           >
                             <div className="flex items-center justify-between gap-1.5 bg-gray-100 dark:bg-gray-800/90 p-1 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm w-full h-full">
@@ -945,11 +945,11 @@ export default function RefuelingPage() {
                             as="div"
                             show={pendingConfirmationId !== event.id}
                             enter="transition-all duration-300 ease-out transform-gpu"
-                            enterFrom="opacity-0 -translate-y-4 md:translate-y-0 md:scale-105"
-                            enterTo="opacity-100 translate-y-0 md:scale-100"
+                            enterFrom="opacity-0 -translate-y-4 md:translate-y-0 md:-translate-x-4"
+                            enterTo="opacity-100 translate-y-0 md:translate-x-0"
                             leave="transition-all duration-200 ease-in transform-gpu"
-                            leaveFrom="opacity-100 translate-y-0 md:scale-100"
-                            leaveTo="opacity-0 -translate-y-4 md:translate-y-0 md:scale-105"
+                            leaveFrom="opacity-100 translate-y-0 md:translate-x-0"
+                            leaveTo="opacity-0 -translate-y-4 md:translate-y-0 md:-translate-x-4"
                             className="absolute inset-0 w-full h-full"
                           >
                             <button
@@ -1277,7 +1277,7 @@ export default function RefuelingPage() {
                 key={template.id}
                 className="w-full p-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors group"
               >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-row items-start md:items-center justify-between gap-4">
                   <div className="flex flex-col gap-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <div className="text-gray-400 flex-shrink-0">
@@ -1312,15 +1312,14 @@ export default function RefuelingPage() {
                         <span className="truncate">{supplier?.nome || 'Não informado'}</span>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex flex-row md:flex-col items-center md:items-end gap-2 md:gap-1 flex-shrink-0">
-                    <div className="flex flex-row md:flex-col items-center gap-2 md:gap-1">
-                      <span className="px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+
+                    {/* Mobile Info (Day/Time + Status) */}
+                    <div className="flex md:hidden items-center gap-2 mt-2">
+                      <span className="px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 text-[10px] text-gray-500 dark:text-gray-400">
                         {dayLabel} • {template.time_of_day}
                       </span>
                       <span
-                        className={`px-2 py-0.5 rounded-full border text-xs font-medium transition-colors ${
+                        className={`px-2 py-0.5 rounded-full border text-[10px] font-medium transition-colors ${
                           template.is_active
                             ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-300'
                             : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-300'
@@ -1329,8 +1328,27 @@ export default function RefuelingPage() {
                         {template.is_active ? 'Ativo' : 'Inativo'}
                       </span>
                     </div>
-                    
-                    <div className="flex items-center gap-2 md:mt-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                  </div>
+                  
+                  <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 flex-shrink-0">
+                    {/* Desktop Stack: Day/Time + Status */}
+                    <div className="hidden md:flex flex-col items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+                        {dayLabel} • {template.time_of_day}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full border text-[10px] font-medium transition-colors ${
+                          template.is_active
+                            ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-300'
+                            : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-300'
+                        }`}
+                      >
+                        {template.is_active ? 'Ativo' : 'Inativo'}
+                      </span>
+                    </div>
+
+                    {/* Buttons (Stacked on Mobile) */}
+                    <div className="flex flex-col md:flex-row items-center gap-1 md:gap-2">
                       <button
                         onClick={() => handleOpenEditTemplate(template)}
                         className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
