@@ -14,7 +14,7 @@ export const revalidate = 0
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const activeOnly = searchParams.get('activeOnly') !== 'false'
+    const activeOnly = searchParams.get('activeOnly') === 'true'
 
     let query = supabaseServer.from('refueling_templates').select(`
       *,

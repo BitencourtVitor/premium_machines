@@ -28,6 +28,16 @@ export default function SiteDetailsModal({
   const [activeTab, setActiveTab] = useState<'calendar' | 'history'>('calendar')
   const [, setTimezoneTick] = useState(0)
 
+  // Filtrar eventos de abastecimento para mostrar apenas os confirmados
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      if (event.event_type === 'refueling' && event.status !== 'approved') {
+        return false
+      }
+      return true
+    })
+  }, [events])
+
   useEffect(() => {
     const handleTimezoneChange = () => {
       setTimezoneTick(prev => prev + 1)
@@ -112,7 +122,7 @@ export default function SiteDetailsModal({
   }, [getEntityEvents])
 
   const getAllocationStatusToday = (machineId: string) => {
-    const status = getDayStatus(new Date(), machineId, events)
+    const status = getDayStatus(new Date(), machineId, filteredEvents)
     const isActive = status === 'working' || status === 'maintenance'
 
     return {
@@ -126,15 +136,15 @@ export default function SiteDetailsModal({
 
   const todayStatus = useMemo(() => {
     if (!selectedMachineId) return null
-    return getDayStatus(new Date(), selectedMachineId, events)
-  }, [selectedMachineId, events, getDayStatus])
+    return getDayStatus(new Date(), selectedMachineId, filteredEvents)
+  }, [selectedMachineId, filteredEvents, getDayStatus])
 
   // Filtrar eventos para o histórico
   const machineHistoryEvents = useMemo(() => {
     if (!selectedMachineId) return []
-    return getEntityEvents(events, selectedMachineId)
+    return getEntityEvents(filteredEvents, selectedMachineId)
       .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
-  }, [events, selectedMachineId, getEntityEvents])
+  }, [filteredEvents, selectedMachineId, getEntityEvents])
 
   // Fechar com ESC
   useEffect(() => {
@@ -387,7 +397,7 @@ export default function SiteDetailsModal({
 
                                 if (dayEvents.length === 0) {
                                   // Verificar status do dia para mensagem contextual
-                                  const status = getDayStatus(selectedDate, selectedMachineId, events)
+                                  const status = getDayStatus(selectedDate, selectedMachineId, filteredEvents)
                                   return (
                                     <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-xl text-center">
                                       <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -479,7 +489,7 @@ export default function SiteDetailsModal({
                               const currentDate = new Date(startDate)
 
                               for (let i = 0; i < 42; i++) {
-                                const dayStatus = getDayStatus(currentDate, selectedMachineId, events)
+                                const dayStatus = getDayStatus(currentDate, selectedMachineId, filteredEvents)
                                 const isCurrentMonth = currentDate.getMonth() === month
                                 const isToday = currentDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]
 

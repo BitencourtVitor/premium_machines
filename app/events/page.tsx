@@ -30,8 +30,8 @@ export default function EventsPage() {
   const [machines, setMachines] = useState<any[]>([])
   const [sites, setSites] = useState<any[]>([])
   const [extensions, setExtensions] = useState<any[]>([])
-  const [filterStatus, setFilterStatus] = useState<string>('')
-  const [filterType, setFilterType] = useState<string>('')
+  const [filterStatus, setFilterStatus] = useState<string[]>([])
+  const [filterType, setFilterType] = useState<string[]>([])
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -440,8 +440,13 @@ export default function EventsPage() {
   }
 
   const filteredEvents = events.filter(event => {
-    const matchesStatus = !filterStatus || event.status === filterStatus
-    const matchesType = !filterType || event.event_type === filterType
+    // Apenas abastecimentos confirmados devem aparecer no sistema
+    if (event.event_type === 'refueling' && event.status !== 'approved') {
+      return false
+    }
+
+    const matchesStatus = filterStatus.length === 0 || filterStatus.includes(event.status)
+    const matchesType = filterType.length === 0 || filterType.includes(event.event_type)
     
     let matchesDate = true
     if (startDate || endDate) {
@@ -481,7 +486,7 @@ export default function EventsPage() {
       <Header title="Alocações" />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
-        <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-250 ease-in-out ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`}>
+        <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-300 ease-in-out ${isExpanded ? 'md:ml-52' : 'md:ml-16'}`}>
           <div className="max-w-7xl mx-auto md:flex md:flex-col md:flex-1 md:overflow-hidden md:w-full">
             
             {/* Tabs */}

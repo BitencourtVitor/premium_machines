@@ -303,7 +303,7 @@ export default function MapPage() {
       <Header title="Mapa" />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
-        <main className={`relative flex-1 p-4 md:p-6 transition-all duration-250 ease-in-out md:flex md:flex-col md:overflow-hidden ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`} style={{ minHeight: 'calc(100vh - 200px)' }}>
+        <main className={`relative flex-1 p-4 md:p-6 transition-all duration-300 ease-in-out md:flex md:flex-col md:overflow-hidden ${isExpanded ? 'md:ml-52' : 'md:ml-16'}`} style={{ minHeight: 'calc(100vh - 200px)' }}>
           <div className="relative w-full h-full rounded-lg overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700" style={{ minHeight: '400px' }}>
             {/* Map Container */}
             <div ref={mapContainer} className="map-container w-full h-full" />

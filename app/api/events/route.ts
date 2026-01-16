@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     const machineId = searchParams.get('machine_id')
     const siteId = searchParams.get('site_id')
     const status = searchParams.get('status')
+    const eventType = searchParams.get('event_type')
     const startDate = searchParams.get('start_date')
     const endDate = searchParams.get('end_date')
 
@@ -36,6 +37,10 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       query = query.eq('status', status)
+    }
+
+    if (eventType) {
+      query = query.eq('event_type', eventType)
     }
 
     if (startDate) {

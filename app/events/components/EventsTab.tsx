@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import CustomDropdown from '../../components/CustomDropdown'
+import MultiSelectDropdown from '../../components/MultiSelectDropdown'
 import { AllocationEvent } from '../types'
 import { EVENT_STATUS_LABELS, EVENT_TYPE_LABELS, DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 import { formatDate, getEventConfig } from '../utils'
@@ -15,13 +15,13 @@ import {
   FiFilter
 } from 'react-icons/fi'
 import { GiKeyCard } from "react-icons/gi"
-import { LuPuzzle } from "react-icons/lu"
+import { LuPuzzle, LuFilterX } from "react-icons/lu"
 
 interface EventsTabProps {
-  filterStatus: string
-  setFilterStatus: (status: string) => void
-  filterType: string
-  setFilterType: (type: string) => void
+  filterStatus: string[]
+  setFilterStatus: (status: string[]) => void
+  filterType: string[]
+  setFilterType: (type: string[]) => void
   filteredEvents: AllocationEvent[]
   loadingEvents: boolean
   loadEvents: () => void
@@ -104,7 +104,7 @@ export default function EventsTab({
               <button
                 onClick={() => setShowFilter(!showFilter)}
                 className={`p-2 rounded-lg transition-colors ${
-                  showFilter || filterStatus || startDate || endDate
+                  showFilter || filterStatus.length > 0 || filterType.length > 0 || startDate || endDate
                     ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400'
                     : 'text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
@@ -114,21 +114,46 @@ export default function EventsTab({
               </button>
 
               {showFilter && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-4 z-50">
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Filtros</h3>
-                    
-                    <CustomDropdown
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 rounded-t-xl">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Filtros</h3>
+                    {(filterStatus.length > 0 || filterType.length > 0 || startDate || endDate) && (
+                      <button
+                        onClick={() => {
+                          setFilterStatus([])
+                          setFilterType([])
+                          setStartDate('')
+                          setEndDate('')
+                        }}
+                        className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                        title="Limpar Filtros"
+                      >
+                        <LuFilterX className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="p-4 space-y-4">
+                    <MultiSelectDropdown
                       label="Status"
                       value={filterStatus}
                       onChange={setFilterStatus}
-                      options={[
-                        { value: '', label: 'Todos' },
-                        ...Object.entries(EVENT_STATUS_LABELS).map(([value, label]) => ({
-                          value,
-                          label: label as string
-                        }))
-                      ]}
+                      options={Object.entries(EVENT_STATUS_LABELS).map(([value, label]) => ({
+                        value,
+                        label: label as string
+                      }))}
+                      placeholder="Todos os status"
+                    />
+
+                    <MultiSelectDropdown
+                      label="Tipo de Evento"
+                      value={filterType}
+                      onChange={setFilterType}
+                      options={Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => ({
+                        value,
+                        label: label as string
+                      }))}
+                      placeholder="Todos os tipos"
                     />
 
                     <div className="space-y-2">
@@ -156,19 +181,6 @@ export default function EventsTab({
                         </div>
                       </div>
                     </div>
-
-                    {(filterStatus || startDate || endDate) && (
-                      <button
-                        onClick={() => {
-                          setFilterStatus('')
-                          setStartDate('')
-                          setEndDate('')
-                        }}
-                        className="w-full py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                      >
-                        Limpar Filtros
-                      </button>
-                    )}
                   </div>
                 </div>
               )}

@@ -98,10 +98,17 @@ export default function DashboardPage() {
     )
   }
 
+  const filteredRecentEvents = recentEvents.filter(event => {
+    if (event.event_type === 'refueling' && event.status !== 'approved') {
+      return false
+    }
+    return true
+  })
+
   const itemsPerPage = 5
-  const totalPages = Math.max(1, Math.ceil(recentEvents.length / itemsPerPage))
+  const totalPages = Math.max(1, Math.ceil(filteredRecentEvents.length / itemsPerPage))
   const safeCurrentPage = Math.min(currentPage, totalPages)
-  const paginatedEvents = recentEvents.slice(
+  const paginatedEvents = filteredRecentEvents.slice(
     (safeCurrentPage - 1) * itemsPerPage,
     safeCurrentPage * itemsPerPage
   )
@@ -111,7 +118,7 @@ export default function DashboardPage() {
       <Header />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
-        <main className={`flex-1 p-4 md:p-6 transition-all duration-250 ease-in-out md:overflow-y-auto ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`}>
+        <main className={`flex-1 p-4 md:p-6 transition-all duration-300 ease-in-out md:overflow-y-auto ${isExpanded ? 'md:ml-52' : 'md:ml-16'}`}>
           <div className="max-w-7xl mx-auto">
             {/* Welcome Message */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">

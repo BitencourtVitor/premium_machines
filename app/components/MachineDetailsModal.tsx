@@ -50,6 +50,14 @@ export default function MachineDetailsModal({
 
   if (!isOpen) return null
 
+  // Filtrar eventos de abastecimento para mostrar apenas os confirmados
+  const filteredEvents = events.filter(event => {
+    if (event.event_type === 'refueling' && event.status !== 'approved') {
+      return false
+    }
+    return true
+  })
+
   // Helper for status badge styles
   const getStatusBadgeStyle = (status: string) => {
     switch (status) {
@@ -214,13 +222,13 @@ export default function MachineDetailsModal({
                   Histórico de Eventos
                 </h3>
 
-                {events.length === 0 ? (
+                {filteredEvents.length === 0 ? (
                   <div className="text-center py-12 px-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
                     <p className="text-gray-500 dark:text-gray-400 font-medium">Nenhum evento registrado para esta máquina</p>
                   </div>
                 ) : (
                   <div className="relative border-l-2 border-gray-200 dark:border-gray-700 ml-3 space-y-8">
-                    {events
+                    {filteredEvents
                       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                       .map((event) => {
                         const eventColors = getEventColors(event.event_type)

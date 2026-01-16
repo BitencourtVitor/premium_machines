@@ -211,10 +211,10 @@ export default function Sidebar() {
   return (
     <>
       <aside className={`hidden md:flex fixed left-0 top-16 bottom-0 bg-gray-50/50 dark:bg-gray-900/50 backdrop-blur-md border-r border-gray-100 dark:border-gray-800 flex-col z-20 transition-all duration-300 ease-in-out ${
-        isExpanded ? 'w-48 lg:w-64' : 'w-16 lg:w-20'
+        isExpanded ? 'w-52' : 'w-16'
       }`}>
         <nav className="flex-1 overflow-y-auto py-4">
-          <div className={`space-y-2 ${isExpanded ? 'px-4' : 'px-2'}`}>
+          <div className="space-y-1.5 px-2">
             {navItems.map((item) => {
               const isActive = pathname === item.href
               return (
@@ -222,11 +222,8 @@ export default function Sidebar() {
                   key={item.href}
                   href={item.href}
                   className={`
-                    flex items-center transition-all duration-200 ease-in-out
-                    ${isExpanded 
-                      ? 'gap-3 px-4 py-3 rounded-xl text-sm font-medium' 
-                      : 'justify-center px-2 py-3 rounded-xl'
-                    }
+                    flex items-center h-12 rounded-xl transition-all duration-300 ease-in-out group overflow-hidden
+                    ${isExpanded ? 'w-full' : 'w-12'}
                     ${isActive
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-blue-900/20'
                       : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-gray-200'
@@ -234,64 +231,73 @@ export default function Sidebar() {
                   `}
                   title={!isExpanded ? item.label : undefined}
                 >
-                  <div className={`transition-colors duration-200 ${isActive ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`}>
-                    {item.icon}
+                  <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center">
+                    <div className={`transition-all duration-300 ${isActive ? 'text-white' : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-200'}`}>
+                      {item.icon}
+                    </div>
                   </div>
-                  {isExpanded && <span className="font-medium truncate">{item.label}</span>}
+                  <span className={`
+                    font-medium text-sm truncate transition-all duration-300 ease-in-out
+                    ${isExpanded ? 'opacity-100 translate-x-0 w-auto' : 'opacity-0 -translate-x-4 w-0'}
+                  `}>
+                    {item.label}
+                  </span>
                 </Link>
               )
             })}
           </div>
         </nav>
         
-        <div className={`py-2 ${isExpanded ? 'px-4' : 'px-2'}`}>
+        <div className="py-2 px-2">
           <button
             onClick={() => setIsSettingsModalOpen(true)}
             className={`
-              w-full flex items-center transition-all duration-200 ease-in-out
-              ${isExpanded 
-                ? 'gap-3 px-4 py-3 rounded-xl text-sm font-medium' 
-                : 'justify-center px-2 py-3 rounded-xl'
-              }
-              text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-gray-200
+              flex items-center h-12 rounded-xl transition-all duration-300 ease-in-out text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-gray-200 overflow-hidden group
+              ${isExpanded ? 'w-full' : 'w-12'}
             `}
             title={!isExpanded ? 'Configurações' : undefined}
           >
-            <div className="text-gray-500 dark:text-gray-400">
+            <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-gray-200">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
-            {isExpanded && <span className="font-medium truncate">Configurações</span>}
+            <span className={`
+              font-medium text-sm truncate transition-all duration-300 ease-in-out
+              ${isExpanded ? 'opacity-100 translate-x-0 w-auto' : 'opacity-0 -translate-x-4 w-0'}
+            `}>
+              Configurações
+            </span>
           </button>
         </div>
 
-        <div className="border-t border-gray-100 dark:border-gray-800 p-3">
+        <div className="border-t border-gray-100 dark:border-gray-800 p-2">
           <button
             onClick={toggleSidebar}
-            className="w-full flex items-center justify-center px-3 py-2.5 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 ease-in-out"
+            className={`
+              flex items-center h-12 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300 ease-in-out group overflow-hidden
+              ${isExpanded ? 'w-full' : 'w-12'}
+            `}
             title={isExpanded ? 'Collapse menu' : 'Expand menu'}
           >
-            {isExpanded ? (
-              <svg 
-                className="w-5 h-5"
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-              </svg>
-            ) : (
-              <svg 
-                className="w-5 h-5"
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-              </svg>
-            )}
+            <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center">
+              {isExpanded ? (
+                <svg className="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+              )}
+            </div>
+            <span className={`
+              font-medium text-sm truncate transition-all duration-300 ease-in-out
+              ${isExpanded ? 'opacity-100 translate-x-0 w-auto' : 'opacity-0 -translate-x-4 w-0'}
+            `}>
+              {isExpanded ? 'Recolher' : 'Expandir'}
+            </span>
           </button>
         </div>
       </aside>

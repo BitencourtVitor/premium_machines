@@ -1,15 +1,18 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Header from '../components/Header'
 import BottomNavigation from '../components/BottomNavigation'
 import Sidebar from '../components/Sidebar'
-import CustomDropdown from '../components/CustomDropdown'
+import MultiSelectDropdown from '../components/MultiSelectDropdown'
 import CustomInput from '../components/CustomInput'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
 import { formatWithSystemTimezone, adjustDateToSystemTimezone } from '@/lib/timezone'
+import { FiFilter } from 'react-icons/fi'
+import { LuFilterX } from 'react-icons/lu'
+import { HiOutlineArrowPath, HiOutlineMagnifyingGlass } from 'react-icons/hi2'
 
 interface Log {
   id: string
@@ -36,12 +39,15 @@ export default function LogsPage() {
   const [allLogs, setAllLogs] = useState<Log[]>([])
   const [loadingLogs, setLoadingLogs] = useState(false)
   
-  const [filterEntity, setFilterEntity] = useState<string>('all')
-  const [filterAction, setFilterAction] = useState<string>('all')
+  const [filterEntity, setFilterEntity] = useState<string[]>([])
+  const [filterAction, setFilterAction] = useState<string[]>([])
   const [filterDateFrom, setFilterDateFrom] = useState<string>('')
   const [filterDateTo, setFilterDateTo] = useState<string>('')
   const [searchText, setSearchText] = useState<string>('')
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
+  const [showFilter, setShowFilter] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false)
   
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(50)
@@ -53,6 +59,18 @@ export default function LogsPage() {
     }
     window.addEventListener('timezoneChange', handleTimezoneChange)
     return () => window.removeEventListener('timezoneChange', handleTimezoneChange)
+  }, [])
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setShowFilter(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
   }, [])
 
   const loadLogs = useCallback(async () => {
@@ -173,8 +191,8 @@ export default function LogsPage() {
   const uniqueActions = Array.from(new Set(allLogs.map(log => log.acao)))
 
   const filteredLogs = allLogs.filter(log => {
-    if (filterEntity !== 'all' && log.entidade !== filterEntity) return false
-    if (filterAction !== 'all' && log.acao !== filterAction) return false
+    if (filterEntity.length > 0 && !filterEntity.includes(log.entidade)) return false
+    if (filterAction.length > 0 && !filterAction.includes(log.acao)) return false
     
     if (filterDateFrom) {
       const [fYear, fMonth, fDay] = filterDateFrom.split('-').map(Number)
@@ -204,8 +222,8 @@ export default function LogsPage() {
   const paginatedLogs = filteredLogs.slice(startIndex, startIndex + itemsPerPage)
 
   const clearFilters = () => {
-    setFilterEntity('all')
-    setFilterAction('all')
+    setFilterEntity([])
+    setFilterAction([])
     setFilterDateFrom('')
     setFilterDateTo('')
     setSearchText('')
@@ -225,101 +243,128 @@ export default function LogsPage() {
       <Header />
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
-        <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-250 ease-in-out ${isExpanded ? 'md:ml-48 lg:ml-64' : 'md:ml-16 lg:ml-20'}`}>
-          <div className="max-w-7xl mx-auto md:flex md:flex-col md:flex-1 md:overflow-hidden md:w-full">
-            {/* Search Bar */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4 flex-shrink-0">
-              <div className="flex gap-2 items-end">
-                <div className="flex-1">
-                  <CustomInput
-                    type="text"
-                    placeholder="Buscar logs..."
-                    value={searchText}
-                    onChange={(e) => {
-                      setSearchText(e.target.value)
-                      setCurrentPage(1)
-                    }}
-                  />
-                </div>
-                {(filterEntity !== 'all' || filterAction !== 'all' || filterDateFrom || filterDateTo || searchText) && (
-                  <button
-                    onClick={clearFilters}
-                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                  >
-                    Limpar Filtros
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Filters */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4 flex-shrink-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <CustomDropdown
-                  label="Entidade"
-                  value={filterEntity}
-                  onChange={(value) => {
-                    setFilterEntity(value)
-                    setCurrentPage(1)
-                  }}
-                  options={[
-                    { value: 'all', label: 'Todas' },
-                    ...uniqueEntities.map(entity => ({ value: entity, label: entity }))
-                  ]}
-                />
-                <CustomDropdown
-                  label="Ação"
-                  value={filterAction}
-                  onChange={(value) => {
-                    setFilterAction(value)
-                    setCurrentPage(1)
-                  }}
-                  options={[
-                    { value: 'all', label: 'Todas' },
-                    ...uniqueActions.map(action => ({ value: action, label: action }))
-                  ]}
-                />
-                <CustomInput
-                  label="Data Inicial"
-                  type="date"
-                  value={filterDateFrom}
-                  onChange={(e) => {
-                    setFilterDateFrom(e.target.value)
-                    setCurrentPage(1)
-                  }}
-                />
-                <CustomInput
-                  label="Data Final"
-                  type="date"
-                  value={filterDateTo}
-                  onChange={(e) => {
-                    setFilterDateTo(e.target.value)
-                    setCurrentPage(1)
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Results Count */}
-            <div className="mb-4 text-sm text-gray-600 dark:text-gray-400 flex-shrink-0">
-              Mostrando {paginatedLogs.length} de {filteredLogs.length} logs
-              {filteredLogs.length !== allLogs.length && ` (filtrados de ${allLogs.length} total)`}
-            </div>
-
-            {/* Logs List */}
+        <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-300 ease-in-out ${isExpanded ? 'md:ml-52' : 'md:ml-16'}`}>
+          <div className="max-w-7xl md:flex md:flex-col md:flex-1 md:overflow-hidden md:w-full">
+            {/* Logs List Header */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2">
-                <h2 className="text-base font-normal text-gray-500 dark:text-gray-400">Histórico • {filteredLogs.length}</h2>
-                <div className="flex items-center gap-2">
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-4">
+                <h2 className={`text-base font-normal text-gray-500 dark:text-gray-400 ${isSearchExpanded ? 'hidden sm:block sm:opacity-0' : 'block'}`}>
+                  Histórico • {filteredLogs.length}
+                </h2>
+                
+                <div className="flex items-center gap-2 ml-auto">
+                  <div className={`flex items-center transition-all duration-300 ease-in-out ${isSearchExpanded ? 'w-48 sm:w-64 opacity-100' : 'w-0 opacity-0 overflow-hidden'}`}>
+                    <input
+                      type="text"
+                      placeholder="Buscar logs..."
+                      value={searchText}
+                      onChange={(e) => {
+                        setSearchText(e.target.value)
+                        setCurrentPage(1)
+                      }}
+                      className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:text-white"
+                      autoFocus={isSearchExpanded}
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => setIsSearchExpanded(!isSearchExpanded)}
+                    className={`p-2 rounded-lg transition-colors ${
+                      isSearchExpanded 
+                        ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/30' 
+                        : 'text-blue-600 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                    title="Pesquisar"
+                  >
+                    <HiOutlineMagnifyingGlass className="w-5 h-5" />
+                  </button>
+
+                  <div className="relative" ref={filterRef}>
+                    <button
+                      onClick={() => setShowFilter(!showFilter)}
+                      className={`p-2 rounded-lg transition-colors ${
+                        showFilter || filterEntity.length > 0 || filterAction.length > 0 || filterDateFrom || filterDateTo
+                          ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400'
+                          : 'text-blue-600 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                      title="Filtrar"
+                    >
+                      <FiFilter className="w-5 h-5" />
+                    </button>
+
+                    {showFilter && (
+                      <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 rounded-t-xl">
+                          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Filtros</h3>
+                          {(filterEntity.length > 0 || filterAction.length > 0 || filterDateFrom || filterDateTo || searchText) && (
+                            <button
+                              onClick={clearFilters}
+                              className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                              title="Limpar Filtros"
+                            >
+                              <LuFilterX className="w-5 h-5" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                          <MultiSelectDropdown
+                            label="Entidade"
+                            value={filterEntity}
+                            onChange={(value) => {
+                              setFilterEntity(value)
+                              setCurrentPage(1)
+                            }}
+                            options={uniqueEntities.map(entity => ({ value: entity, label: entity }))}
+                            placeholder="Todas as entidades"
+                          />
+                          <MultiSelectDropdown
+                            label="Ação"
+                            value={filterAction}
+                            onChange={(value) => {
+                              setFilterAction(value)
+                              setCurrentPage(1)
+                            }}
+                            options={uniqueActions.map(action => ({ value: action, label: action }))}
+                            placeholder="Todas as ações"
+                          />
+                          <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                              Período
+                            </label>
+                            <div className="grid grid-cols-1 gap-2">
+                              <CustomInput
+                                type="date"
+                                value={filterDateFrom}
+                                onChange={(e) => {
+                                  setFilterDateFrom(e.target.value)
+                                  setCurrentPage(1)
+                                }}
+                                placeholder="Data Inicial"
+                              />
+                              <CustomInput
+                                type="date"
+                                value={filterDateTo}
+                                onChange={(e) => {
+                                  setFilterDateTo(e.target.value)
+                                  setCurrentPage(1)
+                                }}
+                                placeholder="Data Final"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <button
                     onClick={loadLogs}
                     className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                     disabled={loadingLogs}
                     title="Atualizar"
                   >
-                    <svg className={`w-5 h-5 ${loadingLogs ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
+                    <HiOutlineArrowPath className={`w-5 h-5 ${loadingLogs ? 'animate-spin' : ''}`} />
                   </button>
                 </div>
               </div>

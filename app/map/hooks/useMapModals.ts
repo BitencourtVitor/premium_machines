@@ -17,6 +17,11 @@ function inferEventsForSite(allEvents: any[], siteId: string) {
   const siteEvents: any[] = []
 
   for (const event of sortedEvents) {
+    // Apenas abastecimentos confirmados devem aparecer no sistema
+    if (event.event_type === 'refueling' && event.status !== 'approved') {
+      continue
+    }
+
     const machineId = event.machine?.id || event.machine_id
     if (!machineId) continue
 

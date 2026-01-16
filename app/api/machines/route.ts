@@ -5,16 +5,23 @@ import { createAuditLog } from '@/lib/auditLog'
 
 export async function GET(request: NextRequest) {
   try {
-    const { data: machines, error } = await supabaseServer
+    const { searchParams } = new URL(request.url)
+    const ativoOnly = searchParams.get('ativo') !== 'false'
+
+    let query = supabaseServer
       .from('machines')
       .select(`
         *,
-        machine_type:machine_types(id, nome),
+        machine_type:machine_types(id, nome, is_attachment),
         supplier:suppliers(id, nome),
         current_site:sites(id, title)
       `)
-      .eq('ativo', true)
-      .order('unit_number', { ascending: true })
+
+    if (ativoOnly) {
+      query = query.eq('ativo', true)
+    }
+
+    const { data: machines, error } = await query.order('unit_number', { ascending: true })
 
     if (error) {
       console.error('Error fetching machines:', error)
