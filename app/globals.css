@@ -197,7 +197,7 @@ html.dark input[type="date"],
   }
 }
 
-/* Custom Scrollbar */
+/* Custom Scrollbar Styles */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -208,124 +208,20 @@ html.dark input[type="date"],
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background-color: #d1d5db; /* gray-300 */
   border-radius: 4px;
-  transition: background 0.2s ease;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: #4b5563; /* gray-600 */
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background-color: #9ca3af; /* gray-400 */
 }
 
-html.dark ::-webkit-scrollbar-thumb,
-.dark ::-webkit-scrollbar-thumb {
-  background: #475569;
-}
-
-html.dark ::-webkit-scrollbar-thumb:hover,
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background-color: #6b7280; /* gray-500 */
 }
 
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
-}
 
-html.dark *,
-.dark * {
-  scrollbar-color: #475569 transparent;
-}
-
-/* Mapbox overrides */
-.mapboxgl-popup-content {
-  padding: 12px 16px !important;
-  border-radius: 8px !important;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-}
-
-.mapboxgl-popup-close-button {
-  font-size: 18px !important;
-  padding: 4px 8px !important;
-}
-
-html.dark .mapboxgl-popup-content,
-.dark .mapboxgl-popup-content {
-  background: #1f2937 !important;
-  color: #ffffff !important;
-}
-
-html.dark .mapboxgl-popup-close-button,
-.dark .mapboxgl-popup-close-button {
-  color: #ffffff !important;
-}
-
-/* Map container fixes for mobile (iOS and Android) */
-.map-container {
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 400px;
-  position: relative;
-  -webkit-overflow-scrolling: touch;
-}
-
-@media (max-width: 768px) {
-  .map-container {
-    min-height: calc(100vh - 200px);
-    height: calc(100vh - 200px) !important;
-  }
-}
-
-/* Fix for iOS Safari viewport issues */
-@supports (-webkit-touch-callout: none) {
-  .map-container {
-    height: -webkit-fill-available !important;
-  }
-}
-
-/* Ensure mapbox container has proper dimensions */
-.mapboxgl-map {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.mapboxgl-canvas-container {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.mapboxgl-canvas {
-  width: 100% !important;
-  height: 100% !important;
-  touch-action: pan-x pan-y;
-}
-
-/* Machine status colors */
-.status-available {
-  @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;
-}
-
-.status-allocated {
-  @apply bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200;
-}
-
-.status-maintenance {
-  @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200;
-}
-
-.status-inactive {
-  @apply bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300;
-}
-
-/* Event status colors */
-.event-pending {
-  @apply bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200;
-}
-
-.event-approved {
-  @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;
-}
-
-.event-rejected {
-  @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200;
-}

@@ -81,7 +81,7 @@ export default function PinInput({ length = 6, onComplete, disabled = false, err
   }
 
   return (
-    <div className="flex gap-2 justify-center">
+    <div className="flex gap-1.5 md:gap-2 justify-center">
       {values.map((value, index) => (
         <input
           key={index}
@@ -97,7 +97,7 @@ export default function PinInput({ length = 6, onComplete, disabled = false, err
           onFocus={() => handleFocus(index)}
           disabled={disabled}
           className={`
-            w-12 h-14 text-center text-2xl font-bold rounded-lg border-2 
+            w-10 h-12 md:w-12 md:h-14 text-center text-xl md:text-2xl font-bold rounded-lg border-2 
             transition-all duration-200
             ${error 
               ? 'border-red-500 bg-red-50 dark:bg-red-900/20' 

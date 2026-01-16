@@ -56,6 +56,15 @@ export default function EventsTab({
 }: EventsTabProps) {
   const [showFilter, setShowFilter] = useState(false)
   const filterRef = useRef<HTMLDivElement>(null)
+  const [, setTimezoneTick] = useState(0)
+
+  useEffect(() => {
+    const handleTimezoneChange = () => {
+      setTimezoneTick(prev => prev + 1)
+    }
+    window.addEventListener('timezoneChange', handleTimezoneChange)
+    return () => window.removeEventListener('timezoneChange', handleTimezoneChange)
+  }, [])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

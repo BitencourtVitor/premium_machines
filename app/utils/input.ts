@@ -25,3 +25,18 @@ export function formatUSPhone(value: string): string {
       : `(${limited.slice(0, 3)}) ${limited.slice(3, 6)}-${limited.slice(6)}`
   }
 }
+
+export function validateEmail(email: string): boolean {
+  if (!email) return false
+  // Regex mais robusto para email
+  const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+  return re.test(email)
+}
+
+export function validateUSPhone(phone: string): boolean {
+  // Verifica se tem 10 dígitos (formato local) ou 11 (com +1)
+  const numbers = phone.replace(/\D/g, '')
+  if (numbers.startsWith('1') && numbers.length === 11) return true
+  if (numbers.length === 10) return true
+  return false
+}

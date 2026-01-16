@@ -16,9 +16,15 @@ type RefuelingTemplate = {
   day_of_week: number
   time_of_day: string
   is_active: boolean
+  created_by: string | null
 }
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
+
+// Standard project timezone offset (Brazil/Sao Paulo = UTC-3)
+// We add 3 hours to the wall-clock time to get the correct UTC representation
+// that will be displayed back as the intended local time in the browser.
+const BR_OFFSET = 3
 
 function getNextWeekRange() {
   const now = new Date()
@@ -51,7 +57,7 @@ function getScheduledDatesForTemplate(
   for (let d = new Date(weekStart); d <= weekEnd; d = new Date(d.getTime() + ONE_DAY_MS)) {
     if (d.getUTCDay() === dayOfWeek) {
       const scheduled = new Date(
-        Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hour, minute, 0),
+        Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hour + BR_OFFSET, minute, 0),
       )
       results.push(scheduled)
     }
@@ -69,6 +75,18 @@ serve(async (req) => {
     return new Response("Missing Supabase environment variables", { status: 500 })
   }
 
+  // 1. Get a fallback user ID (admin or dev) in case template.created_by is null
+  const { data: fallbackUser, error: fallbackError } = await supabase
+    .from("users")
+    .select("id")
+    .in("role", ["admin", "dev"])
+    .limit(1)
+    .maybeSingle()
+
+  if (fallbackError) {
+    console.error("Error fetching fallback user", fallbackError)
+  }
+
   const { start, end } = getNextWeekRange()
 
   const { data: templates, error: templatesError } = await supabase
@@ -81,7 +99,8 @@ serve(async (req) => {
       fuel_supplier_id,
       day_of_week,
       time_of_day,
-      is_active
+      is_active,
+      created_by
     `,
     )
     .eq("is_active", true)
@@ -102,6 +121,14 @@ serve(async (req) => {
       template.day_of_week,
       template.time_of_day,
     )
+
+    // Ensure we have a created_by ID
+    const createdBy = template.created_by || fallbackUser?.id
+
+    if (!createdBy) {
+      console.error(`Skipping template ${template.id}: No creator or fallback user found`)
+      continue
+    }
 
     for (const scheduledAt of dates) {
       const scheduledIso = scheduledAt.toISOString()
@@ -133,6 +160,7 @@ serve(async (req) => {
         event_date: scheduledIso,
         status: "pending",
         has_refueling: true,
+        created_by: createdBy,
       })
 
       if (insertError) {

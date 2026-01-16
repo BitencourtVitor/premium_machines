@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useState } from 'react'
 import CustomInput from '@/app/components/CustomInput'
 import CustomDropdown from '@/app/components/CustomDropdown'
 import PinInput from '@/app/components/PinInput'
+import { validateEmail } from '@/app/utils/input'
 
 interface UserModalProps {
   isOpen: boolean
@@ -50,6 +51,19 @@ export default function UserModal({
   fixedRole,
   fixedSupplierId
 }: UserModalProps) {
+  const [localEmailError, setLocalEmailError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (formData.role !== 'fornecedor' && formData.email && !validateEmail(formData.email)) {
+      setLocalEmailError('Formato de email inválido')
+      return
+    }
+
+    await onSave(e)
+  }
+
   if (!isOpen) return null
 
   return (
@@ -74,7 +88,7 @@ export default function UserModal({
 
         {/* Conteúdo */}
         <div className="p-6 flex-1 overflow-y-auto">
-          <form onSubmit={onSave} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <CustomInput
               label={formData.role === 'fornecedor' ? 'Primeiro Nome' : 'Nome'}
               value={formData.nome}
@@ -86,7 +100,16 @@ export default function UserModal({
                 label="Email"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, email: e.target.value })
+                  if (e.target.value && !validateEmail(e.target.value)) {
+                    setLocalEmailError('Formato de email inválido')
+                  } else {
+                    setLocalEmailError('')
+                  }
+                }}
+                error={!!localEmailError}
+                helperText={localEmailError}
               />
             )}
             {formData.role === 'fornecedor' && (
@@ -95,6 +118,7 @@ export default function UserModal({
               </p>
             )}
             <div>
+
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 {editingUser ? 'Novo PIN (deixe vazio para manter)' : 'PIN (6 dígitos)'}
               </label>

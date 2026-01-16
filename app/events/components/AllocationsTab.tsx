@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { ActiveAllocation, ActiveDowntime } from '../types'
 import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 import { formatDate } from '../utils'
@@ -31,6 +31,16 @@ export default function AllocationsTab({
   activeDowntimes,
   creating
 }: AllocationsTabProps) {
+  const [, setTimezoneTick] = useState(0)
+
+  useEffect(() => {
+    const handleTimezoneChange = () => {
+      setTimezoneTick(prev => prev + 1)
+    }
+    window.addEventListener('timezoneChange', handleTimezoneChange)
+    return () => window.removeEventListener('timezoneChange', handleTimezoneChange)
+  }, [])
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-2">

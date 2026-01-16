@@ -7,8 +7,13 @@ import BottomNavigation from '../components/BottomNavigation'
 import Sidebar from '../components/Sidebar'
 import CustomDropdown from '../components/CustomDropdown'
 import CustomInput from '../components/CustomInput'
+import PageTabs from '../components/PageTabs'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
+import { 
+  formatDateOnly, 
+  adjustDateToSystemTimezone 
+} from '@/lib/timezone'
 
 interface FinancialSnapshot {
   id: string
@@ -47,6 +52,15 @@ export default function ReportsPage() {
   const [dateTo, setDateTo] = useState('')
   const [selectedSite, setSelectedSite] = useState('all')
   const [selectedSupplier, setSelectedSupplier] = useState('all')
+  const [, setTimezoneTick] = useState(0)
+
+  useEffect(() => {
+    const handleTimezoneChange = () => {
+      setTimezoneTick(prev => prev + 1)
+    }
+    window.addEventListener('timezoneChange', handleTimezoneChange)
+    return () => window.removeEventListener('timezoneChange', handleTimezoneChange)
+  }, [])
   
   const [sites, setSites] = useState<any[]>([])
   const [suppliers, setSuppliers] = useState<any[]>([])
@@ -113,10 +127,20 @@ export default function ReportsPage() {
 
     // Filtrar por período
     if (dateFrom) {
-      filtered = filtered.filter(s => new Date(s.period_start) >= new Date(dateFrom))
+      const [fYear, fMonth, fDay] = dateFrom.split('-').map(Number)
+      const fromDateTime = new Date(Date.UTC(fYear, fMonth - 1, fDay, 0, 0, 0))
+      filtered = filtered.filter(s => {
+        const adjustedStart = adjustDateToSystemTimezone(s.period_start)
+        return adjustedStart.getTime() >= fromDateTime.getTime()
+      })
     }
     if (dateTo) {
-      filtered = filtered.filter(s => new Date(s.period_end) <= new Date(dateTo))
+      const [tYear, tMonth, tDay] = dateTo.split('-').map(Number)
+      const toDateTime = new Date(Date.UTC(tYear, tMonth - 1, tDay, 23, 59, 59, 999))
+      filtered = filtered.filter(s => {
+        const adjustedEnd = adjustDateToSystemTimezone(s.period_end)
+        return adjustedEnd.getTime() <= toDateTime.getTime()
+      })
     }
 
     // Filtrar por site
@@ -171,47 +195,15 @@ export default function ReportsPage() {
           <div className="max-w-7xl mx-auto md:flex md:flex-col md:flex-1 md:overflow-hidden md:w-full">
             {/* Tipo de Relatório */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 flex-shrink-0 overflow-hidden">
-              <div className="flex">
-                <button
-                  onClick={() => setReportType('period')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-                    reportType === 'period'
-                      ? 'text-blue-600 dark:text-gray-300'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Por Período
-                  {reportType === 'period' && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
-                  )}
-                </button>
-                <button
-                  onClick={() => setReportType('site')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-                    reportType === 'site'
-                      ? 'text-blue-600 dark:text-gray-300'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Por Jobsite
-                  {reportType === 'site' && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
-                  )}
-                </button>
-                <button
-                  onClick={() => setReportType('supplier')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-                    reportType === 'supplier'
-                      ? 'text-blue-600 dark:text-gray-300'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Por Fornecedor
-                  {reportType === 'supplier' && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
-                  )}
-                </button>
-              </div>
+              <PageTabs
+                tabs={[
+                  { id: 'period', label: 'Por Período' },
+                  { id: 'site', label: 'Por Jobsite' },
+                  { id: 'supplier', label: 'Por Fornecedor' },
+                ]}
+                activeId={reportType}
+                onChange={(id) => setReportType(id as 'period' | 'site' | 'supplier')}
+              />
             </div>
 
             {/* Filtros */}
@@ -338,7 +330,7 @@ export default function ReportsPage() {
                             {snapshot.site?.title || 'Jobsite'} • {snapshot.supplier?.nome || 'Fornecedor'}
                           </p>
                           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                            {new Date(snapshot.period_start).toLocaleDateString('en-US')} - {new Date(snapshot.period_end).toLocaleDateString('en-US')}
+                            {formatDateOnly(snapshot.period_start)} - {formatDateOnly(snapshot.period_end)}
                           </p>
                         </div>
                         <div className="text-right">

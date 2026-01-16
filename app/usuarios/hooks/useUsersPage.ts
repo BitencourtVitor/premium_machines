@@ -57,7 +57,7 @@ export function useUsersPage() {
     nome: '',
     email: '',
     telefone: '',
-    supplier_type: 'rental' as 'rental' | 'maintenance' | 'both',
+    supplier_type: 'rental' as 'rental' | 'maintenance' | 'both' | 'fuel',
   })
 
   const [fixedRole, setFixedRole] = useState<string | undefined>(undefined)

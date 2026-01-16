@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { formatWithSystemTimezone } from '@/lib/timezone';
 import Header from '@/app/components/Header';
 import Sidebar from '@/app/components/Sidebar';
 import BottomNavigation from '@/app/components/BottomNavigation';
@@ -114,10 +115,10 @@ export default function DebugPage() {
                                     {event.site && <span> • {event.site.title}</span>}
                                 </div>
                                 <div className="text-xs text-gray-400 dark:text-gray-500">
-                                    Criado: {new Date(event.created_at).toLocaleString('pt-BR')}
+                                    Criado: {formatWithSystemTimezone(event.created_at)}
                                     {event.approved_at && (
                                     <span className="ml-4 text-green-600 dark:text-green-400">
-                                        Aprovado: {new Date(event.approved_at).toLocaleString('pt-BR')}
+                                        Aprovado: {formatWithSystemTimezone(event.approved_at)}
                                     </span>
                                     )}
                                 </div>

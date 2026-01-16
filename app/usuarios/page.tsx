@@ -3,6 +3,7 @@
 import Header from '@/app/components/Header'
 import BottomNavigation from '@/app/components/BottomNavigation'
 import Sidebar from '@/app/components/Sidebar'
+import PageTabs from '@/app/components/PageTabs'
 import { useSidebar } from '@/lib/useSidebar'
 import UserModal from './components/UserModal'
 import SupplierModal from './components/SupplierModal'
@@ -79,37 +80,19 @@ export default function UsuariosPage() {
           <div className="max-w-7xl mx-auto md:flex md:flex-col md:flex-1 md:overflow-hidden md:w-full">
             {/* Tabs */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 flex-shrink-0 overflow-hidden">
-              <div className="flex">
-                <button
-                  onClick={() => setActiveTab('users')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-                    activeTab === 'users'
-                      ? 'text-blue-600 dark:text-gray-300'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Funcionários
-                  {activeTab === 'users' && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab('suppliers')
+              <PageTabs
+                tabs={[
+                  { id: 'users', label: 'Funcionários' },
+                  { id: 'suppliers', label: 'Fornecedores' },
+                ]}
+                activeId={activeTab}
+                onChange={(id) => {
+                  setActiveTab(id as 'users' | 'suppliers')
+                  if (id === 'suppliers') {
                     loadSuppliers()
-                  }}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-                    activeTab === 'suppliers'
-                      ? 'text-blue-600 dark:text-gray-300'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Fornecedores
-                  {activeTab === 'suppliers' && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
-                  )}
-                </button>
-              </div>
+                  }
+                }}
+              />
             </div>
 
             {/* Users Tab */}

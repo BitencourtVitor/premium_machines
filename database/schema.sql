@@ -428,7 +428,7 @@ ORDER BY ae.created_at DESC;
 -- ============================================
 COMMENT ON TABLE users IS 'Usuários do sistema com suas permissões e roles';
 COMMENT ON TABLE suppliers IS 'Fornecedores de máquinas alugadas e/ou prestadores de manutenção';
-COMMENT ON COLUMN suppliers.supplier_type IS 'Tipo de fornecedor: rental (aluguel), maintenance (manutenção), both (ambos)';
+COMMENT ON COLUMN suppliers.supplier_type IS 'Tipo de fornecedor: rental (aluguel), maintenance (manutenção), both (ambos), fuel (abastecimento)';
 COMMENT ON COLUMN allocation_events.supplier_id IS 'Referência ao fornecedor/mecânico responsável (usado principalmente para manutenção de máquinas próprias)';
 COMMENT ON COLUMN allocation_events.construction_type IS 'Tipo de construção: "lot" (Lote) ou "building" (Prédio/Edifício). Indica a localização específica dentro do site.';
 COMMENT ON COLUMN allocation_events.lot_building_number IS 'Número do lote ou prédio onde a máquina está alocada. Especifica a localização exata dentro do site.';

@@ -1,7 +1,7 @@
-import React from 'react'
+import React, { useState } from 'react'
 import CustomInput from '@/app/components/CustomInput'
 import CustomDropdown from '@/app/components/CustomDropdown'
-import { formatUSPhone } from '../utils'
+import { formatUSPhone, validateEmail, validateUSPhone } from '@/app/utils/input'
 
 interface SupplierModalProps {
   isOpen: boolean
@@ -13,7 +13,7 @@ interface SupplierModalProps {
     nome: string
     email: string
     telefone: string
-    supplier_type: 'rental' | 'maintenance' | 'both'
+    supplier_type: 'rental' | 'maintenance' | 'both' | 'fuel'
   }
   setFormData: (data: any) => void
   error: string
@@ -29,6 +29,28 @@ export default function SupplierModal({
   setFormData,
   error
 }: SupplierModalProps) {
+  const [localEmailError, setLocalEmailError] = useState('')
+  const [localPhoneError, setLocalPhoneError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    let hasError = false
+    if (formData.email && !validateEmail(formData.email)) {
+      setLocalEmailError('Formato de email inválido')
+      hasError = true
+    }
+    
+    if (formData.telefone && !validateUSPhone(formData.telefone)) {
+      setLocalPhoneError('Telefone inválido (requer 10 dígitos)')
+      hasError = true
+    }
+
+    if (hasError) return
+
+    await onSave(e)
+  }
+
   if (!isOpen) return null
 
   return (
@@ -59,7 +81,7 @@ export default function SupplierModal({
             </div>
           )}
 
-          <form onSubmit={onSave} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <CustomInput
               label="Nome da Empresa"
               value={formData.nome}
@@ -70,46 +92,80 @@ export default function SupplierModal({
               label="Email"
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, email: e.target.value })
+                if (e.target.value && !validateEmail(e.target.value)) {
+                  setLocalEmailError('Formato de email inválido')
+                } else {
+                  setLocalEmailError('')
+                }
+              }}
+              error={!!localEmailError}
+              helperText={localEmailError}
             />
             <CustomInput
               label="Telefone"
               type="tel"
               value={formData.telefone}
-              onChange={(e) => setFormData({ ...formData, telefone: formatUSPhone(e.target.value) })}
-              placeholder="+1 (555) 123-4567"
+              onChange={(e) => {
+                const formatted = formatUSPhone(e.target.value)
+                setFormData({ ...formData, telefone: formatted })
+                if (formatted && !validateUSPhone(formatted)) {
+                  setLocalPhoneError('Telefone inválido (requer 10 dígitos)')
+                } else {
+                  setLocalPhoneError('')
+                }
+              }}
+              placeholder="(555) 123-4567"
+              error={!!localPhoneError}
+              helperText={localPhoneError}
             />
             <CustomDropdown
               label="Tipo de Fornecedor"
               value={formData.supplier_type}
-              onChange={(value) => setFormData({ ...formData, supplier_type: value as 'rental' | 'maintenance' | 'both' })}
+              onChange={(value) =>
+                setFormData({
+                  ...formData,
+                  supplier_type: value as 'rental' | 'maintenance' | 'both' | 'fuel',
+                })
+              }
               options={[
                 { value: 'rental', label: 'Aluguel de Máquinas' },
                 { value: 'maintenance', label: 'Manutenção' },
                 { value: 'both', label: 'Alocação e Manutenção' },
+                { value: 'fuel', label: 'Abastecimento (Combustível)' },
               ]}
             />
           </form>
         </div>
 
         {/* Rodapé com borda */}
-        <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={onSave}
-              disabled={saving}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? 'Salvando...' : editingSupplier ? 'Salvar Alterações' : 'Criar Empresa'}
-            </button>
-          </div>
+        <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            disabled={saving}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+            disabled={saving}
+          >
+            {saving ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Salvando...
+              </>
+            ) : (
+              'Salvar'
+            )}
+          </button>
         </div>
       </div>
     </div>

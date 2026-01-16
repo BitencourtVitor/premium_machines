@@ -1,5 +1,6 @@
 import { ActiveAllocation, ActiveDowntime } from './types'
 import { EVENT_TYPE_LABELS } from '@/lib/permissions'
+import { formatWithSystemTimezone } from '@/lib/timezone'
 import { 
   FiCalendar, 
   FiUser, 
@@ -21,13 +22,7 @@ import { PiGasCanBold } from "react-icons/pi"
  * @returns Formatted date string
  */
 export const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleString('en-US', {
-    month: '2-digit',
-    day: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatWithSystemTimezone(dateString)
 }
 
 /**

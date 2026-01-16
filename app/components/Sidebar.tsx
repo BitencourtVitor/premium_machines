@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { PiGasCanBold } from 'react-icons/pi'
+import { LuForklift } from 'react-icons/lu'
+import SettingsModal from '@/app/components/SettingsModal'
 
 interface UserPermissions {
   can_view_dashboard: boolean
@@ -26,6 +28,7 @@ export default function Sidebar() {
   const [user, setUser] = useState<UserPermissions | null>(null)
   const [isDark, setIsDark] = useState(false)
   const [isExpanded, setIsExpanded] = useState(true)
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -138,12 +141,7 @@ export default function Sidebar() {
       href: '/machines',
       label: 'Machines',
       requiredPermission: 'can_manage_machines' as keyof UserPermissions,
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
+      icon: <LuForklift className="w-5 h-5" />,
     },
     {
       href: '/refueling',
@@ -211,62 +209,97 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className={`hidden md:flex fixed left-0 top-16 bottom-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex-col z-20 transition-all duration-250 ease-in-out ${
-      isExpanded ? 'w-48 lg:w-64' : 'w-16 lg:w-20'
-    }`}>
-      <nav className="flex-1 overflow-y-auto py-4">
-        <div className={`space-y-1 ${isExpanded ? 'px-3' : 'px-2'}`}>
-          {navItems.map((item) => {
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`
-                  flex items-center rounded-lg transition-all duration-250 ease-in-out
-                  ${isExpanded ? 'gap-3 px-3 py-2.5' : 'justify-center px-2 py-2.5'}
-                  ${isActive
-                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                  }
-                `}
-                title={!isExpanded ? item.label : undefined}
-              >
-                {item.icon}
-                {isExpanded && <span className="font-medium">{item.label}</span>}
-              </Link>
-            )
-          })}
+    <>
+      <aside className={`hidden md:flex fixed left-0 top-16 bottom-0 bg-gray-50/50 dark:bg-gray-900/50 backdrop-blur-md border-r border-gray-100 dark:border-gray-800 flex-col z-20 transition-all duration-300 ease-in-out ${
+        isExpanded ? 'w-48 lg:w-64' : 'w-16 lg:w-20'
+      }`}>
+        <nav className="flex-1 overflow-y-auto py-4">
+          <div className={`space-y-2 ${isExpanded ? 'px-4' : 'px-2'}`}>
+            {navItems.map((item) => {
+              const isActive = pathname === item.href
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`
+                    flex items-center transition-all duration-200 ease-in-out
+                    ${isExpanded 
+                      ? 'gap-3 px-4 py-3 rounded-xl text-sm font-medium' 
+                      : 'justify-center px-2 py-3 rounded-xl'
+                    }
+                    ${isActive
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-blue-900/20'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-gray-200'
+                    }
+                  `}
+                  title={!isExpanded ? item.label : undefined}
+                >
+                  <div className={`transition-colors duration-200 ${isActive ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`}>
+                    {item.icon}
+                  </div>
+                  {isExpanded && <span className="font-medium truncate">{item.label}</span>}
+                </Link>
+              )
+            })}
+          </div>
+        </nav>
+        
+        <div className={`py-2 ${isExpanded ? 'px-4' : 'px-2'}`}>
+          <button
+            onClick={() => setIsSettingsModalOpen(true)}
+            className={`
+              w-full flex items-center transition-all duration-200 ease-in-out
+              ${isExpanded 
+                ? 'gap-3 px-4 py-3 rounded-xl text-sm font-medium' 
+                : 'justify-center px-2 py-3 rounded-xl'
+              }
+              text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-gray-900 dark:hover:text-gray-200
+            `}
+            title={!isExpanded ? 'Configurações' : undefined}
+          >
+            <div className="text-gray-500 dark:text-gray-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            {isExpanded && <span className="font-medium truncate">Configurações</span>}
+          </button>
         </div>
-      </nav>
-      
-      <div className="border-t border-gray-200 dark:border-gray-700 p-3">
-        <button
-          onClick={toggleSidebar}
-          className="w-full flex items-center justify-center px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-250 ease-in-out"
-          title={isExpanded ? 'Collapse menu' : 'Expand menu'}
-        >
-          {isExpanded ? (
-            <svg 
-              className="w-5 h-5"
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-            </svg>
-          ) : (
-            <svg 
-              className="w-5 h-5"
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-            </svg>
-          )}
-        </button>
-      </div>
-    </aside>
+
+        <div className="border-t border-gray-100 dark:border-gray-800 p-3">
+          <button
+            onClick={toggleSidebar}
+            className="w-full flex items-center justify-center px-3 py-2.5 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 ease-in-out"
+            title={isExpanded ? 'Collapse menu' : 'Expand menu'}
+          >
+            {isExpanded ? (
+              <svg 
+                className="w-5 h-5"
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            ) : (
+              <svg 
+                className="w-5 h-5"
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </aside>
+
+      <SettingsModal 
+        isOpen={isSettingsModalOpen} 
+        onClose={() => setIsSettingsModalOpen(false)} 
+      />
+    </>
   )
 }

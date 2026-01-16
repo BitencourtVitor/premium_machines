@@ -9,6 +9,7 @@ import CustomDropdown from '../components/CustomDropdown'
 import CustomInput from '../components/CustomInput'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
+import { formatWithSystemTimezone, adjustDateToSystemTimezone } from '@/lib/timezone'
 
 interface Log {
   id: string
@@ -44,6 +45,15 @@ export default function LogsPage() {
   
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(50)
+  const [, setTimezoneTick] = useState(0)
+
+  useEffect(() => {
+    const handleTimezoneChange = () => {
+      setTimezoneTick(prev => prev + 1)
+    }
+    window.addEventListener('timezoneChange', handleTimezoneChange)
+    return () => window.removeEventListener('timezoneChange', handleTimezoneChange)
+  }, [])
 
   const loadLogs = useCallback(async () => {
     setLoadingLogs(true)
@@ -167,15 +177,16 @@ export default function LogsPage() {
     if (filterAction !== 'all' && log.acao !== filterAction) return false
     
     if (filterDateFrom) {
-      const logDate = new Date(log.created_at)
-      const fromDate = new Date(filterDateFrom)
-      if (logDate < fromDate) return false
+      const [fYear, fMonth, fDay] = filterDateFrom.split('-').map(Number)
+      const fromDateTime = new Date(Date.UTC(fYear, fMonth - 1, fDay, 0, 0, 0))
+      const logDate = adjustDateToSystemTimezone(log.created_at)
+      if (logDate.getTime() < fromDateTime.getTime()) return false
     }
     if (filterDateTo) {
-      const logDate = new Date(log.created_at)
-      const toDate = new Date(filterDateTo)
-      toDate.setHours(23, 59, 59, 999)
-      if (logDate > toDate) return false
+      const [tYear, tMonth, tDay] = filterDateTo.split('-').map(Number)
+      const toDateTime = new Date(Date.UTC(tYear, tMonth - 1, tDay, 23, 59, 59, 999))
+      const logDate = adjustDateToSystemTimezone(log.created_at)
+      if (logDate.getTime() > toDateTime.getTime()) return false
     }
     
     if (searchText) {
@@ -349,7 +360,7 @@ export default function LogsPage() {
                                 </span>
                                 <span className="text-gray-300 dark:text-gray-600">•</span>
                                 <span className="text-sm text-gray-500 dark:text-gray-400">
-                                  {new Date(log.created_at).toLocaleString('en-US')}
+                                  {formatWithSystemTimezone(log.created_at)}
                                 </span>
                               </div>
                               

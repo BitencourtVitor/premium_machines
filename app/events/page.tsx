@@ -5,9 +5,15 @@ import { useRouter } from 'next/navigation'
 import Header from '@/app/components/Header'
 import BottomNavigation from '@/app/components/BottomNavigation'
 import Sidebar from '@/app/components/Sidebar'
+import PageTabs from '@/app/components/PageTabs'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
 import { refreshAfterAllocation } from '@/lib/allocationEvents'
+import { 
+  convertLocalToUtc, 
+  getLocalDateTimeForInput, 
+  adjustDateToSystemTimezone 
+} from '@/lib/timezone'
 import { AllocationEvent, ActiveAllocation, ActiveDowntime } from './types'
 import AllocationsTab from './components/AllocationsTab'
 import EventsTab from './components/EventsTab'
@@ -38,15 +44,6 @@ export default function EventsPage() {
   const [activeDowntimes, setActiveDowntimes] = useState<ActiveDowntime[]>([])
   const [loadingAllocations, setLoadingAllocations] = useState(false)
   
-  const getLocalDateTimeForInput = (date: Date = new Date()) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    const hours = String(date.getHours()).padStart(2, '0')
-    const minutes = String(date.getMinutes()).padStart(2, '0')
-    return `${year}-${month}-${day}T${hours}:${minutes}`
-  }
-
   const [newEvent, setNewEvent] = useState({
     event_type: 'start_allocation',
     machine_id: '',
@@ -161,15 +158,6 @@ export default function EventsPage() {
       return
     }
 
-    const convertLocalToUtcIso = (local: string) => {
-      const [datePart, timePart] = local.split('T')
-      if (!datePart || !timePart) return local
-      const [year, month, day] = datePart.split('-').map(Number)
-      const [hour, minute] = timePart.split(':').map(Number)
-      const localDate = new Date(year, month - 1, day, hour, minute)
-      return localDate.toISOString()
-    }
-
     setCreating(true)
     try {
       const url = editingEventId ? `/api/events/${editingEventId}` : '/api/events'
@@ -192,7 +180,7 @@ export default function EventsPage() {
       })
 
       if (payload.event_date) {
-        payload.event_date = convertLocalToUtcIso(String(payload.event_date))
+        payload.event_date = convertLocalToUtc(String(payload.event_date))
       }
 
       const response = await fetch(url, {
@@ -457,14 +445,20 @@ export default function EventsPage() {
     
     let matchesDate = true
     if (startDate || endDate) {
-      const eventDate = new Date(event.event_date)
+      // Ajustar a data do evento para o fuso horário do sistema para o filtro
+      const eventDate = adjustDateToSystemTimezone(event.event_date)
+      
       if (startDate) {
-        matchesDate = matchesDate && eventDate >= new Date(startDate)
+        // Criar objeto Date para o início do dia no fuso horário do sistema
+        const [sYear, sMonth, sDay] = startDate.split('-').map(Number)
+        const startDateTime = new Date(Date.UTC(sYear, sMonth - 1, sDay, 0, 0, 0))
+        matchesDate = matchesDate && eventDate.getTime() >= startDateTime.getTime()
       }
       if (endDate) {
-        const endDateTime = new Date(endDate)
-        endDateTime.setHours(23, 59, 59, 999)
-        matchesDate = matchesDate && eventDate <= endDateTime
+        // Criar objeto Date para o fim do dia no fuso horário do sistema
+        const [eYear, eMonth, eDay] = endDate.split('-').map(Number)
+        const endDateTime = new Date(Date.UTC(eYear, eMonth - 1, eDay, 23, 59, 59, 999))
+        matchesDate = matchesDate && eventDate.getTime() <= endDateTime.getTime()
       }
     }
     
@@ -492,34 +486,14 @@ export default function EventsPage() {
             
             {/* Tabs */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 flex-shrink-0 overflow-hidden">
-              <div className="flex">
-                <button
-                  onClick={() => setActiveTab('allocations')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-                    activeTab === 'allocations'
-                      ? 'text-blue-600 dark:text-gray-300'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Alocações Ativas
-                  {activeTab === 'allocations' && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
-                  )}
-                </button>
-                <button
-                  onClick={() => setActiveTab('events')}
-                  className={`flex-1 px-4 py-3 text-sm font-medium transition-colors relative ${
-                    activeTab === 'events'
-                      ? 'text-blue-600 dark:text-gray-300'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                  }`}
-                >
-                  Histórico de Eventos
-                  {activeTab === 'events' && (
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-0.5 bg-blue-600 dark:bg-gray-400 rounded-t-full"></div>
-                  )}
-                </button>
-              </div>
+              <PageTabs
+                tabs={[
+                  { id: 'allocations', label: 'Alocações Ativas' },
+                  { id: 'events', label: 'Histórico de Eventos' },
+                ]}
+                activeId={activeTab}
+                onChange={(id) => setActiveTab(id as 'events' | 'allocations')}
+              />
             </div>
 
             {/* Tab: Alocações Ativas */}

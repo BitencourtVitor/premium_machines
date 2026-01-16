@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import CustomDropdown from '../../components/CustomDropdown'
 import { NewEventState, ActiveDowntime, ActiveAllocation } from '../types'
 import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
+import { formatDateOnly } from '@/lib/timezone'
 import { filterMachinesForEvent } from '../utils'
 import { GiKeyCard } from "react-icons/gi"
 import { LuPuzzle } from "react-icons/lu"
@@ -574,7 +575,7 @@ export default function CreateEventModal({
                       .filter(d => d.machine_id === newEvent.machine_id)
                       .map((d) => ({
                         value: d.downtime_event_id,
-                        label: `${d.downtime_reason} - ${new Date(d.downtime_start).toLocaleDateString()}`
+                        label: `${d.downtime_reason} - ${formatDateOnly(d.downtime_start)}`
                       }))
                   ]}
                   placeholder="Selecione o downtime a finalizar"

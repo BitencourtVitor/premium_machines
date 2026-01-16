@@ -32,6 +32,15 @@ export default function DashboardPage() {
   const [expandedStats, setExpandedStats] = useState(false)
   const [expandedEvents, setExpandedEvents] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [, setTimezoneTick] = useState(0)
+
+  useEffect(() => {
+    const handleTimezoneChange = () => {
+      setTimezoneTick(prev => prev + 1)
+    }
+    window.addEventListener('timezoneChange', handleTimezoneChange)
+    return () => window.removeEventListener('timezoneChange', handleTimezoneChange)
+  }, [])
 
   const loadStats = useCallback(async () => {
     setLoadingStats(true)

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import MachineImage from '@/app/components/MachineImage'
 import { AllocationEvent } from '@/app/events/types'
 import { getEventConfig, formatDate } from '@/app/events/utils'
+import { adjustDateToSystemTimezone, formatWithSystemTimezone } from '@/lib/timezone'
 import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 
 interface SiteDetailsModalProps {
@@ -25,6 +26,15 @@ export default function SiteDetailsModal({
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [activeTab, setActiveTab] = useState<'calendar' | 'history'>('calendar')
+  const [, setTimezoneTick] = useState(0)
+
+  useEffect(() => {
+    const handleTimezoneChange = () => {
+      setTimezoneTick(prev => prev + 1)
+    }
+    window.addEventListener('timezoneChange', handleTimezoneChange)
+    return () => window.removeEventListener('timezoneChange', handleTimezoneChange)
+  }, [])
 
   // Selecionar a primeira máquina automaticamente ao abrir
   useEffect(() => {
@@ -47,6 +57,8 @@ export default function SiteDetailsModal({
   const getDayStatus = useCallback((date: Date, entityId: string | null, allEvents: any[]) => {
     if (!entityId) return 'not-allocated'
 
+    // Formatar a data para comparação (YYYY-MM-DD) usando a data local do calendário
+    // O calendário já gera datas locais do navegador, então usamos o formato ISO
     const dateStr = date.toISOString().split('T')[0]
     
     const entityEvents = getEntityEvents(allEvents, entityId)
@@ -60,7 +72,8 @@ export default function SiteDetailsModal({
     let lastAllocationStart = null
 
     for (const event of sortedEvents) {
-      const eventDateStr = new Date(event.event_date).toISOString().split('T')[0]
+      // Ajustar a data do evento para o fuso horário do sistema para comparação justa com o calendário
+      const eventDateStr = adjustDateToSystemTimezone(event.event_date).toISOString().split('T')[0]
       if (eventDateStr > dateStr) break
 
       if (event.status !== 'approved') continue
@@ -87,8 +100,8 @@ export default function SiteDetailsModal({
     if (!isAllocated) return 'not-allocated'
     if (isInDowntime) return 'maintenance'
     
-    // Verificar se é futuro e solicitado
-    const today = new Date().toISOString().split('T')[0]
+    // Verificar se é futuro e solicitado usando o fuso horário do sistema
+    const today = adjustDateToSystemTimezone(new Date()).toISOString().split('T')[0]
     if (dateStr > today) {
         // Lógica futura simplificada: se está alocado (sem fim definido), é 'working' (verde) ou 'requested' (azul)?
         // Se já começou, é working (verde planejado).
@@ -304,7 +317,7 @@ export default function SiteDetailsModal({
                           Visualização Mensal
                         </span>
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white capitalize">
-                          {calendarMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                          {calendarMonth.toLocaleString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })}
                         </h3>
                         {selectedMachineId && (todayStatus === 'working' || todayStatus === 'maintenance') && (
                           <span className="inline-flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300">
@@ -354,7 +367,7 @@ export default function SiteDetailsModal({
                           <div className="flex flex-col h-full">
                             <div className="flex items-center justify-between mb-4">
                               <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
-                                {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                {selectedDate.toLocaleString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}
                               </h4>
                               <button 
                                 onClick={() => setSelectedDate(null)}
@@ -366,10 +379,10 @@ export default function SiteDetailsModal({
                             
                             <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                               {(() => {
-                                const dayEvents = events.filter(e => {
-                                  const eDate = new Date(e.event_date).toISOString().split('T')[0]
+                                const dayEvents = machineHistoryEvents.filter(e => {
+                                  const eDate = adjustDateToSystemTimezone(e.event_date).toISOString().split('T')[0]
                                   const sDate = selectedDate.toISOString().split('T')[0]
-                                  return (e.machine_id === selectedMachineId || e.machine?.id === selectedMachineId) && eDate === sDate
+                                  return eDate === sDate
                                 }).sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
 
                                 if (dayEvents.length === 0) {
@@ -400,7 +413,7 @@ export default function SiteDetailsModal({
                                             {config.label}
                                           </p>
                                           <p className="text-[10px] text-gray-500 mt-0.5">
-                                            {new Date(event.event_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                            {formatWithSystemTimezone(event.event_date, { hour: '2-digit', minute: '2-digit' })}
                                           </p>
                                         </div>
                                       </div>

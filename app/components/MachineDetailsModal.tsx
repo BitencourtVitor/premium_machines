@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import MachineImage from '@/app/components/MachineImage'
 import { MACHINE_STATUS_LABELS, OWNERSHIP_TYPE_LABELS, EVENT_TYPE_LABELS } from '@/lib/permissions'
+import { formatWithSystemTimezone, formatDateOnly } from '@/lib/timezone'
 
 interface MachineDetailsModalProps {
   isOpen: boolean
@@ -19,6 +20,16 @@ export default function MachineDetailsModal({
   events
 }: MachineDetailsModalProps) {
   const modalRef = useRef<HTMLDivElement>(null)
+  const [, setTimezoneTick] = useState(0)
+
+  // Listener para mudanças de fuso horário
+  useEffect(() => {
+    const handleTimezoneChange = () => {
+      setTimezoneTick(prev => prev + 1)
+    }
+    window.addEventListener('timezoneChange', handleTimezoneChange)
+    return () => window.removeEventListener('timezoneChange', handleTimezoneChange)
+  }, [])
 
   // Close on escape key
   useEffect(() => {
@@ -238,7 +249,7 @@ export default function MachineDetailsModal({
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                   </svg>
-                                  {new Date(event.event_date).toLocaleDateString('pt-BR')}
+                                  {formatDateOnly(event.event_date)}
                                 </span>
                               </div>
                               
@@ -265,7 +276,7 @@ export default function MachineDetailsModal({
                                   )}
                                   
                                   <div className="pt-3 mt-3 border-t border-gray-100 dark:border-gray-700/50 flex justify-between items-center text-xs text-gray-400">
-                                    <span>Registrado em {new Date(event.created_at).toLocaleString('pt-BR')}</span>
+                                    <span>Registrado em {formatWithSystemTimezone(event.created_at)}</span>
                                     {event.created_by_user && (
                                       <span title={`Por: ${event.created_by_user.nome || 'Usuário'}`}>
                                         {event.created_by_user.nome ? event.created_by_user.nome.split(' ')[0] : 'Usuário'}

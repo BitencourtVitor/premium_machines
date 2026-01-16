@@ -131,8 +131,14 @@ export default function SuppliersTab({
                             {supplier.telefone || 'Sem telefone'}
                           </p>
                           {supplier.supplier_type && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {supplier.supplier_type === 'rental' ? 'Aluguel de Máquinas' : supplier.supplier_type === 'maintenance' ? 'Manutenção' : 'Alocação e Manutenção'}
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                              {supplier.supplier_type === 'rental'
+                                ? 'Aluguel de Máquinas'
+                                : supplier.supplier_type === 'maintenance'
+                                ? 'Manutenção'
+                                : supplier.supplier_type === 'both'
+                                ? 'Alocação e Manutenção'
+                                : 'Abastecimento (Combustível)'}
                             </p>
                           )}
                         </div>
@@ -188,7 +194,16 @@ export default function SuppliersTab({
                       <p className="text-sm text-gray-500 dark:text-gray-400 break-words">
                         {supplier.email && `${supplier.email} • `}
                         {supplier.telefone || 'Sem telefone'}
-                        {supplier.supplier_type && ` • ${supplier.supplier_type === 'rental' ? 'Aluguel' : supplier.supplier_type === 'maintenance' ? 'Manutenção' : 'Alocação e Manutenção'}`}
+                        {supplier.supplier_type &&
+                          ` • ${
+                            supplier.supplier_type === 'rental'
+                              ? 'Aluguel'
+                              : supplier.supplier_type === 'maintenance'
+                              ? 'Manutenção'
+                              : supplier.supplier_type === 'both'
+                              ? 'Alocação e Manutenção'
+                              : 'Abastecimento'
+                          }`}
                       </p>
                     </div>
                   </div>

@@ -32,7 +32,7 @@ export interface Supplier {
   nome: string
   email?: string
   telefone?: string
-  supplier_type: 'rental' | 'maintenance' | 'both'
+  supplier_type: 'rental' | 'maintenance' | 'both' | 'fuel'
   ativo: boolean
   created_at: string
   updated_at: string
