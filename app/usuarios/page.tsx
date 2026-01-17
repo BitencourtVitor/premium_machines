@@ -4,10 +4,10 @@ import Header from '@/app/components/Header'
 import BottomNavigation from '@/app/components/BottomNavigation'
 import Sidebar from '@/app/components/Sidebar'
 import PageTabs from '@/app/components/PageTabs'
+import ConfirmModal from '@/app/components/ConfirmModal'
 import { useSidebar } from '@/lib/useSidebar'
 import UserModal from './components/UserModal'
 import SupplierModal from './components/SupplierModal'
-import DeleteUserModal from './components/DeleteUserModal'
 import UsersTab from './components/UsersTab'
 import SuppliersTab from './components/SuppliersTab'
 import { useUsersPage } from './hooks/useUsersPage'
@@ -56,8 +56,12 @@ export default function UsuariosPage() {
     handleOpenSupplierModal,
     handleArchiveSupplier,
     handleUnarchiveSupplier,
+    executeSupplierStatusChange,
+    confirmModal,
+    setConfirmModal,
     handleValidate,
     handleDelete,
+    openDeleteConfirm,
     toggleSupplierExpansion,
     fixedRole,
     fixedSupplierId,
@@ -103,11 +107,7 @@ export default function UsuariosPage() {
                 onReload={loadUsers}
                 onEdit={handleOpenModal}
                 onValidate={handleValidate}
-                onDelete={(u) => {
-                  setUserToDelete(u)
-                  setShowDeleteModal(true)
-                  setError('')
-                }}
+                onDelete={openDeleteConfirm}
               />
             )}
 
@@ -131,11 +131,7 @@ export default function UsuariosPage() {
                 }}
                 onValidateUser={handleValidate}
                 onEditUser={handleOpenModal}
-                onDeleteUser={(u) => {
-                  setUserToDelete(u)
-                  setShowDeleteModal(true)
-                  setError('')
-                }}
+                onDeleteUser={openDeleteConfirm}
               />
             )}
           </div>
@@ -180,16 +176,15 @@ export default function UsuariosPage() {
         fixedSupplierId={fixedSupplierId}
       />
 
-      <DeleteUserModal
-        isOpen={showDeleteModal}
-        onClose={() => {
-          setShowDeleteModal(false)
-          setUserToDelete(null)
-          setError('')
-        }}
-        userToDelete={userToDelete}
-        onDelete={handleDelete}
-        deleting={deleting}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmButtonText={confirmModal.confirmButtonText}
+        isDangerous={confirmModal.isDangerous}
+        isLoading={confirmModal.isLoading}
         error={error}
       />
     </div>

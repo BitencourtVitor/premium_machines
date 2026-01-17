@@ -18,6 +18,7 @@ import { AllocationEvent, ActiveAllocation, ActiveDowntime } from './types'
 import AllocationsTab from './components/AllocationsTab'
 import EventsTab from './components/EventsTab'
 import CreateEventModal from './components/CreateEventModal'
+import ConfirmModal from '@/app/components/ConfirmModal'
 
 
 export default function EventsPage() {
@@ -37,6 +38,40 @@ export default function EventsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [creating, setCreating] = useState(false)
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
+  
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    confirmButtonText?: string
+    isDangerous?: boolean
+    isLoading?: boolean
+    error?: string | null
+    showInput?: boolean
+    inputValue?: string
+    inputPlaceholder?: string
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    isDangerous: false,
+    isLoading: false,
+    error: null,
+    showInput: false,
+    inputValue: '',
+    inputPlaceholder: '',
+  })
+  const [error, setError] = useState<string | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
+
+  // Atualizar o valor do input no confirmModal quando o rejectionReason mudar
+  useEffect(() => {
+    if (confirmModal.showInput) {
+      setConfirmModal(prev => ({ ...prev, inputValue: rejectionReason }))
+    }
+  }, [rejectionReason, confirmModal.showInput])
   
   // Novas funcionalidades: abas e alocações ativas
   const [activeTab, setActiveTab] = useState<'events' | 'allocations'>('events')
@@ -192,7 +227,13 @@ export default function EventsPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert(editingEventId ? 'Evento atualizado com sucesso!' : 'Evento criado com sucesso!')
+        setConfirmModal({
+          isOpen: true,
+          title: 'Sucesso',
+          message: editingEventId ? 'Evento atualizado com sucesso!' : 'Evento criado com sucesso!',
+          confirmButtonText: 'OK',
+          onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+        })
         
         setShowCreateModal(false)
         setEditingEventId(null)
@@ -213,11 +254,23 @@ export default function EventsPage() {
         loadEvents()
         if (activeTab === 'allocations') loadActiveAllocations()
       } else {
-        alert(data.message || 'Error saving event')
+        setConfirmModal({
+          isOpen: true,
+          title: 'Erro',
+          message: data.message || 'Erro ao salvar evento',
+          confirmButtonText: 'OK',
+          onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+        })
       }
     } catch (error) {
       console.error('Error saving event:', error)
-      alert('Erro ao salvar evento. Verifique sua conexão e tente novamente.')
+      setConfirmModal({
+        isOpen: true,
+        title: 'Erro',
+        message: 'Erro ao salvar evento. Verifique sua conexão e tente novamente.',
+        confirmButtonText: 'OK',
+        onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+      })
     } finally {
       setCreating(false)
     }
@@ -273,136 +326,191 @@ export default function EventsPage() {
     const event = events.find(e => e.id === eventId)
     if (!event) return
 
-    // Eliminar confirmação redundante para solicitação de alocação
-    if (event.event_type !== 'request_allocation') {
-      if (!confirm('Aprovar este evento?')) return
+    const approve = async () => {
+      setConfirmModal(prev => ({ ...prev, isLoading: true }))
+      setError(null)
+      try {
+        const response = await fetch(`/api/events/${eventId}/approve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ approved_by: user?.id }),
+        })
+
+        const data = await response.json()
+        if (data.success) {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
+          loadEvents()
+          refreshAfterAllocation()
+
+          if (event.event_type === 'request_allocation') {
+            setNewEvent({
+              ...newEvent,
+              event_type: 'start_allocation',
+              machine_id: event.machine?.id || '',
+              site_id: event.site?.id || '',
+              construction_type: event.construction_type || '',
+              lot_building_number: event.lot_building_number || '',
+              event_date: getLocalDateTimeForInput(),
+            })
+            setShowCreateModal(true)
+          }
+        } else {
+          setError(data.message || 'Erro ao aprovar evento')
+        }
+      } catch (error) {
+        console.error('Error approving event:', error)
+        setError('Erro ao conectar com o servidor')
+      } finally {
+        setConfirmModal(prev => ({ ...prev, isLoading: false }))
+      }
     }
 
-    try {
-      const response = await fetch(`/api/events/${eventId}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ approved_by: user?.id }),
+    // Eliminar confirmação redundante para solicitação de alocação
+    if (event.event_type !== 'request_allocation') {
+      setError(null)
+      setConfirmModal({
+        isOpen: true,
+        title: 'Aprovar Evento',
+        message: 'Deseja aprovar este evento?',
+        confirmButtonText: 'Aprovar',
+        onConfirm: approve
       })
-
-      const data = await response.json()
-      if (data.success) {
-        loadEvents()
-        // Disparar atualização global para todas as interfaces
-        refreshAfterAllocation()
-        alert(data.message || 'Evento aprovado com sucesso!')
-
-        // Transição direta para início de alocação após aprovar solicitação
-        if (event.event_type === 'request_allocation') {
-          setNewEvent({
-            ...newEvent,
-            event_type: 'start_allocation',
-            machine_id: event.machine?.id || '',
-            site_id: event.site?.id || '',
-            construction_type: event.construction_type || '',
-            lot_building_number: event.lot_building_number || '',
-            event_date: getLocalDateTimeForInput(),
-          })
-          setShowCreateModal(true)
-        }
-      } else {
-        alert(data.message || 'Error approving event')
-      }
-    } catch (error) {
-      console.error('Error approving event:', error)
+    } else {
+      await approve()
     }
   }
 
   const handleRejectEvent = async (eventId: string) => {
-    const reason = prompt('Motivo da rejeição:')
-    if (!reason) return
+    setRejectionReason('')
+    setConfirmModal({
+      isOpen: true,
+      title: 'Rejeitar Evento',
+      message: 'Por favor, informe o motivo da rejeição:',
+      confirmButtonText: 'Rejeitar',
+      isDangerous: true,
+      showInput: true,
+      inputValue: '',
+      inputPlaceholder: 'Motivo da rejeição...',
+      onConfirm: async () => {
+        // O valor atualizado virá do estado rejectionReason via useEffect
+        if (!rejectionReason.trim()) {
+          setError('O motivo da rejeição é obrigatório')
+          return
+        }
 
-    try {
-      const response = await fetch(`/api/events/${eventId}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          approved_by: user?.id,
-          rejection_reason: reason 
-        }),
-      })
+        setConfirmModal(prev => ({ ...prev, isLoading: true }))
+        setError(null)
+        try {
+          const response = await fetch(`/api/events/${eventId}/reject`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              approved_by: user?.id,
+              rejection_reason: rejectionReason 
+            }),
+          })
 
-      const data = await response.json()
-      if (data.success) {
-        loadEvents()
-      } else {
-        alert(data.message || 'Error rejecting event')
+          const data = await response.json()
+          if (data.success) {
+            setConfirmModal(prev => ({ ...prev, isOpen: false }))
+            loadEvents()
+          } else {
+            setError(data.message || 'Erro ao rejeitar evento')
+          }
+        } catch (error) {
+          console.error('Error rejecting event:', error)
+          setError('Erro ao conectar com o servidor')
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isLoading: false }))
+        }
       }
-    } catch (error) {
-      console.error('Error rejecting event:', error)
-    }
+    })
   }
 
   // Criar evento de fim de alocação a partir de uma alocação ativa
   const handleEndAllocation = async (allocation: ActiveAllocation) => {
-    if (!confirm(`Encerrar alocação da máquina ${allocation.machine_unit_number} em ${allocation.site_title}?`)) return
+    setError(null)
+    setConfirmModal({
+      isOpen: true,
+      title: 'Encerrar Alocação',
+      message: `Tem certeza que deseja encerrar a alocação da máquina ${allocation.machine_unit_number} em ${allocation.site_title}?`,
+      confirmButtonText: 'Encerrar',
+      isDangerous: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }))
+        setError(null)
+        try {
+          const response = await fetch('/api/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event_type: 'end_allocation',
+              machine_id: allocation.machine_id,
+              site_id: allocation.site_id,
+              event_date: new Date().toISOString(),
+              created_by: user?.id,
+            }),
+          })
 
-    setCreating(true)
-    try {
-      const response = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_type: 'end_allocation',
-          machine_id: allocation.machine_id,
-          site_id: allocation.site_id,
-          event_date: new Date().toISOString(),
-          created_by: user?.id,
-        }),
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        loadActiveAllocations()
-        loadEvents()
-        // alert('Evento de fim de alocação criado. Aguardando aprovação.')
-      } else {
-        alert(data.message || 'Erro ao criar evento')
+          const data = await response.json()
+          if (data.success) {
+            setConfirmModal(prev => ({ ...prev, isOpen: false }))
+            loadActiveAllocations()
+            loadEvents()
+          } else {
+            setError(data.message || 'Erro ao criar evento')
+          }
+        } catch (error) {
+          console.error('Error creating end allocation event:', error)
+          setError('Erro ao conectar com o servidor')
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isLoading: false }))
+        }
       }
-    } catch (error) {
-      console.error('Error creating end allocation event:', error)
-    } finally {
-      setCreating(false)
-    }
+    })
   }
 
   // Criar evento de fim de downtime
   const handleEndDowntime = async (downtime: ActiveDowntime) => {
-    if (!confirm(`Finalizar downtime da máquina ${downtime.machine_unit_number}?`)) return
+    setError(null)
+    setConfirmModal({
+      isOpen: true,
+      title: 'Finalizar Downtime',
+      message: `Finalizar downtime da máquina ${downtime.machine_unit_number}?`,
+      confirmButtonText: 'Finalizar',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }))
+        setError(null)
+        try {
+          const response = await fetch('/api/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event_type: 'downtime_end',
+              machine_id: downtime.machine_id,
+              site_id: downtime.site_id,
+              event_date: new Date().toISOString(),
+              corrects_event_id: downtime.downtime_event_id,
+              created_by: user?.id,
+            }),
+          })
 
-    setCreating(true)
-    try {
-      const response = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_type: 'downtime_end',
-          machine_id: downtime.machine_id,
-          site_id: downtime.site_id,
-          event_date: new Date().toISOString(),
-          corrects_event_id: downtime.downtime_event_id,
-          created_by: user?.id,
-        }),
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        loadActiveAllocations()
-        loadEvents()
-        // alert('Evento de fim de downtime criado. Aguardando aprovação.')
-      } else {
-        alert(data.message || 'Erro ao criar evento')
+          const data = await response.json()
+          if (data.success) {
+            setConfirmModal(prev => ({ ...prev, isOpen: false }))
+            loadActiveAllocations()
+            loadEvents()
+          } else {
+            setError(data.message || 'Erro ao criar evento')
+          }
+        } catch (error) {
+          console.error('Error creating end downtime event:', error)
+          setError('Erro ao conectar com o servidor')
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isLoading: false }))
+        }
       }
-    } catch (error) {
-      console.error('Error creating end downtime event:', error)
-    } finally {
-      setCreating(false)
-    }
+    })
   }
 
   // Criar evento de início de downtime a partir de uma alocação ativa
@@ -418,25 +526,38 @@ export default function EventsPage() {
   }
 
   const handleDeleteEvent = async (event: AllocationEvent) => {
-    if (!confirm(`Tem certeza que deseja excluir o evento da máquina ${event.machine?.unit_number}?`)) return
+    setError(null)
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Evento',
+      message: `Tem certeza que deseja excluir o evento da máquina ${event.machine?.unit_number}? Esta ação não pode ser desfeita.`,
+      confirmButtonText: 'Excluir',
+      isDangerous: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }))
+        setError(null)
+        try {
+          const response = await fetch(`/api/events/${event.id}?user_id=${user?.id}`, {
+            method: 'DELETE',
+          })
 
-    try {
-      const response = await fetch(`/api/events/${event.id}?user_id=${user?.id}`, {
-        method: 'DELETE',
-      })
+          const data = await response.json()
 
-      const data = await response.json()
-
-      if (data.success) {
-        loadEvents()
-        if (activeTab === 'allocations') loadActiveAllocations()
-      } else {
-        alert(data.message || 'Erro ao excluir evento')
+          if (data.success) {
+            setConfirmModal(prev => ({ ...prev, isOpen: false }))
+            loadEvents()
+            if (activeTab === 'allocations') loadActiveAllocations()
+          } else {
+            setError(data.message || 'Erro ao excluir evento')
+          }
+        } catch (error) {
+          console.error('Error deleting event:', error)
+          setError('Erro ao conectar com o servidor')
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isLoading: false }))
+        }
       }
-    } catch (error) {
-      console.error('Error deleting event:', error)
-      alert('Erro ao excluir evento')
-    }
+    })
   }
 
   const filteredEvents = events.filter(event => {
@@ -544,6 +665,22 @@ export default function EventsPage() {
       </div>
 
       <BottomNavigation />
+      
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmButtonText={confirmModal.confirmButtonText}
+        isDangerous={confirmModal.isDangerous}
+        isLoading={confirmModal.isLoading}
+        error={error || undefined}
+        showInput={confirmModal.showInput}
+        inputValue={rejectionReason}
+        onInputChange={setRejectionReason}
+        inputPlaceholder={confirmModal.inputPlaceholder}
+      />
 
       {/* Create Event Modal */}
       <CreateEventModal

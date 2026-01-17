@@ -52,7 +52,26 @@ export function useUsersPage() {
   const [deleting, setDeleting] = useState(false)
   const [expandedSuppliers, setExpandedSuppliers] = useState<Set<string>>(new Set())
   const [showArchivedSuppliers, setShowArchivedSuppliers] = useState(false)
+  const [archivingSupplierId, setArchivingSupplierId] = useState<string | null>(null)
   
+  // Estado unificado para modais de confirmação
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    confirmButtonText?: string
+    isDangerous?: boolean
+    isLoading?: boolean
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    isDangerous: false,
+    isLoading: false
+  })
+
   const [supplierFormData, setSupplierFormData] = useState({
     nome: '',
     email: '',
@@ -368,46 +387,41 @@ export function useUsersPage() {
     setShowSupplierModal(true)
   }
 
-  const handleArchiveSupplier = async (supplierId: string) => {
-    if (!confirm('Are you sure you want to archive this company? It will not be deleted, but will be hidden from the list.')) {
-      return
-    }
-
-    try {
-      const response = await fetch(`/api/suppliers/${supplierId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          archived: true,
-          currentUserId: user?.id,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok && data.success) {
-        await loadSuppliers(showArchivedSuppliers)
-        await loadUsers()
-      } else {
-        setError(data.error || 'Error archiving supplier')
-      }
-    } catch (err) {
-      console.error('Erro ao arquivar fornecedor:', err)
-      setError('Erro ao conectar com o servidor')
-    }
+  const handleArchiveSupplier = (supplier: any) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Arquivar Fornecedor',
+      message: `Tem certeza que deseja arquivar o fornecedor "${supplier.nome}"?`,
+      confirmButtonText: 'Arquivar',
+      isDangerous: true,
+      onConfirm: () => executeSupplierStatusChange(supplier, true)
+    })
   }
 
-  const handleUnarchiveSupplier = async (supplierId: string) => {
-    if (!confirm('Are you sure you want to unarchive this company?')) {
-      return
-    }
+  const handleUnarchiveSupplier = (supplier: any) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Desarquivar Fornecedor',
+      message: `Tem certeza que deseja desarquivar o fornecedor "${supplier.nome}"?`,
+      confirmButtonText: 'Desarquivar',
+      isDangerous: false,
+      onConfirm: () => executeSupplierStatusChange(supplier, false)
+    })
+  }
 
+  const executeSupplierStatusChange = async (supplier: any, isArchiving: boolean) => {
+    if (!supplier || archivingSupplierId) return;
+
+    const action = isArchiving ? 'arquivar' : 'desarquivar';
+    
+    setConfirmModal(prev => ({ ...prev, isLoading: true }))
+    setArchivingSupplierId(supplier.id)
     try {
-      const response = await fetch(`/api/suppliers/${supplierId}`, {
+      const response = await fetch(`/api/suppliers/${supplier.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          archived: false,
+          archived: isArchiving,
           currentUserId: user?.id,
         }),
       })
@@ -417,12 +431,16 @@ export function useUsersPage() {
       if (response.ok && data.success) {
         await loadSuppliers(showArchivedSuppliers)
         await loadUsers()
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
       } else {
-        setError(data.error || 'Error unarchiving supplier')
+        setError(data.error || `Erro ao ${action} fornecedor`)
       }
     } catch (err) {
-      console.error('Erro ao desarquivar fornecedor:', err)
+      console.error(`Erro ao ${action} fornecedor:`, err)
       setError('Erro ao conectar com o servidor')
+    } finally {
+      setArchivingSupplierId(null)
+      setConfirmModal(prev => ({ ...prev, isLoading: false }))
     }
   }
 
@@ -447,10 +465,10 @@ export function useUsersPage() {
     }
   }
 
-  const handleDelete = async () => {
+  const handleDelete = async (userToDelete: any) => {
     if (!userToDelete) return
 
-    setDeleting(true)
+    setConfirmModal(prev => ({ ...prev, isLoading: true }))
     setError('')
 
     try {
@@ -466,20 +484,30 @@ export function useUsersPage() {
       const data = await response.json()
 
       if (response.ok && data.success) {
-        setShowDeleteModal(false)
-        setUserToDelete(null)
+        setConfirmModal(prev => ({ ...prev, isOpen: false }))
         await loadUsers()
         if (activeTab === 'suppliers') {
           loadSuppliers()
         }
       } else {
-        setError(data.error || 'Error deleting user')
+        setError(data.error || 'Erro ao excluir usuário')
       }
     } catch (err) {
       setError('Erro ao conectar com o servidor')
     } finally {
-      setDeleting(false)
+      setConfirmModal(prev => ({ ...prev, isLoading: false }))
     }
+  }
+
+  const openDeleteConfirm = (userToDelete: any) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Usuário',
+      message: `Tem certeza que deseja excluir o usuário "${userToDelete.nome}"? Esta ação não pode ser desfeita.`,
+      confirmButtonText: 'Excluir',
+      isDangerous: true,
+      onConfirm: () => handleDelete(userToDelete)
+    })
   }
 
   const toggleSupplierExpansion = (supplierId: string) => {
@@ -538,8 +566,12 @@ export function useUsersPage() {
     handleOpenSupplierModal,
     handleArchiveSupplier,
     handleUnarchiveSupplier,
+    executeSupplierStatusChange,
+    confirmModal,
+    setConfirmModal,
     handleValidate,
     handleDelete,
+    openDeleteConfirm,
     toggleSupplierExpansion,
     fixedRole,
     fixedSupplierId,

@@ -13,6 +13,7 @@ import MachineTypesTab from './components/MachineTypesTab'
 import CreateMachineModal from './components/CreateMachineModal'
 import CreateMachineTypeModal from './components/CreateMachineTypeModal'
 import MachineDetailsModal from '@/app/components/MachineDetailsModal'
+import ConfirmModal from '@/app/components/ConfirmModal'
 
 export default function MachinesPage() {
   const router = useRouter()
@@ -64,9 +65,36 @@ export default function MachinesPage() {
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [machineEvents, setMachineEvents] = useState<any[]>([])
 
+  // Estados para Modal de Confirmação
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    confirmButtonText?: string
+    isDangerous?: boolean
+    isLoading?: boolean
+    error?: string | null
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    isDangerous: false,
+    isLoading: false,
+    error: null
+  })
+  const [error, setError] = useState<string | null>(null)
+  const [modalError, setModalError] = useState<string | null>(null)
+
   const handleExportExcel = () => {
-    // TODO: Implementar exportação para Excel
-    alert('Excel export will be implemented soon')
+    setConfirmModal({
+      isOpen: true,
+      title: 'Exportar Excel',
+      message: 'A exportação para Excel será implementada em breve',
+      confirmButtonText: 'OK',
+      onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+    })
   }
 
   const loadMachines = useCallback(async () => {
@@ -178,16 +206,17 @@ export default function MachinesPage() {
 
   const handleCreateMachine = async () => {
     if (!newMachine.unit_number || !newMachine.machine_type_id) {
-      alert('Please fill in the required fields')
+      setModalError('Por favor, preencha os campos obrigatórios')
       return
     }
 
     if (newMachine.ownership_type === 'rented' && !newMachine.supplier_id) {
-      alert('Select a supplier for rented machine')
+      setModalError('Selecione um fornecedor para máquina alugada')
       return
     }
 
     setCreating(true)
+    setModalError(null)
     try {
       const url = editingMachine ? `/api/machines/${editingMachine.id}` : '/api/machines'
       const method = editingMachine ? 'PUT' : 'POST'
@@ -220,10 +249,11 @@ export default function MachinesPage() {
         })
         loadMachines()
       } else {
-        alert(data.message || 'Error saving machine')
+        setModalError(data.message || 'Erro ao salvar máquina')
       }
     } catch (error) {
       console.error('Error saving machine:', error)
+      setModalError('Erro ao conectar com o servidor')
     } finally {
       setCreating(false)
     }
@@ -231,11 +261,12 @@ export default function MachinesPage() {
 
   const handleCreateType = async () => {
     if (!newType.nome || newType.nome.trim() === '') {
-      alert('Name is required')
+      setModalError('O nome é obrigatório')
       return
     }
 
     setCreatingType(true)
+    setModalError(null)
     try {
       const url = editingType ? `/api/machine-types/${editingType.id}` : '/api/machine-types'
       const method = editingType ? 'PUT' : 'POST'
@@ -259,37 +290,48 @@ export default function MachinesPage() {
         loadTypes()
         loadMachineTypes() // Atualizar também para o dropdown de máquinas
       } else {
-        alert(data.message || 'Error saving type')
+        setModalError(data.message || 'Erro ao salvar tipo')
       }
     } catch (error) {
       console.error('Error saving type:', error)
-      alert('Error connecting to server')
+      setModalError('Erro ao conectar com o servidor')
     } finally {
       setCreatingType(false)
     }
   }
 
-  const handleDeleteMachine = async (machine: Machine) => {
-    if (!confirm(`Are you sure you want to delete the machine "${machine.unit_number}"?`)) {
-      return
-    }
+  const handleDeleteMachine = (machine: Machine) => {
+    setError(null)
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Máquina',
+      message: `Tem certeza que deseja excluir a máquina "${machine.unit_number}"? Esta ação não pode ser desfeita.`,
+      confirmButtonText: 'Excluir',
+      isDangerous: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }))
+        setError(null)
+        try {
+          const response = await fetch(`/api/machines?id=${machine.id}`, {
+            method: 'DELETE',
+          })
 
-    try {
-      const response = await fetch(`/api/machines?id=${machine.id}`, {
-        method: 'DELETE',
-      })
+          const data = await response.json()
 
-      const data = await response.json()
-
-      if (data.success) {
-        loadMachines()
-      } else {
-        alert(data.message || 'Error deleting machine')
+          if (data.success) {
+            setConfirmModal(prev => ({ ...prev, isOpen: false }))
+            loadMachines()
+          } else {
+            setError(data.message || 'Erro ao excluir máquina')
+          }
+        } catch (error) {
+          console.error('Error deleting machine:', error)
+          setError('Erro ao conectar com o servidor')
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isLoading: false }))
+        }
       }
-    } catch (error) {
-      console.error('Error deleting machine:', error)
-      alert('Error connecting to server')
-    }
+    })
   }
 
   const handleEditMachine = (machine: Machine) => {
@@ -307,28 +349,39 @@ export default function MachinesPage() {
     setShowCreateModal(true)
   }
 
-  const handleDeleteType = async (type: MachineType) => {
-    if (!confirm(`Are you sure you want to delete the type "${type.nome}"?`)) {
-      return
-    }
+  const handleDeleteType = (type: MachineType) => {
+    setError(null)
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Tipo de Máquina',
+      message: `Tem certeza que deseja excluir o tipo "${type.nome}"? Esta ação não pode ser desfeita e pode afetar máquinas vinculadas.`,
+      confirmButtonText: 'Excluir',
+      isDangerous: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }))
+        setError(null)
+        try {
+          const response = await fetch(`/api/machine-types/${type.id}`, {
+            method: 'DELETE',
+          })
 
-    try {
-      const response = await fetch(`/api/machine-types/${type.id}`, {
-        method: 'DELETE',
-      })
+          const data = await response.json()
 
-      const data = await response.json()
-
-      if (data.success) {
-        loadTypes()
-        loadMachineTypes()
-      } else {
-        alert(data.message || 'Error deleting type')
+          if (data.success) {
+            setConfirmModal(prev => ({ ...prev, isOpen: false }))
+            loadTypes()
+            loadMachineTypes()
+          } else {
+            setError(data.message || 'Erro ao excluir tipo')
+          }
+        } catch (error) {
+          console.error('Error deleting type:', error)
+          setError('Erro ao conectar com o servidor')
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isLoading: false }))
+        }
       }
-    } catch (error) {
-      console.error('Error deleting type:', error)
-      alert('Error connecting to server')
-    }
+    })
   }
 
   const handleEditType = (type: MachineType) => {
@@ -451,7 +504,10 @@ export default function MachinesPage() {
       {/* Create Machine Modal */}
       <CreateMachineModal
         showCreateModal={showCreateModal}
-        setShowCreateModal={setShowCreateModal}
+        setShowCreateModal={(show) => {
+          setShowCreateModal(show)
+          if (!show) setModalError(null)
+        }}
         editingMachine={editingMachine}
         setEditingMachine={setEditingMachine}
         newMachine={newMachine}
@@ -460,12 +516,16 @@ export default function MachinesPage() {
         creating={creating}
         machineTypes={machineTypes}
         suppliers={suppliers}
+        error={modalError}
       />
 
       {/* Create/Edit Type Modal */}
       <CreateMachineTypeModal
         showTypeModal={showTypeModal}
-        setShowTypeModal={setShowTypeModal}
+        setShowTypeModal={(show) => {
+          setShowTypeModal(show)
+          if (!show) setModalError(null)
+        }}
         editingType={editingType}
         setEditingType={setEditingType}
         newType={newType}
@@ -473,6 +533,7 @@ export default function MachinesPage() {
         handleCreateType={handleCreateType}
         creatingType={creatingType}
         user={user}
+        error={modalError}
       />
 
       {/* Machine Details Modal */}
@@ -482,6 +543,19 @@ export default function MachinesPage() {
         machine={selectedMachine}
         loading={loadingDetails}
         events={machineEvents}
+      />
+
+      {/* Modal de Confirmação */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmButtonText={confirmModal.confirmButtonText}
+        isDangerous={confirmModal.isDangerous}
+        isLoading={confirmModal.isLoading}
+        error={error || undefined}
       />
     </div>
   )

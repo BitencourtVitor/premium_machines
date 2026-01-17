@@ -10,6 +10,7 @@ import CustomInput from '@/app/components/CustomInput'
 import TimeInput from '@/app/components/TimeInput'
 import CustomDropdown from '@/app/components/CustomDropdown'
 import MultiSelectDropdown from '@/app/components/MultiSelectDropdown'
+import BaseList from '@/app/components/BaseList'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
 import { supabase } from '@/lib/supabase'
@@ -22,14 +23,14 @@ import {
   HiChevronLeft, 
   HiChevronRight,
   HiOutlineClock,
-  HiOutlineUser,
-  HiOutlineTrash
+  HiOutlineUser
 } from 'react-icons/hi'
-import { HiOutlineCalendarDays, HiOutlineArrowPath, HiOutlinePlus, HiOutlineMagnifyingGlass, HiXMark } from 'react-icons/hi2'
-import { LuForklift, LuFilterX } from 'react-icons/lu'
-import { FiFilter } from 'react-icons/fi'
+import { HiOutlineCalendarDays, HiOutlineArrowPath, HiOutlinePlus, HiXMark } from 'react-icons/hi2'
+import { LuForklift } from 'react-icons/lu'
+import ListActionButton from '@/app/components/ListActionButton'
 import { getSupplierIcon, getRoleIcon } from '@/app/usuarios/components/UserIcons'
 import { adjustDateToSystemTimezone, formatWithSystemTimezone } from '@/lib/timezone'
+import ConfirmModal from '@/app/components/ConfirmModal'
 
 interface RefuelingEvent {
   id: string
@@ -125,7 +126,7 @@ function TemplateModal({
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Template de abastecimento</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Abastecimento</h2>
             <button
               type="button"
               onClick={onClose}
@@ -289,11 +290,7 @@ function TemplateModal({
               {onDelete && (
                 <button
                   type="button"
-                  onClick={async () => {
-                    if (confirm('Tem certeza que deseja excluir este template?')) {
-                      await onDelete()
-                    }
-                  }}
+                  onClick={onDelete}
                   disabled={saving}
                   className="flex-1 px-4 py-2 border border-red-300 dark:border-red-900/50 text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50"
                 >
@@ -339,7 +336,6 @@ export default function RefuelingPage() {
   const [filterSuppliers, setFilterSuppliers] = useState<string[]>([])
   const [showTemplateFilter, setShowTemplateFilter] = useState(false)
   const templateFilterRef = useRef<HTMLDivElement>(null)
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [pendingConfirmationId, setPendingConfirmationId] = useState<string | null>(null)
   
@@ -348,6 +344,27 @@ export default function RefuelingPage() {
   const [modalSaving, setModalSaving] = useState(false)
   const [modalError, setModalError] = useState('')
   const [, setTimezoneTick] = useState(0)
+
+  // Confirm Modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    confirmButtonText?: string
+    isDangerous?: boolean
+    isLoading?: boolean
+    error?: string | null
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    isDangerous: false,
+    isLoading: false,
+    error: null,
+  })
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const handleTimezoneChange = () => {
@@ -585,11 +602,29 @@ export default function RefuelingPage() {
         setPendingConfirmationId(null)
         fetchEvents()
       } else {
-        alert(data.message || 'Erro ao aprovar evento')
+        setConfirmModal({
+          isOpen: true,
+          title: 'Erro ao Aprovar',
+          message: data.message || 'Não foi possível aprovar o evento.',
+          onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })),
+          confirmButtonText: 'OK',
+          isDangerous: false,
+          isLoading: false,
+          error: null
+        })
       }
     } catch (error) {
       console.error('Error approving event:', error)
-      alert('Erro ao conectar com o servidor')
+      setConfirmModal({
+        isOpen: true,
+        title: 'Erro de Conexão',
+        message: 'Ocorreu um erro ao conectar com o servidor.',
+        onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false })),
+        confirmButtonText: 'OK',
+        isDangerous: false,
+        isLoading: false,
+        error: null
+      })
     } finally {
       setConfirmingId(null)
     }
@@ -724,30 +759,41 @@ export default function RefuelingPage() {
     }
   }
 
-  const handleDeleteTemplate = async (templateId?: string) => {
+  const handleDeleteTemplate = async (templateId?: string): Promise<void> => {
     const idToDelete = templateId || currentTemplateId
-    if (!idToDelete) return
+    if (!idToDelete) return Promise.resolve()
     
-    setModalSaving(true)
-    setModalError('')
-    try {
-      const res = await fetch(`/api/refueling-templates/${idToDelete}`, {
-        method: 'DELETE',
-      })
+    setError(null)
+    setConfirmModal({
+      isOpen: true,
+      title: 'Excluir Template',
+      message: 'Tem certeza que deseja excluir este template de abastecimento? Esta ação não pode ser desfeita.',
+      confirmButtonText: 'Excluir',
+      isDangerous: true,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true }))
+        setError(null)
+        try {
+          const res = await fetch(`/api/refueling-templates/${idToDelete}`, {
+            method: 'DELETE',
+          })
 
-      if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || 'Failed to delete template')
+          if (!res.ok) {
+            const errorData = await res.json()
+            throw new Error(errorData.error || 'Failed to delete template')
+          }
+
+          setConfirmModal(prev => ({ ...prev, isOpen: false }))
+          await loadTemplates()
+          setIsTemplateModalOpen(false)
+          setCurrentTemplateId(null)
+        } catch (err: any) {
+          setError(err.message)
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isLoading: false }))
+        }
       }
-
-      await loadTemplates()
-      setIsTemplateModalOpen(false)
-      setCurrentTemplateId(null)
-    } catch (err: any) {
-      setModalError(err.message)
-    } finally {
-      setModalSaving(false)
-    }
+    })
   }
 
   const renderWeekTab = () => {
@@ -755,288 +801,208 @@ export default function RefuelingPage() {
       const formatPart = (date: Date) => {
         const day = date.toLocaleDateString('pt-BR', { day: '2-digit' })
         const month = date.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
-        // Capitalize only the first letter of the month
         const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1)
         return `${capitalizedMonth} ${day}`
       }
-
       return `${formatPart(start)} - ${formatPart(end)}`
     }
 
-    const tabHeader = (
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center justify-between md:justify-start md:gap-2 overflow-hidden w-full md:w-auto">
-          <h2 className="text-base font-normal text-gray-500 dark:text-gray-400 whitespace-nowrap">
-            Cronograma Semanal
-          </h2>
-          <span className="hidden md:block text-gray-300 dark:text-gray-600">|</span>
-          <div className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 overflow-hidden">
-            <HiOutlineCalendarDays className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <span className="truncate tracking-tight">
-              {formatDateRange(labelStart, labelEnd)}
-            </span>
-            {weekOffset !== 0 && (
-              <span className="ml-1 px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-bold rounded-md">
-                {weekOffset > 0 ? `+${weekOffset} sem` : `${weekOffset} sem`}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 justify-center md:justify-end w-full md:w-auto">
-          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700/50 p-1 rounded-xl">
-            <button
-              onClick={() => setWeekOffset(prev => prev - 1)}
-              className="p-1.5 hover:bg-white dark:hover:bg-gray-800 rounded-lg transition-all text-gray-600 dark:text-gray-400 hover:shadow-sm"
-              title="Semana Anterior"
-            >
-              <HiChevronLeft className="w-5 h-5" />
-            </button>
-            
-            <button
-              onClick={() => setWeekOffset(0)}
-              className={`
-                px-3 py-1.5 text-xs font-bold rounded-lg transition-all uppercase tracking-wider
-                ${weekOffset === 0 
-                  ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm' 
-                  : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-800/50'
-                }
-              `}
-            >
-              Hoje
-            </button>
-
-            <button
-              onClick={() => setWeekOffset(prev => prev + 1)}
-              className="p-1.5 hover:bg-white dark:hover:bg-gray-800 rounded-lg transition-all text-gray-600 dark:text-gray-400 hover:shadow-sm"
-              title="Próxima Semana"
-            >
-              <HiChevronRight className="w-5 h-5" />
-            </button>
-          </div>
-
-          <button
-            onClick={() => fetchEvents()}
-            disabled={loading}
-            className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-            title="Atualizar Cronograma"
-          >
-            <svg className={`w-5 h-5 ${loading ? 'animate-spin-reverse' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    )
-
-    if (loading) {
-      return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0">
-          {tabHeader}
-          <div className="p-8 text-center flex-1 overflow-y-auto">
-            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 dark:border-gray-400" />
-          </div>
-        </div>
-      )
-    }
-
-    if (!events.length) {
-      return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0">
-          {tabHeader}
-          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-            Nenhum evento de abastecimento agendado para esta semana.
-          </div>
-        </div>
-      )
-    }
-
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0">
-        {tabHeader}
-        <div className="divide-y divide-gray-200 dark:divide-gray-700 md:flex-1 md:overflow-y-auto">
-          {events.map((event) => {
-            const config = getEventConfig(event.event_type)
-            const Icon = config.icon
-            const isPending = event.status === 'pending'
-            const isConfirming = confirmingId === event.id
+      <BaseList
+        title="Cronograma Semanal"
+        items={events}
+        loading={loading}
+        onRefresh={fetchEvents}
+        showRefresh={true}
+        showCalendarControls={true}
+        calendarConfig={{
+          onPrev: () => setWeekOffset(prev => prev - 1),
+          onNext: () => setWeekOffset(prev => prev + 1),
+          onToday: () => setWeekOffset(0),
+          currentLabel: formatDateRange(labelStart, labelEnd),
+          intervalType: 'weekly',
+          offset: weekOffset,
+          showDateRange: true
+        }}
+        renderItem={(event) => {
+          const isPending = event.status === 'pending'
+          const isConfirming = confirmingId === event.id
 
-            return (
-              <div
-                key={event.id}
-                className="w-full p-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors group"
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex flex-col gap-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className="text-gray-400 flex-shrink-0">
-                        <LuForklift className="w-5 h-5" />
-                      </div>
-                      <span className="text-base font-semibold text-gray-900 dark:text-white truncate">
-                        {event.machine?.unit_number || 'Sem unit'}
-                      </span>
+          return (
+            <div
+              key={event.id}
+              className="w-full p-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors group"
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-col gap-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="text-gray-400 flex-shrink-0">
+                      <LuForklift className="w-5 h-5" />
                     </div>
-
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <svg className="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span className="truncate">{event.site?.title || 'Sem jobsite'}</span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <HiOutlineCalendarDays className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <span className="font-medium text-gray-700 dark:text-gray-300">
-                          {getDayOfWeekLabel(event.event_date)}
-                        </span>
-                        <span>{formatDate(event.event_date)}</span>
-                      </div>
-                    </div>
+                    <span className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                      {event.machine?.unit_number || 'Sem unit'}
+                    </span>
                   </div>
 
-                  <div className="flex flex-col items-center md:items-end gap-3 flex-shrink-0 w-full md:w-auto mt-3 md:mt-0 pb-1 md:pb-0">
-                    <div className="flex items-center gap-2 relative h-11 w-full md:w-[240px]">
-                      {isPending ? (
-                        <div className="relative w-full h-full">
-                          <Transition
-                            as="div"
-                            show={pendingConfirmationId === event.id}
-                            enter="transition-all duration-300 ease-out transform-gpu"
-                            enterFrom="opacity-0 translate-y-4 md:translate-y-0 md:translate-x-4"
-                            enterTo="opacity-100 translate-y-0 md:translate-x-0"
-                            leave="transition-all duration-200 ease-in transform-gpu"
-                            leaveFrom="opacity-100 translate-y-0 md:translate-x-0"
-                            leaveTo="opacity-0 translate-y-4 md:translate-y-0 md:translate-x-4"
-                            className="absolute inset-0 w-full h-full z-10"
-                          >
-                            <div className="flex items-center justify-between gap-1.5 bg-gray-100 dark:bg-gray-800/90 p-1 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm w-full h-full">
-                              <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 px-2 uppercase tracking-tighter whitespace-nowrap">TEM CERTEZA?</span>
-                              <div className="flex items-center gap-1 h-full">
-                                <button
-                                  onClick={() => handleApproveEvent(event.id)}
-                                  disabled={isConfirming}
-                                  className="flex items-center justify-center gap-1.5 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all active:scale-95 disabled:opacity-50 shadow-sm h-full min-w-[65px] flex-1 md:flex-none"
-                                  title="Sim"
-                                >
-                                  {isConfirming ? (
-                                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                  ) : (
-                                    <>
-                                      <HiCheck className="w-4 h-4" />
-                                      <span className="text-xs font-bold">Sim</span>
-                                    </>
-                                  )}
-                                </button>
-                                <button
-                                  onClick={() => setPendingConfirmationId(null)}
-                                  disabled={isConfirming}
-                                  className="flex items-center justify-center bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all active:scale-95 disabled:opacity-50 shadow-sm h-full w-9 md:w-9 flex-none"
-                                  title="Não"
-                                >
-                                  <HiXMark className="w-5 h-5" />
-                                </button>
-                              </div>
-                            </div>
-                          </Transition>
-
-                          <Transition
-                            as="div"
-                            show={pendingConfirmationId !== event.id}
-                            enter="transition-all duration-300 ease-out transform-gpu"
-                            enterFrom="opacity-0 -translate-y-4 md:translate-y-0 md:-translate-x-4"
-                            enterTo="opacity-100 translate-y-0 md:translate-x-0"
-                            leave="transition-all duration-200 ease-in transform-gpu"
-                            leaveFrom="opacity-100 translate-y-0 md:translate-x-0"
-                            leaveTo="opacity-0 -translate-y-4 md:translate-y-0 md:-translate-x-4"
-                            className="absolute inset-0 w-full h-full"
-                          >
-                            <button
-                              onClick={() => setPendingConfirmationId(event.id)}
-                              disabled={isConfirming}
-                              className={`
-                                flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm whitespace-nowrap w-full h-full
-                                ${isConfirming 
-                                  ? 'bg-blue-100 text-blue-400 cursor-not-allowed' 
-                                  : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95 hover:shadow-md'
-                                }
-                              `}
-                            >
-                              {isConfirming ? (
-                                <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <HiOutlineCheckCircle className="w-5 h-5" />
-                              )}
-                              {isConfirming ? 'Efetivando...' : 'Efetivar'}
-                            </button>
-                          </Transition>
-                        </div>
-                      ) : (
-                              <div className="flex items-center">
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg text-xs font-bold border border-green-100 dark:border-green-800/30 uppercase tracking-wider">
-                                  <HiCheck className="w-4 h-4" />
-                                  Efetivado
-                                </div>
-                                
-                                {user?.role && event.status === 'approved' && event.approved_at && (
-                                   <div className="ml-2">
-                                     <Popover className="relative flex items-center">
-                                       <PopoverButton
-                                         className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 shadow-sm transition-all active:scale-95 focus:outline-none"
-                                         title="Ver detalhes da confirmação"
-                                       >
-                                         <div className="w-5 h-5 flex items-center justify-center">
-                                           {getRoleIcon(user.role)}
-                                         </div>
-                                       </PopoverButton>
-                                       
-                                       <PopoverPanel
-                                             anchor={{ to: 'left', gap: 12 }}
-                                             transition
-                                             className="z-[9999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl p-3 transition duration-200 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 ring-1 ring-black/5 !overflow-visible min-w-max"
-                                           >
-                                            <div className="flex flex-col gap-2 text-[12px] text-gray-600 dark:text-gray-300 relative !overflow-visible">
-                                              <div className="flex items-center gap-2.5 whitespace-nowrap">
-                                                <HiOutlineClock className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                                                <span className="font-semibold text-gray-900 dark:text-white">{formatWithSystemTimezone(event.approved_at)}</span>
-                                              </div>
-                                              {event.approved_by_user && (
-                                                <div className="flex items-center gap-2.5 whitespace-nowrap">
-                                                  <HiOutlineUser className="w-4 h-4 text-green-500 flex-shrink-0" />
-                                                  <span className="font-semibold text-gray-900 dark:text-white">{event.approved_by_user.nome}</span>
-                                                </div>
-                                              )}
-                                            </div>
-                                            {/* Arrow */}
-                                            <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white dark:bg-gray-800 border-r border-t border-gray-200 dark:border-gray-700 rotate-45 z-[-1]" />
-                                          </PopoverPanel>
-                                     </Popover>
-                                   </div>
-                                 )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {event.notas && (
-                        <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-600/50">
-                          <p className="text-sm text-gray-600 dark:text-gray-300 italic line-clamp-2">
-                            &quot;{event.notas}&quot;
-                          </p>
-                        </div>
-                      )}
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <svg className="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="truncate">{event.site?.title || 'Sem jobsite'}</span>
                     </div>
-                  )
-                })}
+
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <HiOutlineCalendarDays className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        {getDayOfWeekLabel(event.event_date)}
+                      </span>
+                      <span>{formatDate(event.event_date)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center md:items-end gap-3 flex-shrink-0 w-full md:w-auto mt-3 md:mt-0 pb-1 md:pb-0">
+                  <div className="flex items-center gap-2 relative h-11 w-full md:w-[240px]">
+                    {isPending ? (
+                      <div className="relative w-full h-full">
+                        <Transition
+                          as="div"
+                          show={pendingConfirmationId === event.id}
+                          enter="transition-all duration-300 ease-out transform-gpu"
+                          enterFrom="opacity-0 translate-y-4 md:translate-y-0 md:translate-x-4"
+                          enterTo="opacity-100 translate-y-0 md:translate-x-0"
+                          leave="transition-all duration-200 ease-in transform-gpu"
+                          leaveFrom="opacity-100 translate-y-0 md:translate-x-0"
+                          leaveTo="opacity-0 translate-y-4 md:translate-y-0 md:translate-x-4"
+                          className="absolute inset-0 w-full h-full z-10"
+                        >
+                          <div className="flex items-center justify-between gap-1.5 bg-gray-100 dark:bg-gray-800/90 p-1 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm w-full h-full">
+                            <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 px-2 uppercase tracking-tighter whitespace-nowrap">TEM CERTEZA?</span>
+                            <div className="flex items-center gap-1 h-full">
+                              <button
+                                onClick={() => handleApproveEvent(event.id)}
+                                disabled={isConfirming}
+                                className="flex items-center justify-center gap-1.5 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all active:scale-95 disabled:opacity-50 shadow-sm h-full min-w-[65px] flex-1 md:flex-none"
+                                title="Sim"
+                              >
+                                {isConfirming ? (
+                                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <>
+                                    <HiCheck className="w-4 h-4" />
+                                    <span className="text-xs font-bold">Sim</span>
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => setPendingConfirmationId(null)}
+                                disabled={isConfirming}
+                                className="flex items-center justify-center bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all active:scale-95 disabled:opacity-50 shadow-sm h-full w-9 md:w-9 flex-none"
+                                title="Não"
+                              >
+                                <HiXMark className="w-5 h-5" />
+                              </button>
+                            </div>
+                          </div>
+                        </Transition>
+
+                        <Transition
+                          as="div"
+                          show={pendingConfirmationId !== event.id}
+                          enter="transition-all duration-300 ease-out transform-gpu"
+                          enterFrom="opacity-0 -translate-y-4 md:translate-y-0 md:-translate-x-4"
+                          enterTo="opacity-100 translate-y-0 md:translate-x-0"
+                          leave="transition-all duration-200 ease-in transform-gpu"
+                          leaveFrom="opacity-100 translate-y-0 md:translate-x-0"
+                          leaveTo="opacity-0 -translate-y-4 md:translate-y-0 md:-translate-x-4"
+                          className="absolute inset-0 w-full h-full"
+                        >
+                          <button
+                            onClick={() => setPendingConfirmationId(event.id)}
+                            disabled={isConfirming}
+                            className={`
+                              flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm whitespace-nowrap w-full h-full
+                              ${isConfirming 
+                                ? 'bg-blue-100 text-blue-400 cursor-not-allowed' 
+                                : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95 hover:shadow-md'
+                              }
+                            `}
+                          >
+                            {isConfirming ? (
+                              <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <HiOutlineCheckCircle className="w-5 h-5" />
+                            )}
+                            {isConfirming ? 'Efetivando...' : 'Efetivar'}
+                          </button>
+                        </Transition>
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg text-xs font-bold border border-green-100 dark:border-green-800/30 uppercase tracking-wider">
+                          <HiCheck className="w-4 h-4" />
+                          Efetivado
+                        </div>
+
+                        {user?.role && event.status === 'approved' && event.approved_at && (
+                          <div className="ml-2">
+                            <Popover className="relative flex items-center">
+                              <PopoverButton
+                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 shadow-sm transition-all active:scale-95 focus:outline-none"
+                                title="Ver detalhes da confirmação"
+                              >
+                                <div className="w-5 h-5 flex items-center justify-center">
+                                  {getRoleIcon(user.role)}
+                                </div>
+                              </PopoverButton>
+                              
+                              <PopoverPanel
+                                anchor={{ to: 'left', gap: 12 }}
+                                transition
+                                className="z-[9999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl p-3 transition duration-200 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 ring-1 ring-black/5 !overflow-visible min-w-max"
+                              >
+                                <div className="flex flex-col gap-2 text-[12px] text-gray-600 dark:text-gray-300 relative !overflow-visible">
+                                  <div className="flex items-center gap-2.5 whitespace-nowrap">
+                                    <HiOutlineClock className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                                    <span className="font-semibold text-gray-900 dark:text-white">{formatWithSystemTimezone(event.approved_at)}</span>
+                                  </div>
+                                  {event.approved_by_user && (
+                                    <div className="flex items-center gap-2.5 whitespace-nowrap">
+                                      <HiOutlineUser className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                      <span className="font-semibold text-gray-900 dark:text-white">{event.approved_by_user.nome}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                {/* Arrow */}
+                                <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white dark:bg-gray-800 border-r border-t border-gray-200 dark:border-gray-700 rotate-45 z-[-1]" />
+                              </PopoverPanel>
+                            </Popover>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
+
+              {event.notas && (
+                <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-600/50">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 italic line-clamp-2">
+                    &quot;{event.notas}&quot;
+                  </p>
+                </div>
+              )}
             </div>
           )
-        }
+        }}
+      />
+    )
+  }
 
   const renderTemplatesTab = () => {
-    const filteredTemplates = templates.filter((template) => {
+    const baseFilteredTemplates = templates.filter((template) => {
       // Filter by status
       if (templateStatusFilter.length > 0) {
         if (templateStatusFilter.includes('active') && !template.is_active) {
@@ -1056,329 +1022,205 @@ export default function RefuelingPage() {
       // Filter by Supplier
       if (filterSuppliers.length > 0 && template.fuel_supplier_id && !filterSuppliers.includes(template.fuel_supplier_id)) return false
 
-      // Filter by search term
-      const searchLower = templateSearchTerm.toLowerCase()
-      const machineMatch = template.machine?.unit_number?.toLowerCase().includes(searchLower)
-      const siteMatch = template.site?.title?.toLowerCase().includes(searchLower)
-      const supplier = allFuelSuppliers.find((s) => s.id === (template as any).fuel_supplier_id)
-      const supplierMatch = supplier?.nome?.toLowerCase().includes(searchLower)
-      
-      return machineMatch || siteMatch || supplierMatch
+      return true
     })
+
+    const templatesWithSupplier = baseFilteredTemplates.map(t => ({
+      ...t,
+      supplierName: allFuelSuppliers.find(s => s.id === (t as any).fuel_supplier_id)?.nome || ''
+    }))
 
     const isFiltering = templateStatusFilter.length > 0 || 
                         filterSites.length > 0 || 
                         filterSuppliers.length > 0
 
-    const tabHeader = (
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-4">
-        <h2 className={`text-base font-normal text-gray-500 dark:text-gray-400 ${isSearchExpanded ? 'hidden sm:block sm:opacity-0' : 'block'}`}>
-          Templates de abastecimento • {templates.length}
-        </h2>
-        
-        <div className="flex items-center gap-2 ml-auto">
-          <div className={`flex items-center transition-all duration-300 ease-in-out ${isSearchExpanded ? 'w-48 sm:w-64 opacity-100' : 'w-0 opacity-0 overflow-hidden'}`}>
-            <input
-              type="text"
-              placeholder="Unit, Jobsite ou Fornecedor..."
-              value={templateSearchTerm}
-              onChange={(e) => setTemplateSearchTerm(e.target.value)}
-              className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:text-white"
-              autoFocus={isSearchExpanded}
+    return (
+      <BaseList
+        title="Abastecimento"
+        items={templatesWithSupplier}
+        totalCount={templates.length}
+        loading={loadingTemplates}
+        emptyMessage="Nenhum abastecimento configurado."
+        showSearch
+        searchTerm={templateSearchTerm}
+        onSearchChange={setTemplateSearchTerm}
+        searchPlaceholder="Unit, Jobsite ou Fornecedor..."
+        searchFields={['machine.unit_number', 'site.title', 'supplierName']}
+        showFilter
+        isFiltering={isFiltering}
+        filterConfig={{
+          title: 'Filtros de Template',
+          popoverWidth: 'w-80'
+        }}
+        onClearFilters={() => {
+          setTemplateStatusFilter([])
+          setFilterSites([])
+          setFilterSuppliers([])
+        }}
+        filterPanelContent={(
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Status
+              </label>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setTemplateStatusFilter([])}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all border ${
+                    templateStatusFilter.length === 0
+                      ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300 shadow-sm'
+                      : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Todos
+                </button>
+                <div className="flex flex-[2]">
+                  <button
+                    onClick={() => {
+                      if (templateStatusFilter.includes('active')) {
+                        setTemplateStatusFilter(templateStatusFilter.filter(s => s !== 'active'))
+                      } else {
+                        setTemplateStatusFilter([...templateStatusFilter, 'active'])
+                      }
+                    }}
+                    className={`flex-1 py-1.5 px-3 rounded-l-lg text-xs font-medium transition-all border-y border-l ${
+                      templateStatusFilter.includes('active')
+                        ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300 z-10 shadow-sm'
+                        : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Ativos
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (templateStatusFilter.includes('inactive')) {
+                        setTemplateStatusFilter(templateStatusFilter.filter(s => s !== 'inactive'))
+                      } else {
+                        setTemplateStatusFilter([...templateStatusFilter, 'inactive'])
+                      }
+                    }}
+                    className={`flex-1 py-1.5 px-3 rounded-r-lg text-xs font-medium transition-all border ${
+                      templateStatusFilter.includes('inactive')
+                        ? 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300 z-10 shadow-sm'
+                        : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Inativos
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <MultiSelectDropdown
+              label="Jobsite"
+              value={filterSites}
+              onChange={setFilterSites}
+              options={sites.map(s => ({ value: s.id, label: s.title }))}
+              placeholder="Todos os jobsites"
+              searchable
+            />
+
+            <MultiSelectDropdown
+              label="Fornecedor"
+              value={filterSuppliers}
+              onChange={setFilterSuppliers}
+              options={allFuelSuppliers.map(s => ({ value: s.id, label: s.nome }))}
+              placeholder="Todos os fornecedores"
+              searchable
             />
           </div>
+        )}
+        showRefresh
+        onRefresh={() => loadTemplates()}
+        showAdd
+        onAdd={handleOpenAddTemplate}
+        renderItem={(template) => {
+          const dayLabel = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][template.day_of_week]
+          const supplier = allFuelSuppliers.find((s) => s.id === (template as any).fuel_supplier_id)
+          const supplierIcon = getSupplierIcon(supplier?.supplier_type || 'fuel')
 
-          <button
-            onClick={() => setIsSearchExpanded(!isSearchExpanded)}
-            className={`p-2 rounded-lg transition-colors ${
-              isSearchExpanded 
-                ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/30' 
-                : 'text-blue-600 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-            title="Pesquisar"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </button>
-
-          <div className="relative" ref={templateFilterRef}>
-            <button
-              onClick={() => setShowTemplateFilter(!showTemplateFilter)}
-              className={`p-2 rounded-lg transition-colors ${
-                showTemplateFilter || isFiltering
-                  ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400'
-                  : 'text-blue-600 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
-              title="Filtrar"
-            >
-              <FiFilter className="w-5 h-5" />
-            </button>
-
-            {showTemplateFilter && (
-              <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 rounded-t-xl">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Filtros</h3>
-                  {isFiltering && (
-                    <button
-                      onClick={() => {
-                        setTemplateStatusFilter([])
-                        setFilterSites([])
-                        setFilterSuppliers([])
-                      }}
-                      className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
-                      title="Limpar Filtros"
-                    >
-                      <LuFilterX className="w-5 h-5" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
-                  <div className="space-y-3">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Status
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setTemplateStatusFilter([])}
-                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all border ${
-                          templateStatusFilter.length === 0
-                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300 shadow-sm'
-                            : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
-                        }`}
-                      >
-                        Todos
-                      </button>
-                      
-                      <div className="flex flex-[2]">
-                        <button
-                          onClick={() => {
-                            if (templateStatusFilter.includes('active')) {
-                              setTemplateStatusFilter(templateStatusFilter.filter(s => s !== 'active'))
-                            } else {
-                              setTemplateStatusFilter([...templateStatusFilter, 'active'])
-                            }
-                          }}
-                          className={`flex-1 py-1.5 px-3 rounded-l-lg text-xs font-medium transition-all border-y border-l ${
-                            templateStatusFilter.includes('active')
-                              ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300 z-10 shadow-sm'
-                              : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          Ativos
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (templateStatusFilter.includes('inactive')) {
-                              setTemplateStatusFilter(templateStatusFilter.filter(s => s !== 'inactive'))
-                            } else {
-                              setTemplateStatusFilter([...templateStatusFilter, 'inactive'])
-                            }
-                          }}
-                          className={`flex-1 py-1.5 px-3 rounded-r-lg text-xs font-medium transition-all border ${
-                            templateStatusFilter.includes('inactive')
-                              ? 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300 z-10 shadow-sm'
-                              : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          Inativos
-                        </button>
-                      </div>
+          return (
+            <div className="w-full p-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors group">
+              <div className="flex flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex flex-col gap-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="text-gray-400 flex-shrink-0">
+                      <LuForklift className="w-5 h-5" />
                     </div>
+                    <span className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                      {template.machine?.unit_number || 'Sem unit'}
+                    </span>
                   </div>
-
-                  <MultiSelectDropdown
-                    label="Jobsite"
-                    value={filterSites}
-                    onChange={setFilterSites}
-                    options={sites.map(s => ({ value: s.id, label: s.title }))}
-                    placeholder="Todos os jobsites"
-                    searchable
-                  />
-
-                  <MultiSelectDropdown
-                    label="Fornecedor"
-                    value={filterSuppliers}
-                    onChange={setFilterSuppliers}
-                    options={allFuelSuppliers.map(s => ({ value: s.id, label: s.nome }))}
-                    placeholder="Todos os fornecedores"
-                    searchable
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={() => loadTemplates()}
-            className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            title="Atualizar"
-            disabled={loadingTemplates}
-          >
-            <svg className={`w-5 h-5 ${loadingTemplates ? 'animate-spin-reverse' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
-          
-          <button
-            onClick={handleOpenAddTemplate}
-            className="p-2 text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            title="Adicionar Template"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    )
-
-    if (loadingTemplates) {
-      return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0">
-          {tabHeader}
-          <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 dark:border-gray-400" />
-          </div>
-        </div>
-      )
-    }
-
-    if (!templates.length) {
-      return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0">
-          {tabHeader}
-          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-            Nenhum template de abastecimento configurado.
-          </div>
-        </div>
-      )
-    }
-
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0">
-        {tabHeader}
-        <div className="divide-y divide-gray-200 dark:divide-gray-700 md:flex-1 md:overflow-y-auto">
-          {filteredTemplates.length === 0 ? (
-            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-              Nenhum resultado encontrado para &quot;{templateSearchTerm}&quot;
-            </div>
-          ) : (
-            filteredTemplates.map((template) => {
-            const dayLabel =
-              ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][template.day_of_week]
-            
-            const supplier = allFuelSuppliers.find((s) => s.id === (template as any).fuel_supplier_id)
-            const supplierIcon = getSupplierIcon(supplier?.supplier_type || 'fuel')
-
-            return (
-              <div
-                key={template.id}
-                className="w-full p-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors group"
-              >
-                <div className="flex flex-row items-start md:items-center justify-between gap-4">
-                  <div className="flex flex-col gap-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className="text-gray-400 flex-shrink-0">
-                        <LuForklift className="w-5 h-5" />
-                      </div>
-                      <span className="text-base font-semibold text-gray-900 dark:text-white truncate">
-                        {template.machine?.unit_number || 'Sem unit'}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-3 md:gap-4 text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <svg className="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          <span className="truncate font-medium text-gray-700 dark:text-gray-300">
-                            {(template.site as any)?.address || template.site?.title || 'Sem jobsite'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 min-w-0 ml-6 md:ml-0 md:before:content-['•'] md:before:text-gray-300 dark:md:before:text-gray-600">
-                          <span className="truncate text-xs md:text-sm md:ml-1.5">
-                            {template.site?.title || 'Sem título'}
-                          </span>
-                        </div>
-                      </div>
-                      
+                  <div className="flex flex-col gap-3 md:gap-4 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <div className="flex-shrink-0 text-gray-400">
-                          {React.cloneElement(supplierIcon.icon as React.ReactElement, { className: 'w-4 h-4' })}
-                        </div>
-                        <span className="truncate">{supplier?.nome || 'Não informado'}</span>
+                        <svg className="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span className="truncate font-medium text-gray-700 dark:text-gray-300">
+                          {(template.site as any)?.address || template.site?.title || 'Sem jobsite'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 min-w-0 ml-6 md:ml-0 md:before:content-['•'] md:before:text-gray-300 dark:md:before:text-gray-600">
+                        <span className="truncate text-xs md:text-sm md:ml-1.5">
+                          {template.site?.title || 'Sem título'}
+                        </span>
                       </div>
                     </div>
-
-                    {/* Mobile Info (Day/Time + Status) */}
-                    <div className="flex md:hidden items-center gap-2 mt-2">
-                      <span className="px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 text-[10px] text-gray-500 dark:text-gray-400">
-                        {dayLabel} • {template.time_of_day}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full border text-[10px] font-medium transition-colors ${
-                          template.is_active
-                            ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-300'
-                            : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-300'
-                        }`}
-                      >
-                        {template.is_active ? 'Ativo' : 'Inativo'}
-                      </span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="flex-shrink-0 text-gray-400">
+                        {React.cloneElement(supplierIcon.icon as React.ReactElement, { className: 'w-4 h-4' })}
+                      </div>
+                      <span className="truncate">{supplier?.nome || 'Não informado'}</span>
                     </div>
                   </div>
-                  
-                  <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 flex-shrink-0">
-                    {/* Desktop Stack: Day/Time + Status */}
-                    <div className="hidden md:flex flex-col items-center gap-1">
-                      <span className="px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
-                        {dayLabel} • {template.time_of_day}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full border text-[10px] font-medium transition-colors ${
-                          template.is_active
-                            ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-300'
-                            : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-300'
-                        }`}
-                      >
-                        {template.is_active ? 'Ativo' : 'Inativo'}
-                      </span>
-                    </div>
-
-                    {/* Buttons (Stacked on Mobile) */}
-                    <div className="flex flex-col md:flex-row items-center gap-1 md:gap-2">
-                      <button
-                        onClick={() => handleOpenEditTemplate(template)}
-                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                        title="Editar"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (confirm('Tem certeza que deseja excluir este template?')) {
-                            await handleDeleteTemplate(template.id)
-                          }
-                        }}
-                        className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                        title="Excluir"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
+                  <div className="flex md:hidden items-center gap-2 mt-2">
+                    <span className="px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 text-[10px] text-gray-500 dark:text-gray-400">
+                      {dayLabel} • {template.time_of_day}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full border text-[10px] font-medium transition-colors ${
+                      template.is_active
+                        ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-300'
+                        : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-300'
+                    }`}>
+                      {template.is_active ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 flex-shrink-0">
+                  <div className="hidden md:flex flex-col items-center gap-1">
+                    <span className="px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+                      {dayLabel} • {template.time_of_day}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full border text-[10px] font-medium transition-colors ${
+                      template.is_active
+                        ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-300'
+                        : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-300'
+                    }`}>
+                      {template.is_active ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </div>
+                  <div className="flex flex-col md:flex-row items-center gap-1 md:gap-2">
+                    <ListActionButton
+                      icon="edit"
+                      onClick={() => handleOpenEditTemplate(template)}
+                      variant="blue"
+                      title="Editar"
+                    />
+                    <ListActionButton
+                      icon="delete"
+                      onClick={() => handleDeleteTemplate(template.id)}
+                      variant="red"
+                      title="Excluir"
+                    />
                   </div>
                 </div>
               </div>
-            )
-          }))}
-        </div>
-      </div>
+            </div>
+          )
+        }}
+      />
     )
   }
 
@@ -1419,7 +1261,7 @@ export default function RefuelingPage() {
               />
             </div>
 
-            <div className="flex-1 md:min-h-0 md:overflow-y-auto">
+            <div className="flex-1 md:min-h-0 md:flex md:flex-col">
               {activeTab === 'week' && renderWeekTab()}
               {activeTab === 'templates' && renderTemplatesTab()}
             </div>
@@ -1428,6 +1270,18 @@ export default function RefuelingPage() {
       </div>
 
       <BottomNavigation />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmButtonText={confirmModal.confirmButtonText}
+        isDangerous={confirmModal.isDangerous}
+        isLoading={confirmModal.isLoading}
+        error={error || undefined}
+      />
 
       <TemplateModal
         isOpen={isTemplateModalOpen}

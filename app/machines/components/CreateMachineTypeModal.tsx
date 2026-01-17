@@ -10,6 +10,7 @@ interface CreateMachineTypeModalProps {
   handleCreateType: () => void
   creatingType: boolean
   user: any
+  error?: string | null
 }
 
 export default function CreateMachineTypeModal({
@@ -21,7 +22,8 @@ export default function CreateMachineTypeModal({
   setNewType,
   handleCreateType,
   creatingType,
-  user
+  user,
+  error
 }: CreateMachineTypeModalProps) {
   if (!showTypeModal) return null
 
@@ -51,6 +53,11 @@ export default function CreateMachineTypeModal({
         </div>
 
         <div className="p-6 space-y-4 flex-1 overflow-y-auto">
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+              {error}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Nome *

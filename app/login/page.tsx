@@ -278,7 +278,7 @@ export default function LoginPage() {
 
   const handlePinComplete = async (completedPin: string) => {
     if (!selectedUserId) {
-      setError('Please select a user first')
+      setError('Por favor, selecione um usuário primeiro')
       return
     }
 
@@ -303,10 +303,10 @@ export default function LoginPage() {
           if (data.blockedUntil) {
             setBlockedUntil(new Date(data.blockedUntil))
           }
-          setError('IP blocked due to too many attempts')
+          setError('IP bloqueado devido a muitas tentativas')
         } else if (response.status === 403) {
           // Usuário não validado
-          setError(data.error || 'Your registration has not been validated yet. Please wait for administrator approval.')
+          setError(data.error || 'Seu cadastro ainda não foi validado. Por favor, aguarde a aprovação do administrador.')
         } else if (response.status === 401) {
           // PIN incorreto
           setRemainingAttempts(data.remainingAttempts || 0)
@@ -316,15 +316,15 @@ export default function LoginPage() {
             if (data.blockedUntil) {
               setBlockedUntil(new Date(data.blockedUntil))
             }
-            setError('Too many incorrect attempts. IP blocked for 5 minutes.')
+            setError('Muitas tentativas incorretas. IP bloqueado por 5 minutos.')
           } else {
             const attemptsText = data.remainingAttempts > 0 
-              ? `Attempts remaining: ${data.remainingAttempts}`
-              : 'Last attempt!'
-            setError(`Incorrect PIN. ${attemptsText}`)
+              ? `Tentativas restantes: ${data.remainingAttempts}`
+              : 'Última tentativa!'
+            setError(`PIN incorreto. ${attemptsText}`)
           }
         } else {
-          setError(data.error || data.message || 'Login error')
+          setError(data.error || data.message || 'Erro no login')
         }
         return
       }
@@ -337,7 +337,7 @@ export default function LoginPage() {
         router.push(homePage)
       }
     } catch (err: any) {
-      setError('Error connecting to server')
+      setError('Erro ao conectar com o servidor')
       console.error('Erro no login:', err)
     } finally {
       setLoading(false)

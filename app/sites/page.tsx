@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Header from '@/app/components/Header'
 import BottomNavigation from '@/app/components/BottomNavigation'
 import Sidebar from '@/app/components/Sidebar'
+import ConfirmModal from '@/app/components/ConfirmModal'
 import { useSession } from '@/lib/useSession'
 import { useSidebar } from '@/lib/useSidebar'
 import { useAllocationDataRefresh } from '@/lib/allocationEvents'
@@ -28,12 +29,26 @@ export default function SitesPage() {
     machinesWithIssues: 0,
     archivedSites: 0,
   })
-  const [searchQuery, setSearchQuery] = useState('')
-  const [showSearchDropdown, setShowSearchDropdown] = useState(false)
   const [showArchivedSites, setShowArchivedSites] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingSite, setEditingSite] = useState<Site | null>(null)
   const [creating, setCreating] = useState(false)
+  const [modalError, setModalError] = useState<string | null>(null)
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    confirmButtonText?: string
+    isDangerous?: boolean
+    isLoading?: boolean
+    error?: string | null
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  })
   const [newSite, setNewSite] = useState({
     title: '',
     address: '',
@@ -107,60 +122,60 @@ export default function SitesPage() {
     loadMetrics()
   })
 
-  // Close search dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      if (!target.closest('.relative')) {
-        setShowSearchDropdown(false)
+  const handleArchiveSite = (site: Site) => {
+    const isArchiving = site.ativo;
+    const action = isArchiving ? 'arquivar' : 'desarquivar';
+
+    setConfirmModal({
+      isOpen: true,
+      title: isArchiving ? 'Arquivar Jobsite' : 'Desarquivar Jobsite',
+      message: isArchiving 
+        ? `Tem certeza que deseja arquivar o jobsite "${site.title}"?`
+        : `Tem certeza que deseja desarquivar o jobsite "${site.title}"?`,
+      confirmButtonText: isArchiving ? 'Arquivar' : 'Desarquivar',
+      isDangerous: isArchiving,
+      isLoading: false,
+      error: null,
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isLoading: true, error: null }))
+        try {
+          const response = await fetch(`/api/sites/${site.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...site,
+              ativo: !site.ativo,
+            }),
+          })
+
+          const data = await response.json()
+
+          if (data.success) {
+            setConfirmModal(prev => ({ ...prev, isOpen: false }))
+            await loadSites()
+            await loadMetrics()
+          } else {
+            setConfirmModal(prev => ({ ...prev, error: data.message || `Erro ao ${action} obra` }))
+          }
+        } catch (error) {
+          console.error(`Erro ao ${action} site:`, error)
+          setConfirmModal(prev => ({ ...prev, error: 'Erro ao conectar com o servidor' }))
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isLoading: false }))
+        }
       }
-    }
-
-    if (showSearchDropdown) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showSearchDropdown])
-
-  const handleArchiveSite = async (site: Site) => {
-    if (!confirm(`Are you sure you want to ${site.ativo ? 'archive' : 'unarchive'} this jobsite?`)) {
-      return
-    }
-
-    try {
-      const response = await fetch(`/api/sites/${site.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...site,
-          ativo: !site.ativo,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        loadSites()
-      } else {
-        alert(data.message || 'Error archiving jobsite')
-      }
-    } catch (error) {
-      console.error('Error archiving site:', error)
-      alert('Error connecting to server')
-    }
+    })
   }
 
   const handleGeocode = async () => {
     if (!newSite.address) {
-      alert('Please enter the address before geocoding')
+      setModalError('Por favor, insira o endereço antes de geolocalizar')
       return
     }
 
     setGeocoding(true)
     setGeocodingResult(null)
+    setModalError(null)
     try {
       const response = await fetch('/api/geocode', {
         method: 'POST',
@@ -175,14 +190,14 @@ export default function SitesPage() {
           setGeocodingResult(data.result)
           setMapCoordinates({ lat: data.result.latitude, lng: data.result.longitude })
         } else {
-          alert('Error: The API did not return valid coordinates. Try a more specific address.')
+          setModalError('Erro: A API não retornou coordenadas válidas. Tente um endereço mais específico.')
         }
       } else {
-        alert(data.message || 'Could not find the address. Please make sure the address is complete (include city and state).')
+        setModalError(data.message || 'Não foi possível encontrar o endereço. Certifique-se de que o endereço está completo (inclua cidade e estado).')
       }
     } catch (error: any) {
       console.error('Geocoding error:', error)
-      alert('Error connecting to geocoding service. Check your connection and try again.')
+      setModalError('Erro ao conectar com o serviço de geolocalização. Verifique sua conexão e tente novamente.')
     } finally {
       setGeocoding(false)
     }
@@ -227,23 +242,24 @@ export default function SitesPage() {
 
   const handleCreateSite = async () => {
     if (!newSite.title) {
-      alert('Please enter the jobsite name')
+      setModalError('Por favor, insira o nome da obra')
       return
     }
 
     if (!mapCoordinates) {
-      alert('Please geocode the address and confirm the location on the map before saving.')
+      setModalError('Por favor, geolocalize o endereço e confirme a localização no mapa antes de salvar.')
       return
     }
 
     // Validar que temos coordenadas válidas
     if (!mapCoordinates.lat || !mapCoordinates.lng ||
         isNaN(mapCoordinates.lat) || isNaN(mapCoordinates.lng)) {
-      alert('Error: Invalid coordinates. Please geocode the address again.')
+      setModalError('Erro: Coordenadas inválidas. Por favor, geolocalize o endereço novamente.')
       return
     }
 
     setCreating(true)
+    setModalError(null)
     try {
       const url = editingSite ? `/api/sites/${editingSite.id}` : '/api/sites'
       const method = editingSite ? 'PUT' : 'POST'
@@ -271,11 +287,11 @@ export default function SitesPage() {
         loadSites()
         loadMetrics()
       } else {
-        alert(data.message || 'Error saving jobsite')
+        setModalError(data.message || 'Erro ao salvar obra')
       }
     } catch (error) {
       console.error('Error saving site:', error)
-      alert('Error connecting to server')
+      setModalError('Erro ao conectar com o servidor')
     } finally {
       setCreating(false)
     }
@@ -299,10 +315,6 @@ export default function SitesPage() {
                 loadingSites={loadingSites}
                 showArchivedSites={showArchivedSites}
                 setShowArchivedSites={setShowArchivedSites}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                showSearchDropdown={showSearchDropdown}
-                setShowSearchDropdown={setShowSearchDropdown}
                 loadSites={loadSites}
                 handleOpenModal={handleOpenModal}
                 handleArchiveSite={handleArchiveSite}
@@ -328,6 +340,19 @@ export default function SitesPage() {
         setGeocodingResult={setGeocodingResult}
         mapCoordinates={mapCoordinates}
         setMapCoordinates={setMapCoordinates}
+        error={modalError}
+      />
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmButtonText={confirmModal.confirmButtonText}
+        cancelButtonText="Cancelar"
+        isDangerous={confirmModal.isDangerous}
+        isLoading={confirmModal.isLoading}
+        error={confirmModal.error}
       />
     </div>
   )

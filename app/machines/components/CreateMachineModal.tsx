@@ -13,6 +13,7 @@ interface CreateMachineModalProps {
   creating: boolean
   machineTypes: MachineType[]
   suppliers: any[]
+  error?: string | null
 }
 
 export default function CreateMachineModal({
@@ -25,7 +26,8 @@ export default function CreateMachineModal({
   handleCreateMachine,
   creating,
   machineTypes,
-  suppliers
+  suppliers,
+  error
 }: CreateMachineModalProps) {
   if (!showCreateModal) return null
 
@@ -60,6 +62,11 @@ export default function CreateMachineModal({
         </div>
 
         <div className="p-6 space-y-4 flex-1 overflow-y-auto">
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+              {error}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Número da Unidade *

@@ -19,6 +19,7 @@ interface CreateSiteModalProps {
   setGeocodingResult: (result: GeocodingResult | null) => void
   mapCoordinates: { lat: number; lng: number } | null
   setMapCoordinates: (coords: { lat: number; lng: number } | null) => void
+  error?: string | null
 }
 
 export default function CreateSiteModal({
@@ -35,6 +36,7 @@ export default function CreateSiteModal({
   setGeocodingResult,
   mapCoordinates,
   setMapCoordinates,
+  error,
 }: CreateSiteModalProps) {
   if (!showCreateModal) return null
 
@@ -56,6 +58,11 @@ export default function CreateSiteModal({
         </div>
 
         <div className="p-6 space-y-4 flex-1 overflow-y-auto">
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Nome do Jobsite

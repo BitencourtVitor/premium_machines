@@ -6,6 +6,7 @@ import Header from '@/app/components/Header';
 import Sidebar from '@/app/components/Sidebar';
 import BottomNavigation from '@/app/components/BottomNavigation';
 import { useSidebar } from '@/lib/useSidebar';
+import ConfirmModal from '@/app/components/ConfirmModal';
 
 interface DebugEvent {
   id: string
@@ -22,6 +23,25 @@ export default function DebugPage() {
   const [stats, setStats] = useState<any>({})
   const [loading, setLoading] = useState(true)
   const { isExpanded } = useSidebar();
+
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    confirmButtonText?: string
+    isDangerous?: boolean
+    isLoading?: boolean
+    error?: string | null
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    isDangerous: false,
+    isLoading: false,
+    error: null
+  })
 
   useEffect(() => {
     loadEvents()
@@ -40,6 +60,26 @@ export default function DebugPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const showInfo = (title: string, message: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      confirmButtonText: 'OK',
+      onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+    })
+  }
+
+  const showError = (message: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Erro',
+      message,
+      confirmButtonText: 'OK',
+      onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
+    })
   }
 
   return (
@@ -146,13 +186,13 @@ export default function DebugPage() {
                             const response = await fetch('/api/sync/all', { method: 'POST' })
                             const data = await response.json()
                             if (data.success) {
-                            alert(`✅ ${data.message}`)
+                            showInfo('Sucesso', data.message)
                             loadEvents() // Recarregar após sync
                             } else {
-                            alert(`❌ Erro: ${data.message}`)
+                            showError(data.message)
                             }
                         } catch (error) {
-                            alert('❌ Erro na sincronização')
+                            showError('Erro na sincronização')
                         }
                         }}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -166,12 +206,12 @@ export default function DebugPage() {
                             const data = await response.json()
                             if (data.success) {
                             console.log('🔍 Estado das alocações:', data)
-                            alert(`🔍 Ver console para debug de alocações\nTotal máquinas: ${data.summary.total_machines}\nAlocações ativas: ${data.summary.active_allocations}`)
+                            showInfo('Debug de Alocações', `Total máquinas: ${data.summary.total_machines}\nAlocações ativas: ${data.summary.active_allocations}`)
                             } else {
-                            alert(`❌ Erro: ${data.message}`)
+                            showError(data.message)
                             }
                         } catch (error) {
-                            alert('❌ Erro no debug')
+                            showError('Erro no debug')
                         }
                         }}
                         className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
@@ -184,13 +224,13 @@ export default function DebugPage() {
                             const response = await fetch('/api/test/system')
                             const data = await response.json()
                             if (data.success) {
-                            alert(`✅ ${data.message}`)
+                            showInfo('Sucesso', data.message)
                             } else {
-                            alert(`❌ ${data.message}\n\nRecomendações:\n${data.recommendations.join('\n')}`)
+                            showError(`${data.message}\n\nRecomendações:\n${data.recommendations.join('\n')}`)
                             }
                             console.log('🔧 Teste do sistema:', data)
                         } catch (error) {
-                            alert('❌ Erro no teste do sistema')
+                            showError('Erro no teste do sistema')
                         }
                         }}
                         className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
