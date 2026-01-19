@@ -96,7 +96,14 @@ export const formatDateOnly = (dateString: string): string => {
 export const convertLocalToUtc = (localValue: string): string => {
   if (!localValue) return new Date().toISOString()
   
-  const [datePart, timePart] = localValue.split('T')
+  let datePart, timePart;
+  if (localValue.includes('T')) {
+    [datePart, timePart] = localValue.split('T')
+  } else {
+    datePart = localValue
+    timePart = '12:00' // Default to noon for dates without time to avoid timezone shifts
+  }
+  
   if (!datePart || !timePart) return new Date().toISOString()
   
   const [year, month, day] = datePart.split('-').map(Number)
@@ -129,4 +136,22 @@ export const getLocalDateTimeForInput = (date: Date | string = new Date()): stri
   const minutes = String(adjusted.getUTCMinutes()).padStart(2, '0')
   
   return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+/**
+ * Gets a local date string (YYYY-MM-DD) for input fields
+ * adjusted to the current system timezone.
+ * @param date - Date object or ISO string (defaults to now)
+ * @returns Formatted string for date input
+ */
+export const getLocalDateForInput = (date: Date | string = new Date()): string => {
+  if (!date) return ''
+  const d = typeof date === 'string' ? new Date(date) : date
+  const adjusted = adjustDateToSystemTimezone(d)
+  
+  const year = adjusted.getUTCFullYear()
+  const month = String(adjusted.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(adjusted.getUTCDate()).padStart(2, '0')
+  
+  return `${year}-${month}-${day}`
 }

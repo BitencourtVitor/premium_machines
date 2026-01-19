@@ -11,6 +11,7 @@ import { useAllocationDataRefresh } from '@/lib/allocationEvents'
 import SiteDetailsModal from './components/SiteDetailsModal'
 import MachineDetailsModal from '@/app/components/MachineDetailsModal'
 import MapControls from './components/MapControls'
+import MapLegend from './components/MapLegend'
 import { Site } from './types'
 import { useMapInitialization } from './hooks/useMapInitialization'
 import { useMapMarkers } from './hooks/useMapMarkers'
@@ -57,9 +58,10 @@ export default function MapPage() {
       // 2. Address
       if (site.address?.toLowerCase().includes(query)) return true
       
-      // 3. Machines/Extensions
-      if (site.machines && Array.isArray(site.machines)) {
-         return site.machines.some((machine: any) => {
+      // 3. Machines/Extensions (Current, Past and Future)
+      const machinesToSearch = site.all_machines || site.machines
+      if (machinesToSearch && Array.isArray(machinesToSearch)) {
+         return machinesToSearch.some((machine: any) => {
             const unitNumber = machine.unit_number?.toLowerCase() || ''
             const typeName = typeof machine.machine_type === 'object' ? machine.machine_type?.nome : machine.machine_type
             const typeStr = String(typeName || '').toLowerCase()
@@ -320,6 +322,9 @@ export default function MapPage() {
 
             {/* Controls */}
             <MapControls mapStyle={mapStyle} toggleMapStyle={toggleMapStyle} onSearch={setSearchQuery} />
+            
+            {/* Legend */}
+            <MapLegend isDark={isDark} />
           </div>
         </main>
       </div>

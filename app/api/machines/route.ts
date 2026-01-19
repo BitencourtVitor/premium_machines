@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       let current_site = machine.current_site || null
 
       if (activeAllocation) {
-        status = activeAllocation.is_in_downtime ? 'maintenance' : 'allocated'
+        status = activeAllocation.status
         current_site = {
           id: activeAllocation.site_id,
           title: activeAllocation.site_title,

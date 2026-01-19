@@ -1,7 +1,11 @@
 // Hook para gerenciar eventos de alocação globalmente
 import { useEffect, useCallback } from 'react'
 
-export type AllocationEventType = 'start_allocation' | 'end_allocation'
+export type AllocationEventType = 
+  | 'start_allocation' 
+  | 'end_allocation' 
+  | 'transport_start' 
+  | 'transport_arrival'
 
 export interface AllocationUpdateEvent {
   type: 'allocation_updated'

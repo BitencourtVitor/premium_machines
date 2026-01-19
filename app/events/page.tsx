@@ -11,7 +11,8 @@ import { useSidebar } from '@/lib/useSidebar'
 import { refreshAfterAllocation } from '@/lib/allocationEvents'
 import { 
   convertLocalToUtc, 
-  getLocalDateTimeForInput, 
+  getLocalDateTimeForInput,
+  getLocalDateForInput,
   adjustDateToSystemTimezone 
 } from '@/lib/timezone'
 import { AllocationEvent, ActiveAllocation, ActiveDowntime } from './types'
@@ -87,6 +88,7 @@ export default function EventsPage() {
     construction_type: '',
     lot_building_number: '',
     event_date: getLocalDateTimeForInput(),
+    end_date: '',
     downtime_reason: '',
     downtime_description: '',
     corrects_event_id: '',
@@ -218,6 +220,10 @@ export default function EventsPage() {
         payload.event_date = convertLocalToUtc(String(payload.event_date))
       }
 
+      if (payload.end_date) {
+        payload.end_date = convertLocalToUtc(String(payload.end_date))
+      }
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -227,14 +233,6 @@ export default function EventsPage() {
       const data = await response.json()
 
       if (data.success) {
-        setConfirmModal({
-          isOpen: true,
-          title: 'Sucesso',
-          message: editingEventId ? 'Evento atualizado com sucesso!' : 'Evento criado com sucesso!',
-          confirmButtonText: 'OK',
-          onConfirm: () => setConfirmModal(prev => ({ ...prev, isOpen: false }))
-        })
-        
         setShowCreateModal(false)
         setEditingEventId(null)
         setNewEvent({
@@ -245,6 +243,7 @@ export default function EventsPage() {
           construction_type: '',
           lot_building_number: '',
           event_date: getLocalDateTimeForInput(),
+          end_date: '',
           downtime_reason: '',
           downtime_description: '',
           corrects_event_id: '',
@@ -291,6 +290,7 @@ export default function EventsPage() {
       corrects_event_id: '',
       correction_description: '',
       notas: '',
+      end_date: '',
     })
     setShowCreateModal(true)
   }
@@ -303,6 +303,11 @@ export default function EventsPage() {
     if (event.event_date) {
       const date = new Date(event.event_date)
       localDateString = getLocalDateTimeForInput(date)
+    }
+
+    let localEndDateString = ''
+    if (event.end_date) {
+      localEndDateString = getLocalDateForInput(event.end_date)
     }
 
     setNewEvent({
@@ -318,6 +323,7 @@ export default function EventsPage() {
       corrects_event_id: event.corrects_event_id || '',
       correction_description: event.correction_description || '',
       notas: event.notas || '',
+      end_date: localEndDateString,
     })
     setShowCreateModal(true)
   }
@@ -351,6 +357,7 @@ export default function EventsPage() {
               construction_type: event.construction_type || '',
               lot_building_number: event.lot_building_number || '',
               event_date: getLocalDateTimeForInput(),
+              end_date: event.end_date ? getLocalDateForInput(event.end_date) : '',
             })
             setShowCreateModal(true)
           }
@@ -684,19 +691,20 @@ export default function EventsPage() {
 
       {/* Create Event Modal */}
       <CreateEventModal
-        showCreateModal={showCreateModal}
-        setShowCreateModal={setShowCreateModal}
-        newEvent={newEvent}
-        setNewEvent={setNewEvent}
-        machines={machines}
-        sites={sites}
-        extensions={extensions}
-        activeAllocations={activeAllocations}
-        activeDowntimes={activeDowntimes}
-        creating={creating}
-        handleCreateEvent={handleCreateEvent}
-        editingEventId={editingEventId}
-      />
+          showCreateModal={showCreateModal}
+          setShowCreateModal={setShowCreateModal}
+          newEvent={newEvent}
+          setNewEvent={setNewEvent}
+          machines={machines}
+          sites={sites}
+          extensions={extensions}
+          activeAllocations={activeAllocations}
+          activeDowntimes={activeDowntimes}
+          events={events}
+          creating={creating}
+          handleCreateEvent={handleCreateEvent}
+          editingEventId={editingEventId}
+        />
     </div>
   )
 }

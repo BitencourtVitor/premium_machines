@@ -57,6 +57,8 @@ export default function MachinesTab({
           return 'text-blue-600 dark:text-blue-400'
         case 'maintenance':
           return 'text-yellow-600 dark:text-yellow-400'
+        case 'in_transit':
+          return 'text-teal-600 dark:text-teal-400'
         default:
           return 'text-gray-600 dark:text-gray-400'
       }
@@ -98,6 +100,7 @@ export default function MachinesTab({
                     machine.status === 'available' ? 'bg-green-500' :
                     machine.status === 'allocated' ? 'bg-blue-500' :
                     machine.status === 'maintenance' ? 'bg-yellow-500' :
+                    machine.status === 'in_transit' ? 'bg-teal-500' :
                     'bg-gray-500'
                   }`}></div>
                   <span className={`text-xs font-semibold ${getStatusColor()}`}>

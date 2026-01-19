@@ -20,12 +20,12 @@ export async function calculateAllocationDays(
     return null
   }
 
-  // Buscar eventos aprovados no período
+  // Buscar eventos no período
   const { data: events, error: eventsError } = await supabaseServer
     .from('allocation_events')
     .select('*')
     .eq('machine_id', machineId)
-    .eq('status', 'approved')
+    .or('status.eq.approved,event_type.neq.refueling')
     .gte('event_date', periodStart.toISOString())
     .lte('event_date', periodEnd.toISOString())
     .order('event_date', { ascending: true })

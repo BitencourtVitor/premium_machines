@@ -22,9 +22,13 @@ export async function GET() {
     const maintenanceMachineIds = new Set(
       activeAllocations.filter(a => a.is_in_downtime).map(a => a.machine_id)
     )
+    const inTransitMachineIds = new Set(
+      activeAllocations.filter(a => a.status === 'in_transit').map(a => a.machine_id)
+    )
 
     const allocatedMachines = machinesList.filter(m => allocatedMachineIds.has(m.id)).length
     const maintenanceMachines = machinesList.filter(m => maintenanceMachineIds.has(m.id)).length
+    const inTransitMachines = machinesList.filter(m => inTransitMachineIds.has(m.id)).length
     const availableMachines = totalMachines - allocatedMachines
 
     const ownedMachines = machinesList.filter(m => m.ownership_type === 'owned').length
@@ -80,6 +84,7 @@ export async function GET() {
       allocatedMachines,
       availableMachines,
       maintenanceMachines,
+      inTransitMachines,
       totalSites,
       activeSites,
       pendingEvents: pendingCount,

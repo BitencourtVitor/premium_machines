@@ -32,7 +32,7 @@ export default function MapControls({ mapStyle, toggleMapStyle, onSearch }: MapC
   }
 
   return (
-    <div className="absolute top-4 left-4 z-10 flex items-start gap-2">
+    <div className="absolute top-4 left-4 z-[10001] flex items-start gap-2">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-1 h-10 w-10 flex items-center justify-center">
         <button
           onClick={toggleMapStyle}

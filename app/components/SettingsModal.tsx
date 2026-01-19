@@ -91,7 +91,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   ]
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center p-4 md:p-6 z-[100]">
+    <div className="fixed inset-0 flex items-center justify-center p-4 md:p-6 z-[10010]">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm transition-opacity duration-300"

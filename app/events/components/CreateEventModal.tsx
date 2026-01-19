@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import CustomDropdown from '../../components/CustomDropdown'
-import { NewEventState, ActiveDowntime, ActiveAllocation } from '../types'
+import { NewEventState, ActiveDowntime, ActiveAllocation, AllocationEvent } from '../types'
 import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 import { formatDateOnly } from '@/lib/timezone'
 import { filterMachinesForEvent } from '../utils'
@@ -18,6 +18,7 @@ interface CreateEventModalProps {
   extensions: any[]
   activeAllocations: ActiveAllocation[]
   activeDowntimes: ActiveDowntime[]
+  events?: AllocationEvent[]
   creating: boolean
   handleCreateEvent: () => void
   editingEventId?: string | null
@@ -33,6 +34,7 @@ export default function CreateEventModal({
   extensions,
   activeAllocations,
   activeDowntimes,
+  events = [],
   creating,
   handleCreateEvent,
   editingEventId
@@ -53,6 +55,29 @@ export default function CreateEventModal({
     }
   }, [showCreateModal, editingEventId, newEvent.machine_id, newEvent.event_type])
 
+  // Auto-preencher site_id para fim de alocação baseado no histórico
+  useEffect(() => {
+    if (newEvent.event_type === 'end_allocation' && newEvent.machine_id && !editingEventId && showCreateModal) {
+      const lastSiteEvent = events
+        .filter(e => 
+          e.machine?.id === newEvent.machine_id && 
+          e.site?.id && 
+          e.status === 'approved' &&
+          ['start_allocation', 'transport_arrival', 'extension_attach'].includes(e.event_type)
+        )
+        .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())[0]
+
+      if (lastSiteEvent) {
+        setNewEvent({
+          ...newEvent,
+          site_id: lastSiteEvent.site?.id || '',
+          construction_type: lastSiteEvent.construction_type || '',
+          lot_building_number: lastSiteEvent.lot_building_number || ''
+        })
+      }
+    }
+  }, [newEvent.machine_id, newEvent.event_type, showCreateModal, events, editingEventId])
+
   const validateForm = () => {
     if (!newEvent.event_date) return 'A data do evento é obrigatória.'
     
@@ -62,8 +87,12 @@ export default function CreateEventModal({
         : 'A seleção de máquina é obrigatória.'
     }
 
-    if (['start_allocation', 'request_allocation', 'extension_attach'].includes(newEvent.event_type)) {
-      if (!newEvent.site_id) return 'O local (jobsite) é obrigatório.'
+    if (['start_allocation', 'request_allocation', 'extension_attach', 'transport_start', 'transport_arrival'].includes(newEvent.event_type)) {
+      if (newEvent.event_type !== 'transport_start' && !newEvent.site_id) return 'O local (jobsite) é obrigatório.'
+      
+      if (['start_allocation', 'request_allocation', 'extension_attach'].includes(newEvent.event_type) && !newEvent.end_date) {
+        return 'A data de vencimento é obrigatória.'
+      }
       
       if (newEvent.construction_type && !newEvent.lot_building_number) {
         return 'O número do lote/prédio é obrigatório quando o tipo de construção é selecionado.'
@@ -99,7 +128,8 @@ export default function CreateEventModal({
     newEvent.event_type,
     machines,
     activeAllocations,
-    activeDowntimes
+    activeDowntimes,
+    events
   )
 
   // Ensure selected machine is in the list when editing
@@ -137,19 +167,49 @@ export default function CreateEventModal({
   }
 
   const getAvailableCount = (type: string) => {
+    const allItems = [...(machines || []), ...(extensions || [])]
+    
     if (type === 'extension_attach') {
       return extensions.length
     }
     if (type === 'refueling') {
-      return machines.length
+      return allItems.length
     }
-    return filterMachinesForEvent(type, machines, activeAllocations, activeDowntimes).length
+    return filterMachinesForEvent(type, allItems, activeAllocations, activeDowntimes, events).length
   }
 
   // Helpers for auto-filling and feedback
   const activeAlloc = activeAllocations.find(a => a.machine_id === newEvent.machine_id)
-  const activeDowntime = activeDowntimes.find(d => d.machine_id === newEvent.machine_id)
   
+  // Buscar o evento mais recente que tenha um site associado para esta máquina
+  const lastSiteEvent = events
+    .filter(e => 
+      e.machine?.id === newEvent.machine_id && 
+      e.site?.id && 
+      e.status === 'approved' &&
+      ['start_allocation', 'transport_arrival', 'extension_attach'].includes(e.event_type)
+    )
+    .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())[0]
+
+  const activeDowntime = activeDowntimes.find(d => d.machine_id === newEvent.machine_id)
+  const selectedMachine = machines.find(m => m.id === newEvent.machine_id)
+  
+  // Definir o título do site atual baseado na alocação ativa ou no evento mais recente
+  const machineCurrentSiteTitle = activeAlloc?.site_title || 
+                                 lastSiteEvent?.site?.title || 
+                                 selectedMachine?.current_site?.title
+  
+  // Definir os dados da obra atual para exibição no Fim de Alocação
+  const currentSiteInfo = activeAlloc ? {
+    title: activeAlloc.site_title,
+    construction_type: activeAlloc.construction_type,
+    lot_building_number: activeAlloc.lot_building_number
+  } : lastSiteEvent ? {
+    title: lastSiteEvent.site?.title,
+    construction_type: lastSiteEvent.construction_type,
+    lot_building_number: lastSiteEvent.lot_building_number
+  } : null
+
   // Logic for Extension Allocation Feedback: Machines at selected site
   const machinesAtSite = newEvent.site_id 
     ? activeAllocations
@@ -165,7 +225,9 @@ export default function CreateEventModal({
       downtime_start: getAvailableCount('downtime_start'),
       downtime_end: getAvailableCount('downtime_end'),
       refueling: getAvailableCount('refueling'),
-      extension_attach: getAvailableCount('extension_attach')
+      extension_attach: getAvailableCount('extension_attach'),
+      transport_start: getAvailableCount('transport_start'),
+      transport_arrival: getAvailableCount('transport_arrival')
     }
 
     const Button = ({ type, label, desc, color, icon, count, customStyle }: any) => {
@@ -180,7 +242,7 @@ export default function CreateEventModal({
       const iconBoxClass = customStyle?.iconBox || defaultClasses.iconBox
 
       const shouldDisable =
-        ['end_allocation', 'downtime_start', 'downtime_end'].includes(type) && count === 0
+        ['end_allocation', 'downtime_start', 'downtime_end', 'transport_arrival'].includes(type) && count === 0
 
       return (
         <button
@@ -256,6 +318,28 @@ export default function CreateEventModal({
         {/* Section 2: Demais Eventos */}
         <div className="flex-1">
           <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-1 border-b border-gray-100 dark:border-gray-700 pb-2">
+            Logística e Transporte
+          </h3>
+          <div className="mt-3">
+            <Button 
+              type="transport_start" 
+              label="Início de Transporte" 
+              desc="Máquina saiu para outra obra" 
+              color="teal" 
+              count={counts.transport_start}
+              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>}
+            />
+            <Button 
+              type="transport_arrival" 
+              label="Chegada em Obra" 
+              desc="Máquina chegou no destino" 
+              color="cyan" 
+              count={counts.transport_arrival}
+              icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
+            />
+          </div>
+
+          <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 mt-6 px-1 border-b border-gray-100 dark:border-gray-700 pb-2">
             Demais Eventos
           </h3>
           <div className="mt-3">
@@ -302,12 +386,14 @@ export default function CreateEventModal({
       case 'downtime_end': return `${prefix}Fim de Manutenção`
       case 'refueling': return `${prefix}Abastecimento de Combustível`
       case 'extension_attach': return `${prefix}Alocação de Extensão`
+      case 'transport_start': return `${prefix}Início de Transporte`
+      case 'transport_arrival': return `${prefix}Chegada em Obra`
       default: return `${prefix}Evento`
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 sm:p-6">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010] p-4 sm:p-6">
       <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full ${step === 'selection' ? 'max-w-4xl' : 'max-w-lg'} max-h-[90vh] overflow-hidden flex flex-col transition-all duration-300`}>
         <div className="bg-white dark:bg-gray-800 flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -345,8 +431,8 @@ export default function CreateEventModal({
         <div className="p-6 space-y-4 flex-1 overflow-y-auto">
           {step === 'selection' ? renderSelection() : (
             <>
-              {/* Special Case: Extension Attach shows Site FIRST */}
-              {newEvent.event_type === 'extension_attach' && (
+              {/* Special Case: Extension Attach and Transport Arrival shows Site FIRST */}
+              {['extension_attach', 'transport_arrival'].includes(newEvent.event_type) && (
                 <>
                   <CustomDropdown
                     label="Jobsite *"
@@ -415,15 +501,33 @@ export default function CreateEventModal({
 
               {/* Feedback Info Boxes */}
               
+              {/* Transport Start: Show current site */}
+              {newEvent.event_type === 'transport_start' && machineCurrentSiteTitle && (
+                <div className="p-3 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg">
+                  <p className="text-sm text-teal-800 dark:text-teal-200">
+                    <span className="font-semibold">Saindo de:</span> {machineCurrentSiteTitle}
+                  </p>
+                </div>
+              )}
+
+              {/* Transport Arrival: Show target site info if selected */}
+              {newEvent.event_type === 'transport_arrival' && newEvent.site_id && (
+                <div className="p-3 bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg">
+                  <p className="text-sm text-cyan-800 dark:text-cyan-200">
+                    <span className="font-semibold">Destino:</span> {sites.find(s => s.id === newEvent.site_id)?.title}
+                  </p>
+                </div>
+              )}
+
               {/* End Allocation: Show current allocation info */}
-              {newEvent.event_type === 'end_allocation' && activeAlloc && (
+              {newEvent.event_type === 'end_allocation' && currentSiteInfo && (
                 <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                    <p className="text-sm text-red-800 dark:text-red-200">
-                     <span className="font-semibold">Alocado em:</span> {activeAlloc.site_title}
+                     <span className="font-semibold">Local Atual (Último Evento):</span> {currentSiteInfo.title}
                    </p>
-                   {activeAlloc.construction_type && (
+                   {currentSiteInfo.construction_type && (
                       <p className="text-xs text-red-600 dark:text-red-300 mt-1">
-                        Tipo: {activeAlloc.construction_type === 'lot' ? 'Lote' : 'Prédio'} {activeAlloc.lot_building_number}
+                        Tipo: {currentSiteInfo.construction_type === 'lot' ? 'Lote' : 'Prédio'} {currentSiteInfo.lot_building_number}
                       </p>
                    )}
                 </div>
@@ -434,6 +538,15 @@ export default function CreateEventModal({
                 <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
                    <p className="text-sm text-orange-800 dark:text-orange-200">
                      <span className="font-semibold">Status Atual:</span> Alocado em {activeAlloc.site_title}
+                   </p>
+                </div>
+              )}
+
+              {/* Transport Arrival: Show in transit info */}
+              {newEvent.event_type === 'transport_arrival' && !newEvent.site_id && (
+                <div className="p-3 bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg">
+                   <p className="text-sm text-cyan-800 dark:text-cyan-200">
+                     <span className="font-semibold">Destino:</span> Selecione a nova obra abaixo.
                    </p>
                 </div>
               )}
@@ -511,18 +624,35 @@ export default function CreateEventModal({
                 </>
               )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {newEvent.event_type === 'request_allocation' ? "Data/Hora de Necessidade *" : "Data/Hora do Evento *"}
-                </label>
-                <input
-                  type="datetime-local"
-                  value={newEvent.event_date}
-                  onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-                {newEvent.event_type === 'request_allocation' && (
-                  <p className="text-xs text-gray-500 mt-1">Informe quando a máquina será necessária na obra.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {newEvent.event_type === 'request_allocation' ? "Data/Hora de Necessidade *" : "Data/Hora do Evento *"}
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={newEvent.event_date}
+                    onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  {newEvent.event_type === 'request_allocation' && (
+                    <p className="text-xs text-gray-500 mt-1">Informe quando a máquina será necessária na obra.</p>
+                  )}
+                </div>
+
+                {['start_allocation', 'request_allocation', 'extension_attach'].includes(newEvent.event_type) && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Data de Vencimento *
+                    </label>
+                    <input
+                      type="date"
+                      value={newEvent.end_date || ''}
+                      onChange={(e) => setNewEvent({ ...newEvent, end_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Data final do aluguel/alocação.</p>
+                  </div>
                 )}
               </div>
 

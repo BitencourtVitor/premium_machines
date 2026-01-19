@@ -10,6 +10,7 @@ export interface Site {
   machines_count: number
   created_at: string
   is_headquarters?: boolean
+  machines?: any[]
 }
 
 export interface SiteMetrics {

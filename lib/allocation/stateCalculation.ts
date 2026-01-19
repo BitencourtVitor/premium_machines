@@ -5,7 +5,7 @@ import { MachineAllocationState, ExtensionState } from './types'
  * Calcula o estado atual de uma máquina a partir de uma lista de eventos já carregada
  * Função pura, sem acesso ao banco de dados
  */
-export function calculateStateFromEvents(machineId: string, events: any[]): MachineAllocationState {
+export function calculateStateFromEvents(machineId: string, events: any[], referenceDate: Date = new Date()): MachineAllocationState {
   // Estado inicial
   const state: MachineAllocationState = {
     machine_id: machineId,
@@ -18,6 +18,7 @@ export function calculateStateFromEvents(machineId: string, events: any[]): Mach
     is_in_downtime: false,
     current_downtime_event_id: null,
     allocation_start: null,
+    end_date: null,
     downtime_start: null,
     attached_extensions: [],
   }
@@ -26,8 +27,17 @@ export function calculateStateFromEvents(machineId: string, events: any[]): Mach
     return state
   }
 
+  // Obter data de referência em formato ISO (YYYY-MM-DD) para comparação
+  const refDateStr = referenceDate.toISOString().split('T')[0]
+
   // Processar eventos em ordem cronológica
   for (const event of events) {
+    // Se o evento é futuro em relação à data de referência, ignoramos para o estado "atual"
+    const eventDateStr = event.event_date.split('T')[0]
+    if (eventDateStr > refDateStr) {
+      break
+    }
+
     switch (event.event_type) {
       case 'request_allocation':
         // Eventos de solicitação não afetam o estado atual da máquina
@@ -46,38 +56,30 @@ export function calculateStateFromEvents(machineId: string, events: any[]): Mach
           state.construction_type = event.construction_type
           state.lot_building_number = event.lot_building_number
           state.allocation_start = event.event_date
+          state.end_date = event.end_date
           state.status = 'allocated'
-          // Limpar downtime ao iniciar nova alocação
-          state.is_in_downtime = false
-          state.current_downtime_event_id = null
-          state.downtime_start = null
         }
         break
 
       case 'end_allocation':
         // Só encerra se o site corresponder
         if (state.current_site_id && (!event.site_id || state.current_site_id === event.site_id)) {
-          state.current_site_id = null
-          state.current_site_title = null
+          // Mantemos o current_site_id pois a máquina continua fisicamente no local
+          // até que um transporte seja registrado.
+          state.status = 'available'
           state.current_allocation_event_id = null
           state.construction_type = null
           state.lot_building_number = null
           state.allocation_start = null
-          state.status = 'available'
-          // Limpar downtime ao encerrar alocação
-          state.is_in_downtime = false
-          state.current_downtime_event_id = null
-          state.downtime_start = null
+          state.end_date = null
         }
         break
 
       case 'downtime_start':
-        if (state.current_site_id) {
-          state.is_in_downtime = true
-          state.current_downtime_event_id = event.id
-          state.downtime_start = event.event_date
-          state.status = 'maintenance'
-        }
+        state.is_in_downtime = true
+        state.current_downtime_event_id = event.id
+        state.downtime_start = event.event_date
+        state.status = 'maintenance'
         break
 
       case 'downtime_end':
@@ -112,10 +114,8 @@ export function calculateStateFromEvents(machineId: string, events: any[]): Mach
           state.construction_type = event.construction_type
           state.lot_building_number = event.lot_building_number
           state.allocation_start = event.event_date
+          state.end_date = event.end_date
           state.status = 'allocated'
-          state.is_in_downtime = false
-          state.current_downtime_event_id = null
-          state.downtime_start = null
         }
         break
 
@@ -126,6 +126,53 @@ export function calculateStateFromEvents(machineId: string, events: any[]): Mach
           )
         }
         break
+
+      case 'transport_start':
+        // A máquina inicia o deslocamento. Ela continua vinculada à obra de origem, 
+        // mas o status muda para indicar que não está operando.
+        state.status = 'in_transit'
+        // Registrar o evento de início de transporte como o evento ativo
+        state.current_allocation_event_id = event.id
+        break
+
+      case 'transport_arrival':
+        // A máquina chega em um novo local.
+        if (event.site_id) {
+          state.current_site_id = event.site_id
+          state.current_site_title = event.site?.title || null
+          
+          // Se a máquina já estava alocada (vinda de um start_allocation anterior), 
+          // mantemos o status como alocado e preservamos as datas e contrato.
+          // O usuário ressaltou que alocação e presença física são datas distintas.
+          if (state.allocation_start) {
+            state.status = state.is_in_downtime ? 'maintenance' : 'allocated'
+            // Preservamos construction_type e lot_building_number se vierem no transporte, 
+            // caso contrário mantemos os atuais da alocação.
+            if (event.construction_type) state.construction_type = event.construction_type
+            if (event.lot_building_number) state.lot_building_number = event.lot_building_number
+            // IMPORTANTE: Não atualizamos a data de vencimento (end_date) na chegada do transporte.
+            // O usuário declarou que o evento de início de alocação é a fonte da verdade para o vencimento.
+          } else {
+            // Se não havia alocação anterior, ela chega como disponível no novo local
+            state.status = state.is_in_downtime ? 'maintenance' : 'available'
+            state.construction_type = event.construction_type || null
+            state.lot_building_number = event.lot_building_number || null
+            state.allocation_start = event.event_date || null
+            state.end_date = event.end_date || null
+          }
+          
+          // O evento de chegada passa a ser o evento atual da máquina no local
+          state.current_allocation_event_id = event.id
+        }
+        break
+    }
+  }
+
+  // Verificar se a alocação está excedida (apenas se estiver 'allocated')
+  if (state.status === 'allocated' && state.end_date) {
+    const endDateStr = state.end_date.split('T')[0]
+    if (refDateStr > endDateStr) {
+      state.status = 'exceeded'
     }
   }
 
@@ -137,7 +184,7 @@ export function calculateStateFromEvents(machineId: string, events: any[]): Mach
  * Esta é a função fundamental que deriva o estado dos eventos
  */
 export async function calculateMachineAllocationState(machineId: string): Promise<MachineAllocationState> {
-  // Buscar todos os eventos aprovados para esta máquina, ordenados cronologicamente
+  // Buscar todos os eventos para esta máquina, ordenados cronologicamente
   const { data: events, error } = await supabaseServer
     .from('allocation_events')
     .select(`
@@ -145,10 +192,10 @@ export async function calculateMachineAllocationState(machineId: string): Promis
       site:sites(id, title),
       extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment))
     `)
-    .eq('machine_id', machineId)
-    .eq('status', 'approved')
+    .or(`machine_id.eq.${machineId},extension_id.eq.${machineId}`)
+    .or('status.eq.approved,event_type.neq.refueling')
     .order('event_date', { ascending: true })
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: true }) // Ordem determinística para eventos no mesmo dia
 
   if (error) {
     throw new Error(`Erro ao buscar eventos: ${error.message}`)
@@ -158,7 +205,7 @@ export async function calculateMachineAllocationState(machineId: string): Promis
 }
 
 /**
- * Calcula o estado atual de uma extensão a partir dos eventos aprovados
+ * Calcula o estado atual de uma extensão a partir dos eventos
  */
 export async function calculateExtensionState(extensionId: string): Promise<ExtensionState> {
   const { data: events, error } = await supabaseServer
@@ -168,7 +215,7 @@ export async function calculateExtensionState(extensionId: string): Promise<Exte
       machine:machines(id, unit_number)
     `)
     .eq('extension_id', extensionId)
-    .eq('status', 'approved')
+    .or('status.eq.approved,event_type.neq.refueling')
     .in('event_type', ['extension_attach', 'extension_detach'])
     .order('event_date', { ascending: true })
     .order('created_at', { ascending: true })

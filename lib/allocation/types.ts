@@ -33,31 +33,34 @@ export interface AttachedExtension {
 }
 
 export interface ActiveAllocation {
-  allocation_event_id: string
+  allocation_event_id: string | null
   machine_id: string
   machine_unit_number: string
   machine_type: string
   machine_ownership: 'owned' | 'rented'
   machine_supplier_id: string | null
   machine_supplier_name: string | null
-  site_id: string
+  site_id: string | null
   site_title: string
   construction_type: 'lot' | 'building' | null
   lot_building_number: string | null
   allocation_start: string
+  start_date?: string
+  end_date?: string | null
   is_in_downtime: boolean
   current_downtime_event_id: string | null
   current_downtime_reason: string | null
   current_downtime_start: string | null
   attached_extensions: AttachedExtension[]
+  status: 'available' | 'allocated' | 'maintenance' | 'inactive' | 'in_transit' | 'exceeded'
 }
 
 export interface ActiveDowntime {
   downtime_event_id: string
   machine_id: string
   machine_unit_number: string
-  site_id: string
-  site_title: string
+  site_id: string | null
+  site_title: string | null
   downtime_reason: string
   downtime_description: string | null
   downtime_start: string
@@ -70,10 +73,11 @@ export interface MachineAllocationState {
   current_allocation_event_id: string | null
   construction_type: 'lot' | 'building' | null
   lot_building_number: string | null
-  status: 'available' | 'allocated' | 'maintenance' | 'inactive'
+  status: 'available' | 'allocated' | 'maintenance' | 'inactive' | 'in_transit' | 'exceeded'
   is_in_downtime: boolean
   current_downtime_event_id: string | null
   allocation_start: string | null
+  end_date?: string | null
   downtime_start: string | null
   attached_extensions: AttachedExtension[]
 }
@@ -83,7 +87,7 @@ export interface ExtensionState {
   current_machine_id: string | null
   current_machine_unit_number: string | null
   attach_event_id: string | null
-  status: 'available' | 'attached' | 'maintenance' | 'inactive'
+  status: 'available' | 'attached' | 'maintenance' | 'inactive' | 'in_transit'
   attached_at: string | null
 }
 

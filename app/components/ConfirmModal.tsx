@@ -39,7 +39,7 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   return (
     <Transition show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-[100]" onClose={onClose}>
+      <Dialog as="div" className="relative z-[10020]" onClose={onClose}>
         <TransitionChild
           as={Fragment}
           enter="ease-out duration-300"

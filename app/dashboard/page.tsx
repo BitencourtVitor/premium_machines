@@ -22,6 +22,7 @@ export default function DashboardPage() {
     allocatedMachines: 0,
     availableMachines: 0,
     maintenanceMachines: 0,
+    inTransitMachines: 0,
     totalSites: 0,
     activeSites: 0,
     pendingEvents: 0,
@@ -249,6 +250,10 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <span className="text-gray-600 dark:text-gray-300">Under Maintenance</span>
                       <span className="font-semibold text-yellow-600 dark:text-yellow-400">{stats.maintenanceMachines}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <span className="text-gray-600 dark:text-gray-300">In Transit</span>
+                      <span className="font-semibold text-teal-600 dark:text-teal-400">{stats.inTransitMachines}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <span className="text-gray-600 dark:text-gray-300">Active Jobsites</span>

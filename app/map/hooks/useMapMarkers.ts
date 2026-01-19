@@ -65,7 +65,8 @@ export function useMapMarkers({
       const el = document.createElement('div')
       el.className = 'marker-container'
       el.style.cursor = 'pointer'
-      el.style.zIndex = isSelected ? '1002' : '1000'
+      // Reduzir z-index para não sobrepor os controles do mapa
+      el.style.zIndex = isSelected ? '5' : '1'
       // Sede com borda de 1px normal, 2px selecionado
       const borderWidth = isSelected ? '2px' : '1px'
       el.innerHTML = `
@@ -92,14 +93,14 @@ export function useMapMarkers({
       // Se a sede estiver selecionada, criar painel separado
       if (isSelected) {
         const panelEl = createSitePanel(headquarters, currentIsDark)
-        // Calcular posição abaixo do marcador (100 pixels abaixo)
-        const markerLngLat = [Number(headquarters.longitude), Number(headquarters.latitude)] as [number, number]
-        const markerPoint = mapInstance.project(markerLngLat)
-        const offsetPoint = [markerPoint.x, markerPoint.y + 100] as [number, number]
-        const offsetLngLat = mapInstance.unproject(offsetPoint)
-
-        const panelMarker = new mapboxgl.Marker(panelEl)
-          .setLngLat(offsetLngLat)
+        
+        // Posicionar fixo abaixo do marcador, ancorado no topo para crescer para baixo
+        const panelMarker = new mapboxgl.Marker({
+          element: panelEl,
+          anchor: 'top',
+          offset: [0, 20] // Offset para baixo para não cobrir o ícone da sede
+        })
+          .setLngLat([Number(headquarters.longitude), Number(headquarters.latitude)])
           .addTo(mapInstance)
         markersRef.current.push(panelMarker)
       }
@@ -149,13 +150,14 @@ export function useMapMarkers({
 
         if (isSelected) {
           const panelEl = createSitePanel(site, currentIsDark)
-          const markerLngLat = [Number(site.longitude), Number(site.latitude)] as [number, number]
-          const markerPoint = mapInstance.project(markerLngLat)
-          const offsetPoint = [markerPoint.x, markerPoint.y + 140] as [number, number]
-          const offsetLngLat = mapInstance.unproject(offsetPoint)
-
-          const panelMarker = new mapboxgl.Marker(panelEl)
-            .setLngLat(offsetLngLat)
+          
+          // Posicionar fixo abaixo do marcador, ancorado no topo para crescer para baixo
+          const panelMarker = new mapboxgl.Marker({
+            element: panelEl,
+            anchor: 'top',
+            offset: [0, 20] // Offset para baixo para não cobrir o ícone da obra
+          })
+            .setLngLat([Number(site.longitude), Number(site.latitude)])
             .addTo(mapInstance)
           markersRef.current.push(panelMarker)
         }
@@ -167,6 +169,7 @@ export function useMapMarkers({
             const el = document.createElement('div')
             el.className = 'marker-container'
             el.style.cursor = 'pointer'
+            el.style.zIndex = '1'
             el.style.transition = 'all 0.3s ease' // Transição suave de cor
             el.innerHTML = `
               <div class="relative transition-colors duration-300">

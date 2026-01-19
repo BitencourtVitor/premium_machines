@@ -186,9 +186,9 @@ export default function DebugPage() {
                             const response = await fetch('/api/sync/all', { method: 'POST' })
                             const data = await response.json()
                             if (data.success) {
-                            showInfo('Sucesso', data.message)
-                            loadEvents() // Recarregar após sync
-                            } else {
+              // showInfo('Sucesso', data.message)
+              loadEvents() // Recarregar após sync
+            } else {
                             showError(data.message)
                             }
                         } catch (error) {
@@ -224,8 +224,8 @@ export default function DebugPage() {
                             const response = await fetch('/api/test/system')
                             const data = await response.json()
                             if (data.success) {
-                            showInfo('Sucesso', data.message)
-                            } else {
+              // showInfo('Sucesso', data.message)
+            } else {
                             showError(`${data.message}\n\nRecomendações:\n${data.recommendations.join('\n')}`)
                             }
                             console.log('🔧 Teste do sistema:', data)

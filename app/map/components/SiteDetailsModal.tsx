@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import MachineImage from '@/app/components/MachineImage'
 import { AllocationEvent } from '@/app/events/types'
-import { getEventConfig, formatDate } from '@/app/events/utils'
+import { getEventConfig, formatDate, formatDateOnly } from '@/app/events/utils'
 import { adjustDateToSystemTimezone, formatWithSystemTimezone } from '@/lib/timezone'
 import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 
@@ -24,9 +24,40 @@ export default function SiteDetailsModal({
 }: SiteDetailsModalProps) {
   const [calendarMonth, setCalendarMonth] = useState(new Date())
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null)
+  const [selectedAllocationId, setSelectedAllocationId] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [activeTab, setActiveTab] = useState<'calendar' | 'history'>('calendar')
   const [, setTimezoneTick] = useState(0)
+
+  // Memo para a alocação selecionada e seu intervalo de meses
+  const selectedAllocation = useMemo(() => {
+    return allocations.find(a => a.allocation_event_id === selectedAllocationId)
+  }, [allocations, selectedAllocationId])
+
+  const minMonth = useMemo(() => {
+    if (!selectedAllocation) return null
+    const date = new Date(selectedAllocation.start_date || selectedAllocation.allocation_start)
+    return new Date(date.getFullYear(), date.getMonth(), 1)
+  }, [selectedAllocation])
+
+  const maxMonth = useMemo(() => {
+    if (!selectedAllocation) return null
+    // Se não tiver end_date, a alocação ainda está ativa, então permitimos até o mês atual
+    const endDate = selectedAllocation.end_date ? new Date(selectedAllocation.end_date) : new Date()
+    return new Date(endDate.getFullYear(), endDate.getMonth(), 1)
+  }, [selectedAllocation])
+
+  // Resetar o mês do calendário quando mudar de alocação para focar no início dela
+  useEffect(() => {
+    if (minMonth) {
+      setCalendarMonth(minMonth)
+    }
+  }, [selectedAllocationId, minMonth])
+
+  // Helper para obter string YYYY-MM-DD no fuso horário do sistema
+  const getSystemDateStr = useCallback((date: Date | string) => {
+    return adjustDateToSystemTimezone(date).toISOString().split('T')[0]
+  }, [])
 
   // Filtrar eventos de abastecimento para mostrar apenas os confirmados
   const filteredEvents = useMemo(() => {
@@ -46,13 +77,25 @@ export default function SiteDetailsModal({
     return () => window.removeEventListener('timezoneChange', handleTimezoneChange)
   }, [])
 
-  // Selecionar a primeira máquina automaticamente ao abrir
+  // Selecionar a primeira máquina automaticamente ao abrir ou mudar de site
   useEffect(() => {
-    if (isOpen && allocations.length > 0 && !selectedMachineId) {
+    if (isOpen && !loading && allocations.length > 0) {
+      // Sempre seleciona a primeira se não houver nada selecionado ou se o site mudou
       setSelectedMachineId(allocations[0].machine_id)
+      setSelectedAllocationId(allocations[0].allocation_event_id)
       setSelectedDate(null)
     }
-  }, [isOpen, allocations, selectedMachineId])
+  }, [isOpen, loading, site?.id, allocations])
+
+  // Resetar seleção ao fechar
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedMachineId(null)
+      setSelectedAllocationId(null)
+      setSelectedDate(null)
+      setActiveTab('calendar')
+    }
+  }, [isOpen])
 
   const getEntityEvents = useCallback((allEvents: any[], entityId: string | null) => {
     if (!entityId) return []
@@ -64,73 +107,177 @@ export default function SiteDetailsModal({
     )
   }, [])
 
+  const getExpirationDate = useCallback((machineId: string | null) => {
+    if (!machineId) return null
+    // Prioriza a alocação selecionada no histórico lateral
+    const allocation = selectedAllocationId 
+      ? allocations.find(a => String(a.allocation_event_id) === String(selectedAllocationId))
+      : allocations.find(a => a.machine_id === machineId)
+      
+    if (!allocation?.end_date) return null
+    return getSystemDateStr(allocation.end_date)
+  }, [allocations, getSystemDateStr, selectedAllocationId])
+
+  const getStartDate = useCallback((machineId: string | null) => {
+    if (!machineId) return null
+    const allocation = selectedAllocationId 
+      ? allocations.find(a => String(a.allocation_event_id) === String(selectedAllocationId))
+      : allocations.find(a => a.machine_id === machineId)
+      
+    const dateToUse = allocation?.start_date || allocation?.allocation_start
+    if (!dateToUse) return null
+    return getSystemDateStr(dateToUse)
+  }, [allocations, getSystemDateStr, selectedAllocationId])
+
   const getDayStatus = useCallback((date: Date, entityId: string | null, allEvents: any[]) => {
     if (!entityId) return 'not-allocated'
 
-    // Formatar a data para comparação (YYYY-MM-DD) usando a data local do calendário
-    // O calendário já gera datas locais do navegador, então usamos o formato ISO
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = getSystemDateStr(date)
+    const todayStr = getSystemDateStr(new Date())
     
+    // IMPORTANTE: Usamos todos os eventos da máquina, não apenas desta obra
     const entityEvents = getEntityEvents(allEvents, entityId)
-    
     const sortedEvents = [...entityEvents].sort((a, b) => 
       new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
     )
 
     let isAllocated = false
     let isInDowntime = false
-    let lastAllocationStart = null
+    let isInTransit = false
 
     for (const event of sortedEvents) {
-      // Ajustar a data do evento para o fuso horário do sistema para comparação justa com o calendário
-      const eventDateStr = adjustDateToSystemTimezone(event.event_date).toISOString().split('T')[0]
+      const eventDateStr = getSystemDateStr(event.event_date)
       if (eventDateStr > dateStr) break
+      
+      // Consideramos eventos aprovados ou de abastecimento (que indicam atividade)
+      if (event.status !== 'approved' && event.event_type !== 'refueling') continue
 
-      if (event.status !== 'approved') continue
-
-      if (event.event_type === 'start_allocation' || event.event_type === 'extension_attach') {
-        isAllocated = true
-        isInDowntime = false
-        lastAllocationStart = eventDateStr
-      } else if (event.event_type === 'end_allocation' || event.event_type === 'extension_detach') {
-        if (eventDateStr < dateStr) {
-          isAllocated = false
-        } else if (eventDateStr === dateStr) {
+      switch (event.event_type) {
+        case 'start_allocation':
+        case 'extension_attach':
+        case 'transport_arrival':
           isAllocated = true
-        }
-      } else if (event.event_type === 'downtime_start') {
-        if (isAllocated) isInDowntime = true
-      } else if (event.event_type === 'downtime_end') {
-        if (isAllocated && eventDateStr < dateStr) {
           isInDowntime = false
-        }
+          // No dia da chegada, o transporte ainda é a prioridade visual (roxo)
+          if (event.event_type === 'transport_arrival' && eventDateStr === dateStr) {
+            isInTransit = true
+          } else {
+            isInTransit = false
+          }
+          break
+        
+        case 'transport_start':
+          isInTransit = true
+          // O usuário ressaltou que alocação e presença física são coisas distintas.
+          // Mesmo em trânsito, a máquina continua "alocada" comercialmente.
+          // isAllocated = true // Mantemos como true se já estava alocada
+          break
+
+        case 'end_allocation':
+        case 'extension_detach':
+          // A máquina só deixa de estar alocada no dia SEGUINTE ao fim real
+          if (eventDateStr < dateStr) {
+            isAllocated = false
+            isInTransit = false
+            isInDowntime = false
+          }
+          break
+
+        case 'downtime_start':
+        case 'start_downtime':
+          isInDowntime = true
+          break
+
+        case 'downtime_end':
+        case 'end_downtime':
+          // Fica em manutenção até o fim do dia do evento
+          if (eventDateStr < dateStr) {
+            isInDowntime = false
+          }
+          break
       }
     }
 
-    if (!isAllocated) return 'not-allocated'
-    if (isInDowntime) return 'maintenance'
-    
-    // Verificar se é futuro e solicitado usando o fuso horário do sistema
-    const today = adjustDateToSystemTimezone(new Date()).toISOString().split('T')[0]
-    if (dateStr > today) {
-        // Lógica futura simplificada: se está alocado (sem fim definido), é 'working' (verde) ou 'requested' (azul)?
-        // Se já começou, é working (verde planejado).
-        return 'working' 
+    if (isAllocated) {
+      const expirationDate = getExpirationDate(entityId)
+      // Se a data do calendário for POSTERIOR ao vencimento planejado
+      if (expirationDate && dateStr > expirationDate) {
+        // Se estiver em manutenção ou transporte no dia excedido, 
+        // priorizamos a visualização do estado físico, mas garantimos que 
+        // o 'working-exceeded' seja o fallback se não houver outro estado especial.
+        if (isInTransit) return 'in-transit'
+        if (isInDowntime) return 'maintenance'
+        return 'working-exceeded'
+      }
+      
+      if (isInTransit) return 'in-transit'
+      if (isInDowntime) return 'maintenance'
+      return 'working'
     }
 
-    return 'working'
-  }, [getEntityEvents])
+    return 'not-allocated'
+  }, [getExpirationDate, getSystemDateStr, getEntityEvents])
 
-  const getAllocationStatusToday = (machineId: string) => {
+  const getAllocationStatusToday = (allocation: any) => {
+    const machineId = allocation.machine_id
     const status = getDayStatus(new Date(), machineId, filteredEvents)
-    const isActive = status === 'working' || status === 'maintenance'
+    const isMaintenance = status === 'maintenance'
+    const isExceeded = status === 'working-exceeded'
+    
+    // Uma alocação é considerada ativa se o seu status no ciclo for 'allocated'
+    // E se não houver um evento de fim real (end_allocation)
+    const isStillAllocated = allocation.status === 'allocated'
+    const today = getSystemDateStr(new Date())
+    const dateToUse = allocation.start_date || allocation.allocation_start
+    const startDate = dateToUse ? getSystemDateStr(dateToUse) : null
+
+    if (isMaintenance) {
+      return {
+        isActive: true,
+        label: 'Manutenção',
+        className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+      }
+    }
+
+    if (isExceeded) {
+      return {
+        isActive: true,
+        label: 'Ativa (Excedida)',
+        className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-bold'
+      }
+    }
+
+    if (isStillAllocated) {
+      const expirationDateStr = allocation.end_date ? getSystemDateStr(allocation.end_date) : null
+      const todayStr = getSystemDateStr(new Date())
+      
+      if (expirationDateStr && todayStr > expirationDateStr) {
+        return {
+          isActive: true,
+          label: 'Ativa (Excedida)',
+          className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-bold border border-red-200'
+        }
+      }
+
+      return {
+        isActive: true,
+        label: 'Ativa',
+        className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+      }
+    }
+
+    if (startDate && startDate >= today) {
+      return {
+        isActive: false,
+        label: 'Agendada',
+        className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+      }
+    }
 
     return {
-      isActive,
-      label: isActive ? 'Ativa' : 'Encerrada',
-      className: isActive
-        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-        : 'bg-gray-100 text-gray-600 dark:bg-gray-700/50 dark:text-gray-300'
+      isActive: false,
+      label: 'Encerrada',
+      className: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 font-medium'
     }
   }
 
@@ -139,12 +286,53 @@ export default function SiteDetailsModal({
     return getDayStatus(new Date(), selectedMachineId, filteredEvents)
   }, [selectedMachineId, filteredEvents, getDayStatus])
 
-  // Filtrar eventos para o histórico
+  // Filtrar eventos para o histórico - Mostrar o ciclo completo da alocação selecionada
   const machineHistoryEvents = useMemo(() => {
-    if (!selectedMachineId) return []
-    return getEntityEvents(filteredEvents, selectedMachineId)
-      .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
-  }, [filteredEvents, selectedMachineId, getEntityEvents])
+    if (!selectedMachineId || !site?.id || !selectedAllocationId) return []
+    
+    // Pegamos todos os eventos da máquina para inferir os ciclos de alocação
+    const allMachineEvents = getEntityEvents(filteredEvents, selectedMachineId)
+    
+    const siteId = site.id
+    // Ordenação ascendente para processar a linha do tempo corretamente
+    const sortedEvents = [...allMachineEvents].sort((a, b) => 
+      new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
+    )
+
+    const machineEventsInThisSite: any[] = []
+    let isTrackingThisAllocation = false
+
+    for (const event of sortedEvents) {
+      // Começamos a rastrear EXATAMENTE a partir do evento de alocação selecionado
+      if (event.id === selectedAllocationId) {
+        isTrackingThisAllocation = true
+      }
+
+      if (isTrackingThisAllocation) {
+        machineEventsInThisSite.push(event)
+        
+        // Se este evento NÃO é o de início, verificamos se ele encerra a LOCAÇÃO globalmente
+        if (event.id !== selectedAllocationId) {
+          // 1. Fim de alocação ou desengate de extensão (Fim absoluto)
+          const isAbsoluteEnd = event.event_type === 'end_allocation' || event.event_type === 'extension_detach'
+          
+          // 2. Um NOVO início de alocação (significa que o ciclo anterior terminou, mesmo que sem evento de fim)
+          const isNewAllocationStart = (event.event_type === 'start_allocation' || event.event_type === 'extension_attach') && 
+                                       event.id !== selectedAllocationId
+
+          if (isAbsoluteEnd || isNewAllocationStart) {
+            isTrackingThisAllocation = false
+            break // Ciclo encerrado
+          }
+        }
+      }
+    }
+
+    // Retornamos os eventos em ordem DECRESCENTE (mais recente primeiro)
+    return machineEventsInThisSite.sort((a, b) => 
+      new Date(b.event_date).getTime() - new Date(a.event_date).getTime()
+    )
+  }, [filteredEvents, selectedMachineId, selectedAllocationId, getEntityEvents, site?.id])
 
   // Fechar com ESC
   useEffect(() => {
@@ -165,11 +353,11 @@ export default function SiteDetailsModal({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] p-6"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010] p-6"
       onClick={onClose}
     >
       <div 
-        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-6xl h-[90vh] min-h-[600px] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -194,15 +382,15 @@ export default function SiteDetailsModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden min-h-0">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 h-full">
+            <div className="grid grid-cols-1 lg:grid-cols-12 h-full min-h-0">
               {/* Máquinas Alocadas (Lista Selecionável) */}
-              <div className="p-6 border-r border-gray-200 dark:border-gray-700 overflow-y-auto bg-gray-50/50 dark:bg-gray-800/50">
+              <div className="lg:col-span-4 p-6 border-r border-gray-200 dark:border-gray-700 overflow-y-auto bg-gray-50/50 dark:bg-gray-800/50 h-full min-h-0">
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                     Alocações realizadas
@@ -217,9 +405,13 @@ export default function SiteDetailsModal({
                 ) : (
                   <div className="space-y-3">
                     {allocations.map((allocation) => {
-                      const isSelected = selectedMachineId === allocation.machine_id
-                      const allocationStatus = getAllocationStatusToday(allocation.machine_id)
+                      const isSelected = selectedAllocationId === allocation.allocation_event_id
+                      const allocationStatus = getAllocationStatusToday(allocation)
                       
+                      // Formatar as datas do ciclo
+                      const cycleStart = formatDateOnly(allocation.start_date || allocation.allocation_start)
+                      const cycleEnd = allocation.end_date ? formatDateOnly(allocation.end_date) : 'Ativa'
+
                       // Determinar o caminho da imagem baseada no tipo de máquina
                       const getMachineImagePath = () => {
                         if (!allocation.machine_type) return null
@@ -234,7 +426,10 @@ export default function SiteDetailsModal({
                       return (
                         <div 
                           key={allocation.allocation_event_id} 
-                          onClick={() => setSelectedMachineId(allocation.machine_id)}
+                          onClick={() => {
+                            setSelectedMachineId(allocation.machine_id)
+                            setSelectedAllocationId(allocation.allocation_event_id)
+                          }}
                           className={`
                             group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 border
                             ${isSelected 
@@ -262,29 +457,34 @@ export default function SiteDetailsModal({
                             )}
                           </div>
 
-                          {/* Informações da máquina */}
+                          {/* Informações da máquina (Esquerda) */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`font-medium ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
-                                {allocation.machine_unit_number}
-                              </span>
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                allocationStatus.className
-                              }`}>
-                                {allocationStatus.label}
-                              </span>
-                            </div>
+                            <span className={`font-bold text-lg block ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+                              {allocation.machine_unit_number}
+                            </span>
                             <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                               {allocation.machine_type}
                             </p>
+                            <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium mt-1 whitespace-nowrap">
+                              {cycleStart} — {cycleEnd}
+                            </p>
                           </div>
                           
-                          {/* Chevron indicando seleção */}
-                          {isSelected && (
-                            <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          )}
+                          {/* Status da máquina (Direita) */}
+                          <div className="flex-shrink-0 flex items-center gap-2">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${
+                              allocationStatus.className
+                            }`}>
+                              {allocationStatus.label}
+                            </span>
+                            
+                            {/* Chevron indicando seleção */}
+                            {isSelected && (
+                              <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            )}
+                          </div>
                         </div>
                       )
                     })}
@@ -293,9 +493,9 @@ export default function SiteDetailsModal({
               </div>
 
               {/* Coluna Direita: Abas e Conteúdo */}
-              <div className="col-span-2 flex flex-col h-full bg-white dark:bg-gray-800">
+              <div className="lg:col-span-8 flex flex-col h-full bg-white dark:bg-gray-800 min-h-0">
                 {/* Abas */}
-                <div className="flex items-center border-b border-gray-200 dark:border-gray-700 px-6">
+                <div className="flex items-center border-b border-gray-200 dark:border-gray-700 px-6 flex-shrink-0">
                   <button
                     onClick={() => setActiveTab('calendar')}
                     className={`px-4 py-4 text-sm font-medium border-b-2 transition-colors ${
@@ -321,27 +521,25 @@ export default function SiteDetailsModal({
                 {activeTab === 'calendar' ? (
                   /* Visualização do Calendário */
                   <>
-                    <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
                       <div className="flex flex-col gap-1">
                         <span className="text-sm text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">
                           Visualização Mensal
                         </span>
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white capitalize">
-                          {calendarMonth.toLocaleString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })}
+                          {calendarMonth.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}
                         </h3>
-                        {selectedMachineId && (todayStatus === 'working' || todayStatus === 'maintenance') && (
-                          <span className="inline-flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300">
-                            <span className="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
-                            {todayStatus === 'working' && 'Status hoje: Alocada'}
-                            {todayStatus === 'maintenance' && 'Status hoje: Em manutenção'}
-                          </span>
-                        )}
                       </div>
                       
                       <div className={`flex items-center bg-gray-50 dark:bg-gray-700/50 rounded-xl p-1.5 shadow-sm border ${isCurrentMonthSelected ? 'border-blue-200 ring-1 ring-blue-100 dark:border-blue-800 dark:ring-blue-900/30' : 'border-gray-100 dark:border-gray-600'}`}>
                         <button
                           onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
-                          className="p-2 hover:bg-white dark:hover:bg-gray-600 rounded-lg transition-all text-gray-600 dark:text-gray-300 shadow-sm hover:shadow"
+                          disabled={!minMonth || calendarMonth.getTime() <= minMonth.getTime()}
+                          className={`p-2 rounded-lg transition-all shadow-sm hover:shadow ${
+                            !minMonth || calendarMonth.getTime() <= minMonth.getTime()
+                              ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                              : 'text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-600'
+                          }`}
                           aria-label="Mês anterior"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -350,17 +548,25 @@ export default function SiteDetailsModal({
                         </button>
                         <button
                           onClick={() => setCalendarMonth(new Date())}
+                          disabled={!minMonth || !maxMonth || new Date().getTime() < minMonth.getTime() || new Date().getTime() > new Date(maxMonth.getFullYear(), maxMonth.getMonth() + 1, 0).getTime()}
                           className={`px-4 py-2 mx-1 text-sm font-semibold rounded-lg transition-all shadow-sm hover:shadow ${
                             isCurrentMonthSelected 
                              ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-100 dark:border-blue-800' 
-                             : 'text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-600'
+                             : (!minMonth || !maxMonth || new Date().getTime() < minMonth.getTime() || new Date().getTime() > new Date(maxMonth.getFullYear(), maxMonth.getMonth() + 1, 0).getTime())
+                               ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                               : 'text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-600'
                           }`}
                         >
                           Hoje
                         </button>
                         <button
                           onClick={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
-                          className="p-2 hover:bg-white dark:hover:bg-gray-600 rounded-lg transition-all text-gray-600 dark:text-gray-300 shadow-sm hover:shadow"
+                          disabled={!maxMonth || calendarMonth.getTime() >= maxMonth.getTime()}
+                          className={`p-2 rounded-lg transition-all shadow-sm hover:shadow ${
+                            !maxMonth || calendarMonth.getTime() >= maxMonth.getTime()
+                              ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                              : 'text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-600'
+                          }`}
                           aria-label="Próximo mês"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -370,114 +576,210 @@ export default function SiteDetailsModal({
                       </div>
                     </div>
 
-                    <div className="flex-1 p-6 flex flex-col xl:flex-row gap-8 overflow-y-auto">
-                      {/* Lado Esquerdo: Legenda ou Detalhes do Dia */}
+                    <div className="flex-1 p-6 flex flex-col xl:flex-row gap-8 overflow-y-auto min-h-0">
+                      {/* Lado Esquerdo: Legenda e Detalhes do Dia */}
                       <div className="xl:w-64 flex-shrink-0 flex flex-col gap-6">
+                        {/* Legenda (Sempre visível) */}
+                        <div>
+                          <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3">
+                            Legenda
+                          </h4>
+                          <div className="grid grid-cols-1 gap-2 bg-gray-50 dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-3 h-3 bg-emerald-500 dark:bg-emerald-400 rounded-full shadow-sm"></div>
+                              <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Uso planejado</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-3 h-3 bg-red-600 dark:bg-red-400 rounded-full shadow-sm"></div>
+                              <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Uso excedido</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-3 h-3 bg-orange-600 dark:bg-orange-400 rounded-full shadow-sm"></div>
+                              <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Manutenção</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-3 h-3 bg-purple-600 dark:bg-purple-400 rounded-full shadow-sm"></div>
+                              <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Encerrada / Transporte</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-3 h-3 bg-pink-600 dark:bg-pink-400 rounded-full shadow-sm"></div>
+                              <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Movida</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-3 h-3 bg-gray-500 dark:bg-gray-400/80 rounded-full"></div>
+                              <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Sem alocação</span>
+                            </div>
+                            
+                            <div className="pt-2 border-t border-gray-200 dark:border-gray-700 mt-0.5 space-y-2">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-3 h-3 border-2 border-yellow-500 dark:border-yellow-400 rounded-sm"></div>
+                                <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Data atual</span>
+                              </div>
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-3 h-3 border-2 border-blue-600 dark:border-blue-400 rounded-full"></div>
+                                <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Início</span>
+                              </div>
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-3 h-3 border-2 border-red-600 dark:border-red-400 rounded-full"></div>
+                                <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Vencimento</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Detalhes do Dia (Condicional) */}
                         {selectedDate ? (
-                          <div className="flex flex-col h-full">
-                            <div className="flex items-center justify-between mb-4">
-                              <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
-                                {selectedDate.toLocaleString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}
+                          <div className="flex flex-col border-t border-gray-100 dark:border-gray-700 pt-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="text-[10px] font-bold text-gray-900 dark:text-white uppercase tracking-widest">
+                                {selectedDate.toLocaleString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' }).replace('.', '')}
                               </h4>
                               <button 
                                 onClick={() => setSelectedDate(null)}
-                                className="text-xs text-blue-600 hover:underline"
+                                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                aria-label="Limpar seleção"
                               >
-                                Voltar
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                               </button>
                             </div>
                             
-                            <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                            <div className="space-y-2">
                               {(() => {
+                                const dateStr = getSystemDateStr(selectedDate)
+                                const expirationDateStr = getExpirationDate(selectedMachineId)
+                                const startDateStr = getStartDate(selectedMachineId)
+                                const isExpirationDay = dateStr === expirationDateStr
+                                const isStartDay = dateStr === startDateStr
+
                                 const dayEvents = machineHistoryEvents.filter(e => {
-                                  const eDate = adjustDateToSystemTimezone(e.event_date).toISOString().split('T')[0]
-                                  const sDate = selectedDate.toISOString().split('T')[0]
-                                  return eDate === sDate
+                                  const eDate = getSystemDateStr(e.event_date)
+                                  return eDate === dateStr
                                 }).sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
 
                                 if (dayEvents.length === 0) {
-                                  // Verificar status do dia para mensagem contextual
                                   const status = getDayStatus(selectedDate, selectedMachineId, filteredEvents)
                                   return (
-                                    <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-xl text-center">
-                                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        {status === 'working' ? 'Máquina em operação neste dia.' : 
-                                         status === 'maintenance' ? 'Máquina em manutenção neste dia.' :
-                                         'Nenhum evento registrado.'}
-                                      </p>
+                                    <div className="space-y-2">
+                                      <div className="p-2.5 bg-gray-50/80 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700/50">
+                                        <p className="text-[11px] text-gray-500 dark:text-gray-400 text-center font-medium">
+                                          {status === 'working' ? 'Máquina em operação.' : 
+                                           status === 'working-exceeded' ? 'Máquina em operação (Uso Excedido).' :
+                                           status === 'maintenance' ? 'Máquina em manutenção.' :
+                                           status === 'in-transit' ? 'Máquina em transporte.' :
+                                           'Nenhum evento registrado.'}
+                                        </p>
+                                      </div>
+                                      
+                                      {isStartDay && (
+                                        <div className="p-2.5 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100/50 dark:border-blue-800/30 rounded-lg">
+                                          <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 mb-0.5">
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider">Início da Alocação</span>
+                                          </div>
+                                          <p className="text-[10px] text-blue-600/80 dark:text-blue-400/80 leading-tight">
+                                            Data planejada para o início.
+                                          </p>
+                                        </div>
+                                      )}
+
+                                      {isExpirationDay && (
+                                        <div className="p-2.5 bg-red-50/50 dark:bg-red-900/10 border border-red-100/50 dark:border-red-800/30 rounded-lg">
+                                          <div className="flex items-center gap-2 text-red-700 dark:text-red-400 mb-0.5">
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider">Vencimento</span>
+                                          </div>
+                                          <p className="text-[10px] text-red-600/80 dark:text-red-400/80 leading-tight">
+                                            Encerramento planejado.
+                                          </p>
+                                        </div>
+                                      )}
                                     </div>
                                   )
                                 }
 
-                                return dayEvents.map(event => {
-                                  const config = getEventConfig(event.event_type)
-                                  const Icon = config.icon
-                                  return (
-                                    <div key={event.id} className="bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
-                                      <div className="flex items-start gap-3">
-                                        <div className={`p-2 rounded-lg ${config.bgColor} ${config.textColor}`}>
-                                          <Icon size={16} />
-                                        </div>
-                                        <div>
-                                          <p className="text-xs font-bold text-gray-900 dark:text-white">
-                                            {config.label}
-                                          </p>
-                                          <p className="text-[10px] text-gray-500 mt-0.5">
-                                            {formatWithSystemTimezone(event.event_date, { hour: '2-digit', minute: '2-digit' })}
-                                          </p>
+                                return (
+                                  <div className="space-y-2">
+                                    {isStartDay && (
+                                      <div className="p-2.5 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100/50 dark:border-blue-800/30 rounded-lg">
+                                        <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 mb-0.5">
+                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                          </svg>
+                                          <span className="text-[10px] font-bold uppercase tracking-wider">Início da Alocação</span>
                                         </div>
                                       </div>
-                                    </div>
-                                  )
-                                })
+                                    )}
+                                    {isExpirationDay && (
+                                      <div className="p-2.5 bg-red-50/50 dark:bg-red-900/10 border border-red-100/50 dark:border-red-800/30 rounded-lg">
+                                        <div className="flex items-center gap-2 text-red-700 dark:text-red-400 mb-0.5">
+                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                          </svg>
+                                          <span className="text-[10px] font-bold uppercase tracking-wider">Vencimento</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {dayEvents.map(event => {
+                                      const config = getEventConfig(event.event_type)
+                                      const Icon = config.icon
+                                      return (
+                                        <div key={event.id} className="bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+                                          <div className="flex items-center gap-2.5">
+                                            <div className={`p-1.5 rounded ${config.bgColor} ${config.textColor}`}>
+                                              <Icon size={12} />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                              <p className="text-[10px] font-bold text-gray-900 dark:text-white truncate">
+                                                {config.label}
+                                              </p>
+                                              <p className="text-[9px] text-gray-500">
+                                                {formatWithSystemTimezone(event.event_date, { hour: '2-digit', minute: '2-digit' })}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                )
                               })()}
                             </div>
                           </div>
                         ) : (
-                          <>
-                            <div>
-                              <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">
-                                Legenda
-                              </h4>
-                              <div className="space-y-2 bg-gray-50 dark:bg-gray-700/30 p-3 rounded-2xl border border-gray-100 dark:border-gray-700">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full ring-2 ring-green-100 dark:ring-green-900/30"></div>
-                                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Em funcionamento</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2.5 h-2.5 bg-orange-500 rounded-full ring-2 ring-orange-100 dark:ring-orange-900/30"></div>
-                                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Em manutenção</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2.5 h-2.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Não alocado</span>
-                                </div>
-                              </div>
+                          <div className="flex flex-col items-center justify-center p-4 bg-gray-50/50 dark:bg-gray-800/50 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+                            <div className="w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-sm mb-2 text-gray-400">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
                             </div>
-
-                            {!selectedMachineId && (
-                              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-2xl border border-yellow-100 dark:border-yellow-800">
-                                <p className="text-xs text-yellow-700 dark:text-yellow-200">
-                                  Selecione uma máquina à esquerda para visualizar sua distribuição no calendário.
-                                </p>
-                              </div>
-                            )}
-                          </>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 text-center font-medium leading-tight max-w-[180px]">
+                              {selectedMachineId 
+                                ? 'Selecione uma data no calendário para ver os detalhes.' 
+                                : 'Selecione uma máquina à esquerda para carregar o histórico.'
+                              }
+                            </p>
+                          </div>
                         )}
                       </div>
 
                       {/* Lado Direito: Grade do Calendário */}
-                      <div className="flex-1 min-w-0">
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm">
+                      <div className="flex-1 min-w-0 flex flex-col">
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm flex-1 flex flex-col">
                           <div className="grid grid-cols-7 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
                             {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                              <div key={day} className="py-3 text-center text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                              <div key={day} className="py-3 text-center text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                                 {day}
                               </div>
                             ))}
                           </div>
 
-                          <div className="grid grid-cols-7 auto-rows-fr">
+                          <div className="grid grid-cols-7 flex-1 bg-gray-50 dark:bg-gray-900/50 gap-[1px]">
                             {(() => {
                               const year = calendarMonth.getFullYear()
                               const month = calendarMonth.getMonth()
@@ -487,34 +789,64 @@ export default function SiteDetailsModal({
 
                               const days = []
                               const currentDate = new Date(startDate)
+                              const expirationDateStr = getExpirationDate(selectedMachineId)
+                              const startDateStr = getStartDate(selectedMachineId)
 
                               for (let i = 0; i < 42; i++) {
-                                const dayStatus = getDayStatus(currentDate, selectedMachineId, filteredEvents)
-                                const isCurrentMonth = currentDate.getMonth() === month
-                                const isToday = currentDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0]
+                                const dayDate = new Date(currentDate)
+                                const dateStr = getSystemDateStr(dayDate)
+                                // Passamos 'events' (prop) em vez de 'filteredEvents'
+                                const dayStatus = getDayStatus(dayDate, selectedMachineId, events)
+                                const isCurrentMonth = dayDate.getMonth() === month
+                                const isToday = dateStr === getSystemDateStr(new Date())
+                                const isExpirationDay = dateStr === expirationDateStr
+                                const isStartDay = dateStr === startDateStr
+
+                                const statusConfig = {
+                                  'working': 'bg-emerald-500 dark:bg-emerald-400 text-white dark:text-emerald-950 font-bold border-emerald-600 dark:border-emerald-300',
+                                  'working-exceeded': 'bg-red-600 dark:bg-red-400 text-white dark:text-red-950 font-black border-red-700 dark:border-red-300 shadow-md',
+                                  'maintenance': 'bg-orange-600 dark:bg-orange-400 text-white dark:text-orange-950 font-bold border-orange-700 dark:border-orange-300',
+                                  'in-transit': 'bg-purple-600 dark:bg-purple-400 text-white dark:text-purple-950 font-bold border-purple-700 dark:border-purple-300',
+                                  'scheduled': 'bg-blue-600 dark:bg-blue-400 text-white dark:text-blue-950 font-bold border-blue-700 dark:border-blue-300 border-dashed',
+                                  'not-allocated': 'text-gray-400 dark:text-gray-500'
+                                }
 
                                 days.push(
                                   <div
-                                    key={currentDate.toISOString()}
+                                    key={dayDate.toISOString()}
+                                    onClick={() => setSelectedDate(dayDate)}
                                     className={`
-                                      relative aspect-square flex items-center justify-center border-b border-r border-gray-50 dark:border-gray-700/50 transition-all duration-200
-                                      ${!isCurrentMonth ? 'bg-gray-50/50 dark:bg-gray-900/50' : 'hover:bg-gray-50 dark:hover:bg-gray-700/30'}
+                                      relative flex items-center justify-center transition-all duration-200 cursor-pointer group aspect-square
+                                      ${!isCurrentMonth ? 'bg-gray-50/50 dark:bg-gray-900/50' : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/30'}
+                                      ${selectedDate && getSystemDateStr(selectedDate) === dateStr ? 'bg-gray-50 dark:bg-gray-800/80' : ''}
                                     `}
                                   >
+                                    {/* Indicador de Seleção (Borda Externa) */}
+                                    {selectedDate && getSystemDateStr(selectedDate) === dateStr && (
+                                      <div className="absolute inset-0 border-2 border-gray-300 dark:border-gray-600 z-30 pointer-events-none" />
+                                    )}
+
+                                    {/* Indicador de Hoje (Quadrado Oco Amarelo) */}
+                                    {isToday && (
+                                      <div className="absolute w-[85%] h-[85%] border-2 border-yellow-400 rounded-md z-0" />
+                                    )}
+
+                                    {/* Indicador de Início (Círculo Azul) */}
+                                    {isStartDay && (
+                                      <div className="absolute w-11 h-11 border-2 border-blue-600 dark:border-blue-400 rounded-full z-20 pointer-events-none" />
+                                    )}
+
+                                    {/* Indicador de Vencimento (Círculo Vermelho) */}
+                                    {isExpirationDay && (
+                                      <div className="absolute w-11 h-11 border-2 border-red-600 dark:border-red-400 rounded-full z-20 pointer-events-none" />
+                                    )}
+
                                     <div className={`
-                                      w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full text-sm font-medium transition-all
-                                      ${isToday ? 'font-bold ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-800' : ''}
-                                      ${
-                                        isCurrentMonth
-                                          ? dayStatus === 'working'
-                                            ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
-                                            : dayStatus === 'maintenance'
-                                            ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300'
-                                            : 'text-gray-700 dark:text-gray-300'
-                                          : 'text-gray-300 dark:text-gray-600'
-                                      }
+                                      w-10 h-10 flex items-center justify-center rounded-full text-sm font-medium transition-all relative border-2 z-10
+                                      ${isCurrentMonth ? statusConfig[dayStatus] : 'text-gray-300 dark:text-gray-700 border-transparent'}
+                                      ${isCurrentMonth && dayStatus === 'not-allocated' ? 'border-transparent' : ''}
                                     `}>
-                                      {currentDate.getDate()}
+                                      {dayDate.getDate()}
                                     </div>
                                   </div>
                                 )
@@ -530,7 +862,7 @@ export default function SiteDetailsModal({
                   </>
                 ) : (
                   /* Visualização do Histórico */
-                  <div className="flex-1 overflow-y-auto p-6">
+                  <div className="flex-1 overflow-y-auto p-6 min-h-0">
                     {machineHistoryEvents.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
                         <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -569,6 +901,26 @@ export default function SiteDetailsModal({
                                 </div>
                                 
                                 <div className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/30 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+                                  {event.end_date && (
+                                    <div className="mb-2 flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                                      <span className="font-medium">Vencimento Planejado:</span> 
+                                      <span className="font-semibold">
+                                        {formatDateOnly(event.end_date)}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {(event.event_type === 'transport_arrival' || event.event_type === 'start_allocation') && 
+                                   event.site?.id && event.site.id !== site?.id && (
+                                    <div className="mb-2 flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                      </svg>
+                                      <span className="font-medium">Chegou em:</span> 
+                                      <span className="font-semibold text-gray-700 dark:text-gray-200">{event.site.title}</span>
+                                    </div>
+                                  )}
+
                                   {event.downtime_reason && (
                                     <div className="mb-1">
                                       <span className="font-medium">Motivo:</span> {DOWNTIME_REASON_LABELS[event.downtime_reason] || event.downtime_reason}

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import MultiSelectDropdown from '../../components/MultiSelectDropdown'
 import { AllocationEvent } from '../types'
 import { EVENT_STATUS_LABELS, EVENT_TYPE_LABELS, DOWNTIME_REASON_LABELS } from '@/lib/permissions'
-import { formatDate, getEventConfig } from '../utils'
+import { formatDate, formatDateOnly, getEventConfig } from '../utils'
 import { 
   FiCalendar, 
   FiUser, 
@@ -160,7 +160,7 @@ export default function EventsTab({
         return (
           <div 
             key={event.id} 
-            className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col md:flex-row gap-4 items-start md:items-center hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+            className="p-4 flex flex-col md:flex-row gap-4 items-start md:items-center hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
           >
             {/* Icon Box */}
             <div className={`w-12 h-12 flex-shrink-0 rounded-xl flex items-center justify-center ${config.bgColor} ${config.textColor}`}>
@@ -179,9 +179,17 @@ export default function EventsTab({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-1 gap-x-6 text-sm">
-                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                  <FiCalendar className="flex-shrink-0" />
-                  <span>{formatDate(event.event_date)}</span>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                    <FiCalendar className="flex-shrink-0" />
+                    <span>{formatDateOnly(event.event_date)}</span>
+                  </div>
+                  {event.end_date && (
+                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-medium">
+                      <FiCalendar className="flex-shrink-0" />
+                      <span>Vencimento: {formatDateOnly(event.end_date)}</span>
+                    </div>
+                  )}
                 </div>
                 
                 {event.site && (

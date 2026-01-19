@@ -157,3 +157,15 @@ export interface FinancialSnapshot {
   calculated_at: string
   created_at: string
 }
+
+export interface Notification {
+  id: string
+  event_id: string
+  root_type: 'refueling' | string
+  titulo: string
+  mensagem: string
+  trigger_date: string
+  archived_by: string[]
+  viewed_by: string[]
+  created_at: string
+}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { ActiveAllocation, ActiveDowntime } from '../types'
 import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
-import { formatDate } from '../utils'
+import { formatDate, formatDateOnly } from '../utils'
 import { FiCalendar, FiMapPin, FiTool, FiAlertTriangle, FiCheckCircle, FiPlay, FiStopCircle, FiXCircle, FiRefreshCw } from 'react-icons/fi'
 
 interface AllocationsTabProps {
@@ -141,10 +141,18 @@ export default function AllocationsTab({
                     </div>
                   )}
 
-                  {/* Allocation Start */}
-                  <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
-                    <FiCalendar className="text-gray-400 flex-shrink-0" />
-                    <span>Desde: {formatDate(allocation.allocation_start)}</span>
+                  {/* Dates */}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                      <FiCalendar className="text-gray-400 flex-shrink-0" />
+                      <span>Desde: {formatDateOnly(allocation.allocation_start)}</span>
+                    </div>
+                    {allocation.end_date && (
+                      <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                        <FiCalendar className="text-amber-500 flex-shrink-0" />
+                        <span>Vencimento: {formatDateOnly(allocation.end_date)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -35,6 +35,7 @@ function inferEventsForSite(allEvents: any[], siteId: string) {
 
     switch (event.event_type) {
       case 'start_allocation':
+      case 'transport_arrival':
         if (explicitSiteId) {
           state.currentSiteId = explicitSiteId
         }
@@ -42,10 +43,18 @@ function inferEventsForSite(allEvents: any[], siteId: string) {
         break
 
       case 'end_allocation':
+      case 'extension_detach':
         candidateSiteId = state.currentSiteId || explicitSiteId
         if (state.currentSiteId && (!explicitSiteId || explicitSiteId === state.currentSiteId)) {
           state.currentSiteId = null
         }
+        break
+
+      case 'transport_start':
+        // No início do transporte, a máquina ainda está no local de origem
+        candidateSiteId = state.currentSiteId || explicitSiteId
+        // Após o evento de saída, ela não está mais em nenhum local (está em trânsito)
+        state.currentSiteId = null
         break
 
       case 'extension_attach': {
@@ -62,8 +71,15 @@ function inferEventsForSite(allEvents: any[], siteId: string) {
       }
 
       case 'downtime_start':
+      case 'start_downtime':
       case 'downtime_end':
+      case 'end_downtime':
+      case 'refueling':
         candidateSiteId = explicitSiteId || state.currentSiteId
+        // Se o evento trouxe um local explícito e não tínhamos um, atualizamos o estado
+        if (explicitSiteId && !state.currentSiteId) {
+          state.currentSiteId = explicitSiteId
+        }
         break
 
       default:
@@ -107,7 +123,7 @@ export function useMapModals({ selectedSite, setSelectedSite }: UseMapModalsProp
       const [siteResponse, allocationsResponse, eventsResponse] = await Promise.all([
         fetch(`/api/sites/${siteId}`),
         fetch(`/api/sites/${siteId}/allocations?history=true`),
-        fetch(`/api/events?limit=500`)
+        fetch(`/api/events?site_id=${siteId}&limit=1000`)
       ])
 
       const [siteData, allocationsData, eventsData] = await Promise.all([
@@ -119,8 +135,34 @@ export function useMapModals({ selectedSite, setSelectedSite }: UseMapModalsProp
       if (siteData.success && allocationsData.success && eventsData.success) {
         setSiteDetails(siteData.site)
         setSiteAllocations(allocationsData.allocations || [])
-        const relatedEvents = inferEventsForSite(eventsData.events, siteId)
-        setSiteEvents(relatedEvents)
+        
+        // Agora buscamos também eventos globais para as máquinas que passaram por aqui
+        // para garantir que a inferência de estado funcione corretamente
+        const machinesAtSite = (allocationsData.allocations || []).map((a: any) => a.machine_id)
+        
+        let allRelatedEvents = [...(eventsData.events || [])]
+        
+        // Se houver máquinas, buscamos os últimos eventos delas para complementar
+        if (machinesAtSite.length > 0) {
+          const machineEventsPromises = machinesAtSite.slice(0, 10).map((mId: string) => 
+            fetch(`/api/events?machine_id=${mId}&limit=100`).then(r => r.json())
+          )
+          
+          const machinesEventsResults = await Promise.all(machineEventsPromises)
+          machinesEventsResults.forEach(res => {
+            if (res.success && res.events) {
+              allRelatedEvents = [...allRelatedEvents, ...res.events]
+            }
+          })
+        }
+
+        // Remover duplicados por ID
+        const uniqueEvents = Array.from(new Map(allRelatedEvents.map(e => [e.id, e])).values())
+        
+        // No modal de detalhes do site, passamos TODOS os eventos relacionados às máquinas
+        // que passaram por aqui, para que o histórico possa mostrar o ciclo completo
+        // independentemente de onde terminou.
+        setSiteEvents(uniqueEvents)
       }
     } catch (error) {
       console.error('Error loading site details:', error)

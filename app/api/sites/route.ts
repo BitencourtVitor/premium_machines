@@ -47,44 +47,157 @@ export async function GET(request: NextRequest) {
       // Fetch all active allocations (calculated from events) to ensure real-time accuracy
       const activeAllocations = await getActiveAllocations()
       
+      // Get all machines in the system to identify available ones
+      const { data: allSystemMachines } = await supabaseServer
+        .from('machines')
+        .select('id, unit_number, machine_type:machine_types(nome)')
+        .eq('ativo', true)
+
+      // Fetch all historical and future associations (all events with site_id)
+      const { data: allEvents, error: eventsError } = await supabaseServer
+        .from('allocation_events')
+        .select(`
+          site_id,
+          machine_id,
+          event_date,
+          end_date,
+          event_type,
+          machine:machines(
+            unit_number,
+            machine_type:machine_types(nome)
+          )
+        `)
+        .in('event_type', ['start_allocation', 'extension_attach'])
+        .or('status.eq.approved,event_type.neq.refueling')
+        .not('site_id', 'is', null)
+        .order('event_date', { ascending: false })
+
+      // Map site_id to all machines ever/scheduled to be there
+      const historicalMachinesMap = new Map<string, Map<string, any>>()
+      
+      // Map machine_id to its current site_id for "moved" status detection
+      const globalActiveMap = new Map(activeAllocations.map(a => [a.machine_id, a.site_id]));
+      
+      const now = new Date().toISOString().split('T')[0]
+
+      if (!eventsError && allEvents) {
+        allEvents.forEach(event => {
+          if (!event.site_id || !event.machine_id || !event.machine) return
+          
+          if (!historicalMachinesMap.has(event.site_id)) {
+            historicalMachinesMap.set(event.site_id, new Map())
+          }
+          
+          const siteMap = historicalMachinesMap.get(event.site_id)!
+          if (!siteMap.has(event.machine_id)) {
+            const machine = event.machine as any
+            const isFuture = event.event_date > now
+            const currentSiteId = globalActiveMap.get(event.machine_id);
+            
+            siteMap.set(event.machine_id, {
+              id: event.machine_id,
+              unit_number: machine.unit_number,
+              machine_type: machine.machine_type?.nome || '',
+              start_date: event.event_date,
+              end_date: event.end_date,
+              status: isFuture ? 'scheduled' : 'inactive',
+              current_site_id: currentSiteId || null
+            })
+          }
+        })
+      }
+      
       const sitesWithMachines = sites.map((site) => {
-        // Filter allocations for this site
+        // Filter active allocations for this site
         const siteAllocations = activeAllocations.filter(a => a.site_id === site.id)
         
-        // Map to machine objects
-        const machinesMap = new Map()
+        // Map to active machine objects
+        const activeMachinesMap = new Map()
         
         siteAllocations.forEach(alloc => {
             // Add the main machine
-            machinesMap.set(alloc.machine_id, {
+            activeMachinesMap.set(alloc.machine_id, {
                 id: alloc.machine_id,
                 unit_number: alloc.machine_unit_number,
-                status: alloc.is_in_downtime ? 'maintenance' : 'allocated',
+                status: alloc.status,
                 ownership_type: alloc.machine_ownership,
-                // Add extra fields if needed by frontend
-                machine_type: alloc.machine_type
+                machine_type: alloc.machine_type,
+                start_date: alloc.allocation_start,
+                end_date: alloc.end_date,
+                current_site_id: alloc.site_id
             })
 
             // Add attached extensions
             alloc.attached_extensions.forEach(ext => {
-                if (!machinesMap.has(ext.extension_id)) {
-                    machinesMap.set(ext.extension_id, {
+                if (!activeMachinesMap.has(ext.extension_id)) {
+                    activeMachinesMap.set(ext.extension_id, {
                         id: ext.extension_id,
                         unit_number: ext.extension_unit_number,
-                        status: 'allocated', // Extensions attached are working
-                        ownership_type: 'owned', // Default or unknown
-                        machine_type: ext.extension_type
+                        status: 'allocated',
+                        ownership_type: 'owned',
+                        machine_type: ext.extension_type,
+                        start_date: alloc.allocation_start, // Extension follows machine start
+                        end_date: alloc.end_date,
+                        current_site_id: alloc.site_id
                     })
                 }
             })
         })
 
-        const machines = Array.from(machinesMap.values())
+        // If this is headquarters, also add all machines that are NOT currently allocated anywhere
+        if (site.is_headquarters && allSystemMachines) {
+          const currentlyAllocatedMachineIds = new Set(activeAllocations.map(a => a.machine_id))
+          
+          allSystemMachines.forEach(m => {
+            if (!currentlyAllocatedMachineIds.has(m.id)) {
+              activeMachinesMap.set(m.id, {
+                id: m.id,
+                unit_number: m.unit_number,
+                status: 'available',
+                ownership_type: 'owned', // Default
+                machine_type: (m.machine_type as any)?.nome || '',
+                start_date: null,
+                current_site_id: site.id // At HQ
+              })
+            }
+          })
+        }
+
+        const activeMachines = Array.from(activeMachinesMap.values())
+        
+        // Get all machines for search (including historical/future)
+        const siteHistoricalMachines = historicalMachinesMap.get(site.id)
+        const allMachinesForSearchMap = new Map()
+        
+        // Start with historical/future ones
+        if (siteHistoricalMachines) {
+          siteHistoricalMachines.forEach((m, id) => {
+            allMachinesForSearchMap.set(id, {
+              ...m
+            })
+          })
+        }
+        
+        // Add current ones (includes available if HQ) to ensure they have the correct current status
+        activeMachines.forEach(m => {
+          allMachinesForSearchMap.set(m.id, {
+            id: m.id,
+            unit_number: m.unit_number,
+            machine_type: m.machine_type,
+            status: m.status,
+            start_date: m.start_date,
+            end_date: m.end_date,
+            current_site_id: m.current_site_id
+          })
+        })
+
+        const allMachinesForSearch = Array.from(allMachinesForSearchMap.values())
 
         return {
           ...site,
-          machines_count: machines.length,
-          machines: machines,
+          machines_count: allMachinesForSearch.length,
+          machines: activeMachines,
+          all_machines: allMachinesForSearch
         }
       })
 

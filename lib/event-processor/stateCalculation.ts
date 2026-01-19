@@ -2,15 +2,15 @@ import { supabaseServer } from '../supabase-server'
 import { MachineState, ExtensionState } from './types'
 
 /**
- * Calcula o estado atual de uma máquina baseado em todos os eventos aprovados
+ * Calcula o estado atual de uma máquina baseado em todos os eventos
  */
 export async function calculateMachineState(machineId: string): Promise<MachineState> {
-  // Buscar todos os eventos aprovados para esta máquina, ordenados por data
+  // Buscar todos os eventos para esta máquina, ordenados por data
   const { data: events, error } = await supabaseServer
     .from('allocation_events')
     .select('*')
     .eq('machine_id', machineId)
-    .eq('status', 'approved')
+    .or('status.eq.approved,event_type.neq.refueling')
     .order('event_date', { ascending: true })
     .order('created_at', { ascending: true })
 
@@ -44,9 +44,24 @@ export async function calculateMachineState(machineId: string): Promise<MachineS
       case 'end_allocation':
         // Só termina alocação se estiver alocada no mesmo site
         if (state.current_site_id === event.site_id) {
-          state.current_site_id = null
+          // Mantemos o current_site_id pois a máquina continua fisicamente no local
+          // até que um transporte seja registrado.
+          // state.current_site_id = null
           state.status = state.is_in_downtime ? 'maintenance' : 'available'
           state.last_allocation_event_id = null
+        }
+        break
+
+      case 'transport_start':
+        // A máquina inicia o deslocamento.
+        state.status = 'in_transit'
+        break
+
+      case 'transport_arrival':
+        // A máquina chega em um novo site.
+        if (event.site_id) {
+          state.current_site_id = event.site_id
+          state.status = state.is_in_downtime ? 'maintenance' : 'available'
         }
         break
 
@@ -99,14 +114,15 @@ export async function calculateMachineState(machineId: string): Promise<MachineS
 }
 
 /**
- * Calcula o estado atual de uma extensão baseado em todos os eventos aprovados
+ * Calcula o estado atual de uma extensão baseado em todos os eventos
  */
 export async function calculateExtensionState(extensionId: string): Promise<ExtensionState> {
   const { data: events, error } = await supabaseServer
     .from('allocation_events')
     .select('*')
     .eq('extension_id', extensionId)
-    .eq('status', 'approved')
+    .or('status.eq.approved,event_type.neq.refueling')
+    .in('event_type', ['extension_attach', 'extension_detach'])
     .order('event_date', { ascending: true })
     .order('created_at', { ascending: true })
 

@@ -1,6 +1,6 @@
 import { ActiveAllocation, ActiveDowntime } from './types'
 import { EVENT_TYPE_LABELS } from '@/lib/permissions'
-import { formatWithSystemTimezone } from '@/lib/timezone'
+import { formatWithSystemTimezone, formatDateOnly as libFormatDateOnly } from '@/lib/timezone'
 import { 
   FiCalendar, 
   FiUser, 
@@ -9,7 +9,8 @@ import {
   FiTool,
   FiCheckCircle,
   FiXCircle,
-  FiFileText
+  FiFileText,
+  FiTruck
 } from 'react-icons/fi'
 import { GiKeyCard } from "react-icons/gi"
 import { LuPuzzle } from "react-icons/lu"
@@ -23,6 +24,15 @@ import { PiGasCanBold } from "react-icons/pi"
  */
 export const formatDate = (dateString: string) => {
   return formatWithSystemTimezone(dateString)
+}
+
+/**
+ * Formats a date string using the system timezone, date only.
+ * @param dateString - ISO date string
+ * @returns Formatted string (DD/MM/YYYY)
+ */
+export const formatDateOnly = (dateString: string) => {
+  return libFormatDateOnly(dateString)
 }
 
 /**
@@ -98,6 +108,24 @@ export const getEventConfig = (type: string) => {
         textColor: 'text-[#F39C12]',
         borderColor: 'border-[#F39C12]/20 dark:border-[#F39C12]/30'
       }
+    case 'transport_start':
+      return { 
+        icon: FiTruck, 
+        color: 'teal', 
+        label: 'Início de Transporte',
+        bgColor: 'bg-teal-100 dark:bg-teal-900/40',
+        textColor: 'text-teal-600 dark:text-teal-400',
+        borderColor: 'border-teal-200 dark:border-teal-800'
+      }
+    case 'transport_arrival':
+      return { 
+        icon: FiMapPin, 
+        color: 'cyan', 
+        label: 'Chegada em Obra',
+        bgColor: 'bg-cyan-100 dark:bg-cyan-900/40',
+        textColor: 'text-cyan-600 dark:text-cyan-400',
+        borderColor: 'border-cyan-200 dark:border-cyan-800'
+      }
     default:
       return { 
         icon: FiInfo, 
@@ -114,7 +142,8 @@ export const filterMachinesForEvent = (
   eventType: string,
   machines: any[],
   activeAllocations: ActiveAllocation[],
-  activeDowntimes: ActiveDowntime[]
+  activeDowntimes: ActiveDowntime[],
+  events: any[] = []
 ) => {
   const allocatedIds = activeAllocations.map(a => a.machine_id)
   const downtimeIds = activeDowntimes.map(d => d.machine_id)
@@ -127,15 +156,48 @@ export const filterMachinesForEvent = (
       return machines
       
     case 'end_allocation':
-      return machines.filter(m => allocatedIds.includes(m.id))
+      // Agora permitimos encerrar qualquer máquina que tenha um histórico de local, 
+      // MAS que não tenha um fim de alocação mais recente que o último início de alocação/chegada.
+      return machines.filter(m => {
+        // Buscar eventos relevantes aprovados para esta máquina
+        const machineEvents = events
+          .filter(e => e.machine?.id === m.id && e.status === 'approved')
+          .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
+
+        if (machineEvents.length === 0) return false
+
+        const lastEvent = machineEvents[0]
+        
+        // Se o evento mais recente já for um fim de alocação, não pode encerrar de novo
+        if (lastEvent.event_type === 'end_allocation') return false
+
+        // Se ela está em alocações ativas, permite
+        if (allocatedIds.includes(m.id)) return true
+        
+        // Se ela tem um status que indica presença em obra (mesmo que não oficializada por start_allocation)
+        // e o último evento relevante foi algo que a colocou lá (start, arrival, etc)
+        return ['available', 'maintenance', 'allocated'].includes(m.status) && m.current_site
+      })
     case 'refueling':
       return machines
       
     case 'downtime_start':
-      return machines.filter(m => allocatedIds.includes(m.id) && !downtimeIds.includes(m.id))
-      
+      // Permitir manutenção para qualquer máquina que não esteja em trânsito e não esteja já em manutenção
+      return machines.filter(m => m.status !== 'in_transit' && !downtimeIds.includes(m.id))
+
     case 'downtime_end':
+      // Apenas máquinas que estão em manutenção
       return machines.filter(m => downtimeIds.includes(m.id))
+      
+    case 'transport_start':
+      // VALIDAÇÃO: Máquina precisa estar em algum local (obra/pátio) para sair em transporte
+      // E não pode estar já em trânsito
+      return machines.filter(m => m.status !== 'in_transit' && m.current_site)
+      
+    case 'transport_arrival':
+      // VALIDAÇÃO CRÍTICA: Só permite registrar chegada para máquinas que estão atualmente em trânsito
+      // (ou seja, que possuem um "Início de Transporte" aprovado e sem chegada correspondente)
+      return machines.filter(m => m.status === 'in_transit')
       
     default:
       return machines

@@ -1,5 +1,7 @@
+// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { processNotifications, NotificationInput } from "./notifications.ts"
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
@@ -17,6 +19,8 @@ type RefuelingTemplate = {
   time_of_day: string
   is_active: boolean
   created_by: string | null
+  machines: { unit_number: string }
+  sites: { title: string }
 }
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
@@ -26,12 +30,17 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000
 // that will be displayed back as the intended local time in the browser.
 const BR_OFFSET = 3
 
-function getNextWeekRange() {
+function getCurrentWeekRange() {
   const now = new Date()
-  const day = now.getUTCDay()
-  const diffToNextMonday = (8 - day) % 7 || 7
+  const day = now.getUTCDay() // 0 = Sunday, 1 = Monday, ...
+
+  // Se for Domingo (0), queremos a segunda de AMANHÃ.
+  // Se for Segunda (1), queremos a segunda de HOJE.
+  // Se for qualquer outro dia, pegamos a segunda desta mesma semana (passado).
+  const diffToMonday = day === 0 ? 1 : 1 - day
+
   const monday = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToNextMonday),
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMonday),
   )
   const sunday = new Date(monday.getTime() + 6 * ONE_DAY_MS)
   const start = new Date(
@@ -66,7 +75,7 @@ function getScheduledDatesForTemplate(
   return results
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 })
   }
@@ -87,7 +96,7 @@ serve(async (req) => {
     console.error("Error fetching fallback user", fallbackError)
   }
 
-  const { start, end } = getNextWeekRange()
+  const { start, end } = getCurrentWeekRange()
 
   const { data: templates, error: templatesError } = await supabase
     .from("refueling_templates")
@@ -100,7 +109,9 @@ serve(async (req) => {
       day_of_week,
       time_of_day,
       is_active,
-      created_by
+      created_by,
+      machines (unit_number),
+      sites (title)
     `,
     )
     .eq("is_active", true)
@@ -113,6 +124,8 @@ serve(async (req) => {
   if (!templates || templates.length === 0) {
     return new Response("No active refueling templates", { status: 200 })
   }
+
+  const notificationsToCreate: NotificationInput[] = []
 
   for (const template of templates as RefuelingTemplate[]) {
     const dates = getScheduledDatesForTemplate(
@@ -132,6 +145,10 @@ serve(async (req) => {
 
     for (const scheduledAt of dates) {
       const scheduledIso = scheduledAt.toISOString()
+      
+      // A data de referência para o trigger deve ser o dia local planejado,
+      // não o timestamp UTC que pode ter virado o dia devido ao fuso horário.
+      const eventDay = new Date(scheduledAt.getTime() - (BR_OFFSET * 60 * 60 * 1000))
 
       const { data: existing, error: existingError } = await supabase
         .from("allocation_events")
@@ -152,16 +169,20 @@ serve(async (req) => {
         continue
       }
 
-      const { error: insertError } = await supabase.from("allocation_events").insert({
-        event_type: "refueling",
-        machine_id: template.machine_id,
-        site_id: template.site_id,
-        supplier_id: template.fuel_supplier_id,
-        event_date: scheduledIso,
-        status: "pending",
-        has_refueling: true,
-        created_by: createdBy,
-      })
+      const { data: newEvent, error: insertError } = await supabase
+        .from("allocation_events")
+        .insert({
+          event_type: "refueling",
+          machine_id: template.machine_id,
+          site_id: template.site_id,
+          supplier_id: template.fuel_supplier_id,
+          event_date: scheduledIso,
+          status: "pending",
+          has_refueling: true,
+          created_by: createdBy,
+        })
+        .select("id")
+        .single()
 
       if (insertError) {
         console.error("Error inserting refueling event", insertError)
@@ -172,9 +193,37 @@ serve(async (req) => {
           site_id: template.site_id,
           scheduled_for: scheduledIso,
         })
+
+        // 3. Prepare notification for the new event
+        const machineUnit = template.machines?.unit_number || "Desconhecida"
+        const siteTitle = template.sites?.title || "Desconhecido"
+        const formattedDate = new Date(scheduledIso).toLocaleDateString("pt-BR")
+
+        // A notificação deve disparar no início do dia do evento (00:00 AM BR / 03:00 UTC)
+        // para que o gestor veja as tarefas do dia assim que acessar o sistema.
+        const triggerDate = new Date(
+          Date.UTC(eventDay.getUTCFullYear(), eventDay.getUTCMonth(), eventDay.getUTCDate(), 3, 0, 0, 0)
+        )
+
+        notificationsToCreate.push({
+          event_id: newEvent.id,
+          root_type: "refueling",
+          titulo: `Abastecimento da ${machineUnit}`,
+          mensagem: `Este evento precisa acontecer hoje para a máquina ${machineUnit} no site ${siteTitle} para o dia ${formattedDate}. Aguardamos a confirmação.`,
+          trigger_date: triggerDate.toISOString(),
+        })
       }
     }
   }
 
-  return new Response("Refueling events generated for next week", { status: 200 })
+  // 4. Chamar a função de processamento de notificações (agora como módulo interno)
+  if (notificationsToCreate.length > 0) {
+    console.log(`[Refueling] Processando ${notificationsToCreate.length} notificações...`)
+    // Chamada direta para o módulo interno (com o delay de 10s embutido)
+    // Usamos await aqui se quisermos que a função espere, ou sem await se quisermos que rode em background
+    // No Supabase Edge Functions, é melhor usar await ou a função pode ser encerrada antes de terminar.
+    await processNotifications(supabase, notificationsToCreate)
+  }
+
+  return new Response("Refueling events generated and notifications processed", { status: 200 })
 })

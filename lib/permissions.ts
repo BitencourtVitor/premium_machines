@@ -79,6 +79,8 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
   extension_attach: 'Alocação de Extensão para Obra',
   extension_detach: 'Extensão Desconectada',
   refueling: 'Abastecimento de Combustível',
+  transport_start: 'Início de Transporte',
+  transport_arrival: 'Chegada em Obra',
 }
 
 // Downtime reason labels
@@ -98,6 +100,7 @@ export const MACHINE_STATUS_LABELS: Record<string, string> = {
   allocated: 'Alocada',
   maintenance: 'Em Manutenção',
   inactive: 'Inativa',
+  in_transit: 'Em Trânsito',
 }
 
 // Event status labels

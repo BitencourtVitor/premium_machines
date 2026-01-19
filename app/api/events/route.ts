@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
         correction_description: body.correction_description || null,
         notas: body.notas || null,
         created_by: body.created_by,
-        status: 'approved',
+        status: body.event_type === 'refueling' ? 'pending' : 'approved',
       })
       .select(`
         *,

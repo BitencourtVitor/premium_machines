@@ -3,7 +3,7 @@ import { Site } from './types'
 import { MACHINE_STATUS_LABELS } from '@/lib/permissions'
 
 // Função para obter cores adaptadas ao tema
-export const getThemeColors = (colorType: 'neutral' | 'blue' | 'red' | 'green' | 'yellow' | 'orange' | 'purple', isDark: boolean) => {
+export const getThemeColors = (colorType: 'neutral' | 'blue' | 'red' | 'green' | 'yellow' | 'orange' | 'purple' | 'pink', isDark: boolean) => {
   const colors: Record<string, { bg: string; text: string }> = {
     neutral: {
       bg: isDark ? '#374151' : '#6B7280', // gray-700 : gray-500
@@ -32,6 +32,10 @@ export const getThemeColors = (colorType: 'neutral' | 'blue' | 'red' | 'green' |
     purple: {
       bg: isDark ? '#A78BFA' : '#9333EA', // purple-400 : purple-600
       text: '#FFFFFF'
+    },
+    pink: {
+      bg: isDark ? '#F472B6' : '#DB2777', // pink-400 : pink-600
+      text: '#FFFFFF'
     }
   }
   return colors[colorType] || colors.neutral
@@ -40,43 +44,68 @@ export const getThemeColors = (colorType: 'neutral' | 'blue' | 'red' | 'green' |
 // Função para determinar a cor do cluster baseada no status mais crítico
 export const getClusterStatusColor = (sites: Site[], isDark: boolean) => {
   let hasMaintenance = false
-  let hasInactive = false
-  let hasOperational = false
-  let hasMachines = false
+  let hasExceeded = false
+  let hasActive = false
+  let hasScheduled = false
+  let hasMoved = false
+  let hasHistory = false
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayStr = today.toISOString().split('T')[0]
 
   // Iterar sobre todos os sites do cluster
   for (const site of sites) {
-    if (site.machines && site.machines.length > 0) {
-      hasMachines = true
-      for (const machine of site.machines) {
-        const status = machine.status
-        
-        if (status === 'maintenance') {
-          hasMaintenance = true
-          // Se encontrou manutenção (prioridade máxima), pode parar de verificar este site?
-          // Não, precisamos verificar todos para ter certeza, mas se achou maintenance já é vermelho.
-          break 
-        } else if (status === 'inactive') {
-          hasInactive = true
-        } else if (status === 'allocated' || status === 'available') {
-          hasOperational = true
-        }
+    const machines = site.all_machines || site.machines || []
+    
+    for (const machine of machines) {
+      const startDateStr = machine.start_date ? machine.start_date.split('T')[0] : null
+      const endDateStr = machine.end_date ? machine.end_date.split('T')[0] : null
+      let status = machine.status
+
+      if (status === 'allocated' && startDateStr && startDateStr > todayStr) {
+        status = 'scheduled'
+      }
+
+      if (status === 'allocated' && endDateStr && todayStr > endDateStr) {
+        status = 'exceeded'
+      }
+      
+      const isMoved = (status === 'inactive' || status === 'available') && 
+                      machine.current_site_id && 
+                      machine.current_site_id !== site.id;
+
+      if (status === 'maintenance') {
+        hasMaintenance = true
+      } else if (status === 'exceeded') {
+        hasExceeded = true
+      } else if (status === 'allocated') {
+        hasActive = true
+      } else if (status === 'scheduled') {
+        hasScheduled = true
+      } else if (isMoved) {
+        hasMoved = true
+      } else if (status === 'inactive') {
+        hasHistory = true
       }
     }
-    if (hasMaintenance) break // Prioridade máxima encontrada
   }
 
-  // Definir cor baseada na prioridade
+  // Definir cor baseada na prioridade: Manutenção > Excedida > Ativa > Agendada > Movida > Histórico > Nunca
   if (hasMaintenance) {
-    return getThemeColors('red', isDark) // Crítico: Manutenção
-  } else if (hasInactive) {
-    return getThemeColors('yellow', isDark) // Alerta: Inativo/Problema
-  } else if (hasOperational) {
-    return getThemeColors('blue', isDark) // Normal: Em operação/Disponível
-  } else if (hasMachines) {
-    return getThemeColors('blue', isDark) // Máquinas existem mas status desconhecido
+    return getThemeColors('orange', isDark) // Crítico: Manutenção
+  } else if (hasExceeded) {
+    return getThemeColors('red', isDark) // Crítico: Excedida
+  } else if (hasActive) {
+    return getThemeColors('green', isDark) // Ativa: Em operação
+  } else if (hasScheduled) {
+    return getThemeColors('blue', isDark) // Agendada: Futura
+  } else if (hasMoved) {
+    return getThemeColors('pink', isDark) // Movida: Saiu da obra
+  } else if (hasHistory) {
+    return getThemeColors('purple', isDark) // Histórico: Já teve algo
   } else {
-    return getThemeColors('neutral', isDark) // Sem máquinas
+    return getThemeColors('neutral', isDark) // Nunca houve: Vazio
   }
 }
 
@@ -177,24 +206,71 @@ export const groupNearbySites = (sites: Site[], mapInstance: mapboxgl.Map, thres
 
 // Criar marcador com ícone map-pin do Phosphor Icons para jobsites individuais
 export const createLocationMarker = (site: Site, currentIsDark: boolean, onClick: (e?: Event) => void, isSelected: boolean = false) => {
-  // Check if any machine is in maintenance
-  const hasMaintenance = site.machines?.some((m: any) => m.status === 'maintenance')
+  const machines = site.all_machines || site.machines || []
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayStr = today.toISOString().split('T')[0]
+
+  let hasMaintenance = false
+  let hasExceeded = false
+  let hasActive = false
+  let hasScheduled = false
+  let hasMoved = false
+  let hasHistory = false
+
+  machines.forEach((machine: any) => {
+    const startDateStr = machine.start_date ? machine.start_date.split('T')[0] : null
+    const endDateStr = machine.end_date ? machine.end_date.split('T')[0] : null
+    let status = machine.status
+
+    if (status === 'allocated' && startDateStr && startDateStr > todayStr) {
+      status = 'scheduled'
+    }
+
+    if (status === 'allocated' && endDateStr && todayStr > endDateStr) {
+      status = 'exceeded'
+    }
+
+    const isMoved = (status === 'inactive' || status === 'available') && 
+                    machine.current_site_id && 
+                    machine.current_site_id !== site.id;
+
+    if (status === 'maintenance') hasMaintenance = true
+    else if (status === 'exceeded') hasExceeded = true
+    else if (status === 'allocated') hasActive = true
+    else if (status === 'scheduled') hasScheduled = true
+    else if (isMoved) hasMoved = true
+    else if (status === 'inactive') hasHistory = true
+  })
+
+  let baseColorType: 'neutral' | 'blue' | 'red' | 'green' | 'yellow' | 'orange' | 'purple' | 'pink' = 'neutral'
   
-  let baseColorType = 'neutral'
+  // Prioridade: Manutenção > Excedida > Ativa > Agendada > Movida > Histórico > Nunca
   if (hasMaintenance) {
+    baseColorType = 'orange'
+  } else if (hasExceeded) {
     baseColorType = 'red'
-  } else if (site.machines_count > 0) {
+  } else if (hasActive) {
+    baseColorType = 'green'
+  } else if (hasScheduled) {
     baseColorType = 'blue'
+  } else if (hasMoved) {
+    baseColorType = 'pink'
+  } else if (hasHistory) {
+    baseColorType = 'purple'
+  } else {
+    baseColorType = 'neutral'
   }
   
-  const colors = getThemeColors(baseColorType as any, currentIsDark)
+  const colors = getThemeColors(baseColorType, currentIsDark)
   const strokeWidth = isSelected ? 16 : 8
   const el = document.createElement('div')
   el.className = 'marker-container'
   el.style.cursor = 'pointer'
   el.style.width = '32px'
   el.style.height = '40px'
-  el.style.zIndex = isSelected ? '1002' : '1000'
+  // Reduzir z-index para não sobrepor os controles do mapa (que usam z-10 ou superior)
+  el.style.zIndex = isSelected ? '5' : '1'
   el.innerHTML = `
     <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
       <svg width="32" height="40" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); overflow: visible;">
@@ -238,20 +314,103 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
       ${!site.is_headquarters ? `
         <div style="border-top: 1px solid ${currentIsDark ? '#374151' : '#e5e7eb'}; padding-top: 12px;">
           <p style="font-size: 12px; font-weight: 500; color: ${currentIsDark ? '#d1d5db' : '#374151'}; margin-bottom: 8px;">
-            Máquinas
+            ${(() => {
+              const machines = site.all_machines || site.machines || [];
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const todayStr = today.toISOString().split('T')[0];
+              
+              const workingCount = machines.filter((m: any) => {
+                const startDateStr = m.start_date ? m.start_date.split('T')[0] : null;
+                const endDateStr = m.end_date ? m.end_date.split('T')[0] : null;
+                
+                let finalStatus = m.status;
+                if (finalStatus === 'allocated' && startDateStr && startDateStr > todayStr) {
+                  finalStatus = 'scheduled';
+                }
+                if (finalStatus === 'allocated' && endDateStr && todayStr > endDateStr) {
+                  finalStatus = 'exceeded';
+                }
+                
+                return finalStatus === 'allocated' || finalStatus === 'exceeded';
+              }).length;
+              
+              return `Equipamentos (${workingCount} ativos de ${machines.length})`;
+            })()}
           </p>
-          ${site.machines?.length > 0 ? `
+          ${(site.all_machines?.length || site.machines?.length) > 0 ? `
             <div style="max-height: 120px; overflow-y: auto; gap: 4px; display: flex; flex-direction: column;">
-              ${site.machines.map((machine: any) => `
+              ${(site.all_machines || site.machines).map((machine: any) => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const todayStr = today.toISOString().split('T')[0];
+                
+                const startDateStr = machine.start_date ? machine.start_date.split('T')[0] : null;
+                const endDateStr = machine.end_date ? machine.end_date.split('T')[0] : null;
+
+                // Prioridade para o status vindo da API, mas validamos com a data se necessário
+                let finalStatus = machine.status;
+                
+                // Se a API diz que é 'allocated' mas a data de início é futura, tratamos como agendada
+                if (finalStatus === 'allocated' && startDateStr && startDateStr > todayStr) {
+                  finalStatus = 'scheduled';
+                }
+
+                // Se a alocação está ativa mas passou da data final, é excedida
+                if (finalStatus === 'allocated' && endDateStr && todayStr > endDateStr) {
+                  finalStatus = 'exceeded';
+                }
+
+                let label = 'Encerrada';
+                let statusColor = '';
+
+                const isMoved = (finalStatus === 'inactive' || finalStatus === 'available') && 
+                                machine.current_site_id && 
+                                machine.current_site_id !== site.id;
+
+                if (isMoved) {
+        label = 'MOVIDA';
+        statusColor = `background: ${currentIsDark ? '#831843' : '#fce7f3'}; color: ${currentIsDark ? '#f9a8d4' : '#9d174d'}; border: 1px solid ${currentIsDark ? '#db2777' : '#fbcfe8'}; font-weight: 700;`;
+      } else if (finalStatus === 'allocated') {
+                  label = 'Ativa';
+                  statusColor = `background: ${currentIsDark ? '#064e3b' : '#dcfce7'}; color: ${currentIsDark ? '#6ee7b7' : '#166534'};`;
+                } else if (finalStatus === 'exceeded') {
+                  label = 'Ativa (Excedida)';
+                  statusColor = `background: ${currentIsDark ? '#7f1d1d' : '#fee2e2'}; color: ${currentIsDark ? '#fca5a5' : '#991b1b'}; font-weight: 700; border: 1px solid ${currentIsDark ? '#f87171' : '#fecaca'};`;
+                } else if (finalStatus === 'maintenance') {
+                  label = 'Manutenção';
+                  statusColor = `background: ${currentIsDark ? '#7f1d1d' : '#fee2e2'}; color: ${currentIsDark ? '#fca5a5' : '#991b1b'};`;
+                } else if (finalStatus === 'scheduled') {
+                  label = 'Agendada';
+                  statusColor = `background: ${currentIsDark ? '#1e3a8a' : '#dbeafe'}; color: ${currentIsDark ? '#93c5fd' : '#1e40af'};`;
+                } else if (finalStatus === 'available' || finalStatus === 'inactive') {
+                  // Se for na sede, é "Disponível", se for em obra é "Encerrada"
+                  label = site.is_headquarters ? 'Disponível' : 'Encerrada';
+                  statusColor = site.is_headquarters 
+                    ? `background: ${currentIsDark ? '#1e3a8a' : '#dbeafe'}; color: ${currentIsDark ? '#93c5fd' : '#1e40af'};`
+                    : `background: ${currentIsDark ? '#4c1d95' : '#f3e8ff'}; color: ${currentIsDark ? '#c4b5fd' : '#6d28d9'};`;
+                } else {
+                  label = 'Encerrada';
+                  statusColor = `background: ${currentIsDark ? '#4c1d95' : '#f3e8ff'}; color: ${currentIsDark ? '#c4b5fd' : '#6d28d9'};`;
+                }
+
+                return `
                 <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px; background: ${currentIsDark ? '#374151' : '#f9fafb'}; border-radius: 4px;">
                   <span style="font-size: 12px; font-weight: 500; color: ${currentIsDark ? 'white' : '#111827'};">
                     ${machine.unit_number}
                   </span>
-                  <span class="status-${machine.status}" style="font-size: 10px; padding: 2px 6px; border-radius: 9999px; font-weight: 500;">
-                    ${MACHINE_STATUS_LABELS[machine.status]}
+                  <span style="
+                    font-size: 10px; 
+                    padding: 2px 8px; 
+                    border-radius: 9999px; 
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    ${statusColor}
+                  ">
+                    ${label}
                   </span>
-                </div>
-              `).join('')}
+                </div>`;
+              }).join('')}
             </div>
           ` : `
             <p style="font-size: 12px; color: ${currentIsDark ? '#9ca3af' : '#6b7280'};">

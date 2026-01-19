@@ -41,7 +41,7 @@ export default function CreateSiteModal({
   if (!showCreateModal) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010] p-6">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl my-4 md:my-8 min-w-0 max-w-[calc(100vw-3rem)] md:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">

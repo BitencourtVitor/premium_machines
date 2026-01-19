@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 import { createAuditLog } from '@/lib/auditLog'
+import { syncMachineState, syncExtensionState } from '@/lib/allocation/synchronization'
 
 export async function GET(
   request: NextRequest,
@@ -87,6 +88,17 @@ export async function PUT(
     if (updateData.construction_type === '') updateData.construction_type = null
     if (updateData.lot_building_number === '') updateData.lot_building_number = null
     if (updateData.downtime_reason === '') updateData.downtime_reason = null
+    if (updateData.end_date === '') updateData.end_date = null
+    
+    // event_date should NEVER be null as it's a required field in DB
+    if (updateData.event_date === '') delete updateData.event_date
+
+    // Remove joined objects that might be in the body if it came from a full event object
+    delete updateData.machine
+    delete updateData.site
+    delete updateData.extension
+    delete updateData.supplier
+    delete updateData.created_by_user
 
     const { data: updatedEvent, error: updateError } = await supabaseServer
       .from('allocation_events')
@@ -108,6 +120,14 @@ export async function PUT(
         { success: false, message: 'Erro ao atualizar evento' },
         { status: 500 }
       )
+    }
+
+    // Synchronize state if necessary
+    if (updatedEvent.machine_id) {
+      await syncMachineState(updatedEvent.machine_id)
+    }
+    if (updatedEvent.extension_id) {
+      await syncExtensionState(updatedEvent.extension_id)
     }
 
     // Log action

@@ -7,5 +7,6 @@ export interface Site {
   city?: string
   machines_count: number
   machines: any[]
+  all_machines?: any[]
   is_headquarters?: boolean
 }

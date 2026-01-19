@@ -5,6 +5,7 @@ export interface AllocationEvent {
   site?: { id: string; title: string }
   extension?: { id: string; unit_number: string }
   event_date: string
+  end_date?: string | null
   status: string
   downtime_reason?: string
   downtime_description?: string
@@ -32,6 +33,7 @@ export interface ActiveAllocation {
   construction_type: 'lot' | 'building' | null
   lot_building_number: string | null
   allocation_start: string
+  end_date?: string | null
   is_in_downtime: boolean
   current_downtime_event_id: string | null
   current_downtime_reason: string | null
@@ -56,6 +58,7 @@ export interface NewEventState {
   construction_type: string
   lot_building_number: string
   event_date: string
+  end_date: string
   downtime_reason: string
   downtime_description: string
   corrects_event_id: string

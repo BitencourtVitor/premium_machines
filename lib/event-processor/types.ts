@@ -6,6 +6,11 @@ export type EventType =
   | 'correction'
   | 'extension_attach'
   | 'extension_detach'
+  | 'transport_start'
+  | 'transport_arrival'
+  | 'request_allocation'
+  | 'refueling'
+  | 'monitoring'
 
 export interface AllocationEvent {
   id: string
@@ -34,7 +39,7 @@ export interface AllocationEvent {
 
 export interface MachineState {
   current_site_id: string | null
-  status: 'available' | 'allocated' | 'maintenance' | 'inactive'
+  status: 'available' | 'allocated' | 'maintenance' | 'inactive' | 'in_transit'
   is_in_downtime: boolean
   current_downtime_event_id: string | null
   last_allocation_event_id: string | null

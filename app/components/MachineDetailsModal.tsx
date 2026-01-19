@@ -67,6 +67,8 @@ export default function MachineDetailsModal({
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800'
       case 'maintenance':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
+      case 'in_transit':
+        return 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300 border-teal-200 dark:border-teal-800'
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700'
     }
@@ -92,6 +94,10 @@ export default function MachineDetailsModal({
         return { ring: 'ring-blue-100 dark:ring-blue-900/30', dot: 'bg-blue-500' }
       case 'request_allocation':
         return { ring: 'ring-purple-100 dark:ring-purple-900/30', dot: 'bg-purple-500' }
+      case 'transport_start':
+        return { ring: 'ring-teal-100 dark:ring-teal-900/30', dot: 'bg-teal-500' }
+      case 'transport_arrival':
+        return { ring: 'ring-cyan-100 dark:ring-cyan-900/30', dot: 'bg-cyan-500' }
       default:
         return { ring: 'ring-gray-100 dark:ring-gray-800', dot: 'bg-gray-400' }
     }
@@ -99,7 +105,7 @@ export default function MachineDetailsModal({
 
   return (
     <div 
-      className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-[10010] flex items-center justify-center p-4 sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -182,7 +188,8 @@ export default function MachineDetailsModal({
                     <span className={`w-2 h-2 rounded-full mr-2 ${
                       machine?.status === 'available' ? 'bg-green-500' :
                       machine?.status === 'allocated' ? 'bg-blue-500' :
-                      machine?.status === 'maintenance' ? 'bg-yellow-500' : 'bg-gray-500'
+                      machine?.status === 'maintenance' ? 'bg-yellow-500' :
+                      machine?.status === 'in_transit' ? 'bg-teal-500' : 'bg-gray-500'
                     }`}></span>
                     {MACHINE_STATUS_LABELS[machine?.status] || machine?.status || 'Desconhecido'}
                   </span>
