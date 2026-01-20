@@ -220,7 +220,7 @@ export async function calculateExtensionState(extensionId: string): Promise<Exte
     `)
     .eq('extension_id', extensionId)
     .or('status.eq.approved,event_type.neq.refueling')
-    .in('event_type', ['extension_attach', 'extension_detach'])
+    .in('event_type', ['extension_attach', 'extension_detach', 'end_allocation'])
     .order('event_date', { ascending: true })
     .order('created_at', { ascending: true })
 
@@ -248,7 +248,7 @@ export async function calculateExtensionState(extensionId: string): Promise<Exte
       state.attach_event_id = event.id
       state.status = 'attached'
       state.attached_at = event.event_date
-    } else if (event.event_type === 'extension_detach') {
+    } else if ((event.event_type === 'extension_detach' || event.event_type === 'end_allocation') && state.current_machine_id) {
       state.current_machine_id = null
       state.current_machine_unit_number = null
       state.attach_event_id = null

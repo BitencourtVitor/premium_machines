@@ -1234,7 +1234,7 @@ export default function RefuelingPage() {
             isExpanded ? 'md:ml-52' : 'md:ml-16'
           }`}
         >
-          <div className="max-w-7xl md:flex md:flex-col md:flex-1 md:overflow-hidden md:w-full">
+          <div className="w-full md:flex md:flex-col md:flex-1 md:overflow-hidden">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 flex-shrink-0 overflow-hidden">
               <div 
                 className={`transition-all duration-300 ease-in-out overflow-hidden ${

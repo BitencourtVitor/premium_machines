@@ -25,6 +25,8 @@ interface CreateEventModalProps {
   editingEventId?: string | null
 }
 
+const MANDATORY_DOC_TYPES = ['start_allocation', 'end_allocation', 'extension_attach', 'downtime_end', 'transport_arrival']
+
 export default function CreateEventModal({
   showCreateModal,
   setShowCreateModal,
@@ -147,11 +149,8 @@ export default function CreateEventModal({
       if (!newEvent.downtime_reason) return 'O motivo da manutenção é obrigatório.'
     }
 
-    // Documentos obrigatórios para tipos específicos
-    const mandatoryDocTypes = ['start_allocation', 'end_allocation', 'extension_attach', 'extension_detach', 'downtime_end']
-    
     // Bloqueia se o tipo exige documento e não há arquivos selecionados (apenas na criação)
-    if (mandatoryDocTypes.includes(newEvent.event_type) && files.length === 0 && !editingEventId) {
+    if (MANDATORY_DOC_TYPES.includes(newEvent.event_type) && files.length === 0 && !editingEventId) {
       return 'Este tipo de evento exige obrigatoriamente o anexo de documentos (Imagem ou PDF).'
     }
 
@@ -178,7 +177,9 @@ export default function CreateEventModal({
 
   const filteredMachines = filterMachinesForEvent(
     newEvent.event_type,
-    machines,
+    ['end_allocation', 'downtime_start', 'downtime_end', 'transport_start', 'transport_arrival'].includes(newEvent.event_type) 
+      ? [...(machines || []), ...(extensions || [])]
+      : machines,
     activeAllocations,
     activeDowntimes,
     events
@@ -388,14 +389,6 @@ export default function CreateEventModal({
               color="indigo" 
               count={counts.extension_attach}
               icon={<LuPuzzle className="w-5 h-5" aria-label="Ícone de quebra-cabeça" title="Alocação de Extensão" />}
-            />
-            <Button 
-              type="extension_detach" 
-              label="Fim de Alocação de Extensão" 
-              desc="Desvincular extensão da obra" 
-              color="orange" 
-              count={counts.extension_detach}
-              icon={<LuPuzzle className="w-5 h-5 opacity-70" aria-label="Ícone de quebra-cabeça" title="Fim de Alocação de Extensão" />}
             />
             <Button 
               type="end_allocation" 
@@ -828,167 +821,169 @@ export default function CreateEventModal({
                 />
               )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Documentos (Imagens ou PDF) {['start_allocation', 'end_allocation', 'extension_attach', 'extension_detach', 'downtime_end'].includes(newEvent.event_type) && '*'}
-                </label>
-                {/* Documentos existentes (apenas em edição) */}
-                {editingEventId && (existingFiles.length > 0 || loadingExisting) && (
-                  <div className="mb-4">
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">
-                      Documentos já anexados
-                    </span>
-                    {loadingExisting ? (
-                      <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
-                        <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin" />
-                        Carregando arquivos...
-                      </div>
-                    ) : (
-                      <ul className="divide-y divide-gray-100 dark:divide-gray-800 border border-gray-100 dark:border-gray-800 rounded-lg overflow-hidden bg-gray-50/50 dark:bg-gray-900/20">
-                        {existingFiles.map((file, index) => (
-                          <li key={index} className="flex items-center justify-between py-2 px-3">
-                            <div className="flex items-center gap-2 overflow-hidden">
-                              <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                              <span className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                                {file.name.split('_').slice(1).join('_') || file.name}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-gray-400">Existente</span>
-                              <button 
-                                onClick={async () => {
-                                  if (confirm('Deseja realmente excluir este documento permanentemente?')) {
-                                    try {
-                                      const { supabase } = await import('@/lib/supabase')
-                                      const { error } = await supabase.storage
-                                        .from('Allocation Documents')
-                                        .remove([`${editingEventId}/${file.name}`])
-                                      
-                                      if (!error) {
-                                        setExistingFiles(prev => prev.filter((_, i) => i !== index))
-                                      } else {
-                                        alert('Erro ao excluir arquivo')
-                                      }
-                                    } catch (err) {
-                                      console.error('Error deleting file:', err)
-                                    }
-                                  }
-                                }}
-                                className="text-gray-400 hover:text-red-500 p-1 transition-colors"
-                                title="Excluir permanentemente"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-
-                <div 
-                  className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-lg transition-colors ${
-                    isDragging 
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
-                      : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500'
-                  }`}
-                  onDragOver={(e) => {
-                    e.preventDefault()
-                    setIsDragging(true)
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault()
-                    setIsDragging(false)
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    setIsDragging(false)
-                    const droppedFiles = Array.from(e.dataTransfer.files)
-                    const validFiles = droppedFiles.filter(file => {
-                      if (file.size > 10 * 1024 * 1024) {
-                        alert(`Arquivo ${file.name} excede o limite de 10MB e não será adicionado.`)
-                        return false
-                      }
-                      const isValidType = file.type.startsWith('image/') || file.type === 'application/pdf'
-                      if (!isValidType) {
-                        alert(`Arquivo ${file.name} não é uma imagem ou PDF.`)
-                        return false
-                      }
-                      return true
-                    })
-                    setFiles(prev => [...prev, ...validFiles])
-                    if (validationError && validationError.includes('documento')) {
-                      setValidationError(null)
-                    }
-                  }}
-                >
-                  <div className="space-y-1 text-center">
-                    <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                      <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <div className="flex text-sm text-gray-600 dark:text-gray-400">
-                      <label htmlFor="file-upload" className="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-                        <span>Fazer upload de arquivos</span>
-                        <input 
-                          id="file-upload" 
-                          name="file-upload" 
-                          type="file" 
-                          className="sr-only" 
-                          multiple 
-                          accept="image/*,application/pdf"
-                          onChange={(e) => {
-                            const selectedFiles = Array.from(e.target.files || [])
-                            const validFiles = selectedFiles.filter(file => {
-                              if (file.size > 10 * 1024 * 1024) {
-                                alert(`Arquivo ${file.name} excede o limite de 10MB e não será adicionado.`)
-                                return false
-                              }
-                              return true
-                            })
-                            setFiles(prev => [...prev, ...validFiles])
-                            if (validationError && validationError.includes('documento')) {
-                              setValidationError(null)
-                            }
-                          }}
-                        />
-                      </label>
-                      <p className="pl-1">ou arraste e solte</p>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      PNG, JPG, PDF até 10MB
-                    </p>
-                  </div>
-                </div>
-
-                {files.length > 0 && (
-                  <ul className="mt-3 divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                    {files.map((file, index) => (
-                      <li key={index} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-900/30">
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                          </svg>
-                          <span className="text-xs text-gray-700 dark:text-gray-300 truncate">{file.name}</span>
-                          <span className="text-[10px] text-gray-500 flex-shrink-0">({(file.size / 1024).toFixed(0)} KB)</span>
+              {MANDATORY_DOC_TYPES.includes(newEvent.event_type) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Documentos (Imagens ou PDF) *
+                  </label>
+                  {/* Documentos existentes (apenas em edição) */}
+                  {editingEventId && (existingFiles.length > 0 || loadingExisting) && (
+                    <div className="mb-4">
+                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">
+                        Documentos já anexados
+                      </span>
+                      {loadingExisting ? (
+                        <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
+                          <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin" />
+                          Carregando arquivos...
                         </div>
-                        <button 
-                          onClick={() => setFiles(prev => prev.filter((_, i) => i !== index))}
-                          className="text-red-500 hover:text-red-700 p-1"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+                      ) : (
+                        <ul className="divide-y divide-gray-100 dark:divide-gray-800 border border-gray-100 dark:border-gray-800 rounded-lg overflow-hidden bg-gray-50/50 dark:bg-gray-900/20">
+                          {existingFiles.map((file, index) => (
+                            <li key={index} className="flex items-center justify-between py-2 px-3">
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                                  {file.name.split('_').slice(1).join('_') || file.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-gray-400">Existente</span>
+                                <button 
+                                  onClick={async () => {
+                                    if (confirm('Deseja realmente excluir este documento permanentemente?')) {
+                                      try {
+                                        const { supabase } = await import('@/lib/supabase')
+                                        const { error } = await supabase.storage
+                                          .from('Allocation Documents')
+                                          .remove([`${editingEventId}/${file.name}`])
+                                        
+                                        if (!error) {
+                                          setExistingFiles(prev => prev.filter((_, i) => i !== index))
+                                        } else {
+                                          alert('Erro ao excluir arquivo')
+                                        }
+                                      } catch (err) {
+                                        console.error('Error deleting file:', err)
+                                      }
+                                    }
+                                  }}
+                                  className="text-gray-400 hover:text-red-500 p-1 transition-colors"
+                                  title="Excluir permanentemente"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
+                  <div 
+                    className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-lg transition-colors ${
+                      isDragging 
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+                        : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500'
+                    }`}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      setIsDragging(true)
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault()
+                      setIsDragging(false)
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      setIsDragging(false)
+                      const droppedFiles = Array.from(e.dataTransfer.files)
+                      const validFiles = droppedFiles.filter(file => {
+                        if (file.size > 10 * 1024 * 1024) {
+                          alert(`Arquivo ${file.name} excede o limite de 10MB e não será adicionado.`)
+                          return false
+                        }
+                        const isValidType = file.type.startsWith('image/') || file.type === 'application/pdf'
+                        if (!isValidType) {
+                          alert(`Arquivo ${file.name} não é uma imagem ou PDF.`)
+                          return false
+                        }
+                        return true
+                      })
+                      setFiles(prev => [...prev, ...validFiles])
+                      if (validationError && validationError.includes('documento')) {
+                        setValidationError(null)
+                      }
+                    }}
+                  >
+                    <div className="space-y-1 text-center">
+                      <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <div className="flex text-sm text-gray-600 dark:text-gray-400">
+                        <label htmlFor="file-upload" className="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                          <span>Fazer upload de arquivos</span>
+                          <input 
+                            id="file-upload" 
+                            name="file-upload" 
+                            type="file" 
+                            className="sr-only" 
+                            multiple 
+                            accept="image/*,application/pdf"
+                            onChange={(e) => {
+                              const selectedFiles = Array.from(e.target.files || [])
+                              const validFiles = selectedFiles.filter(file => {
+                                if (file.size > 10 * 1024 * 1024) {
+                                  alert(`Arquivo ${file.name} excede o limite de 10MB e não será adicionado.`)
+                                  return false
+                                }
+                                return true
+                              })
+                              setFiles(prev => [...prev, ...validFiles])
+                              if (validationError && validationError.includes('documento')) {
+                                setValidationError(null)
+                              }
+                            }}
+                          />
+                        </label>
+                        <p className="pl-1">ou arraste e solte</p>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        PNG, JPG, PDF até 10MB
+                      </p>
+                    </div>
+                  </div>
+
+                  {files.length > 0 && (
+                    <ul className="mt-3 divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                      {files.map((file, index) => (
+                        <li key={index} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-900/30">
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                            </svg>
+                            <span className="text-xs text-gray-700 dark:text-gray-300 truncate">{file.name}</span>
+                            <span className="text-[10px] text-gray-500 flex-shrink-0">({(file.size / 1024).toFixed(0)} KB)</span>
+                          </div>
+                          <button 
+                            onClick={() => setFiles(prev => prev.filter((_, i) => i !== index))}
+                            className="text-red-500 hover:text-red-700 p-1"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

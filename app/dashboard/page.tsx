@@ -120,7 +120,7 @@ export default function DashboardPage() {
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
         <main className={`flex-1 p-4 md:p-6 transition-all duration-300 ease-in-out md:overflow-y-auto ${isExpanded ? 'md:ml-52' : 'md:ml-16'}`}>
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full">
             {/* Welcome Message */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
               <div className="flex items-center justify-between">

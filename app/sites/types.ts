@@ -11,6 +11,7 @@ export interface Site {
   created_at: string
   is_headquarters?: boolean
   machines?: any[]
+  all_machines?: any[]
 }
 
 export interface SiteMetrics {

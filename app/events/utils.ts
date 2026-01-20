@@ -183,8 +183,8 @@ export const filterMachinesForEvent = (
 
         const lastEvent = machineEvents[0]
         
-        // Se o evento mais recente já for um fim de alocação, não pode encerrar de novo
-        if (lastEvent.event_type === 'end_allocation') return false
+        // Se o evento mais recente já for um fim de alocação (normal ou extensão), não pode encerrar de novo
+        if (['end_allocation', 'extension_detach'].includes(lastEvent.event_type)) return false
 
         // Se ela está em alocações ativas, permite
         if (allocatedIds.includes(m.id)) return true

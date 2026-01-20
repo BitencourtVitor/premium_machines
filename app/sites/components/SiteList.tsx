@@ -1,10 +1,10 @@
-import React, { useState } from 'react'
-import { Popover, PopoverButton, PopoverPanel, Transition } from '@headlessui/react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Site } from '../types'
 import { cleanAddress } from '../utils'
 import BaseList from '../../components/BaseList'
 import ListActionButton from '../../components/ListActionButton'
 import { MACHINE_STATUS_LABELS } from '@/lib/permissions'
+import { Portal } from '@headlessui/react'
 
 interface MachineCountProps {
   site: Site
@@ -12,78 +12,141 @@ interface MachineCountProps {
 
 function MachineCount({ site }: MachineCountProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const machines = site.machines || []
+  const [coords, setCoords] = useState({ top: 0, left: 0 })
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Usar all_machines se disponível, senão fallback para machines
+  const allMachines = site.all_machines || site.machines || []
+  const activeMachinesIds = new Set((site.machines || []).map(m => m.id))
+
+  const updateCoords = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setCoords({
+        top: rect.top + rect.height / 2,
+        left: rect.left
+      })
+    }
+  }
+
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    updateCoords()
+    setIsOpen(true)
+  }
+
+  const handleMouseLeave = () => {
+    timeoutRef.current = setTimeout(() => {
+      setIsOpen(false)
+    }, 200)
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      window.addEventListener('scroll', updateCoords, true)
+      window.addEventListener('resize', updateCoords)
+    }
+    return () => {
+      window.removeEventListener('scroll', updateCoords, true)
+      window.removeEventListener('resize', updateCoords)
+    }
+  }, [isOpen])
 
   return (
-    <Popover className="relative flex flex-col items-center">
+    <div className="relative flex flex-col items-center" ref={triggerRef}>
       <div
-        onMouseEnter={() => setIsOpen(true)}
-        onMouseLeave={() => setIsOpen(false)}
-        className="flex flex-col items-center"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className="flex flex-col items-center cursor-help"
       >
-        <PopoverButton className="focus:outline-none group cursor-help">
-          <div className="text-center hidden sm:block">
-            <p className="text-xl md:text-2xl font-bold text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
-              {site.machines_count || 0}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">máquinas</p>
-          </div>
-          <div className="text-center sm:hidden">
-            <p className="text-lg font-bold text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
-              {site.machines_count || 0}
-            </p>
-            <p className="text-[10px] text-gray-500 dark:text-gray-400">máq</p>
-          </div>
-        </PopoverButton>
+        <div className="text-center hidden sm:block">
+          <p className={`text-xl md:text-2xl font-bold transition-colors ${
+            isOpen ? 'text-blue-700 dark:text-blue-300' : 'text-blue-600 dark:text-blue-400'
+          }`}>
+            {site.machines_count || 0}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">máquinas</p>
+        </div>
+        <div className="text-center sm:hidden">
+          <p className={`text-lg font-bold transition-colors ${
+            isOpen ? 'text-blue-700 dark:text-blue-300' : 'text-blue-600 dark:text-blue-400'
+          }`}>
+            {site.machines_count || 0}
+          </p>
+          <p className="text-[10px] text-gray-500 dark:text-gray-400">máq</p>
+        </div>
 
-        <Transition
-          show={isOpen && machines.length > 0}
-          as={React.Fragment}
-          enter="transition duration-200 ease-out"
-          enterFrom="opacity-0 scale-95 translate-x-2"
-          enterTo="opacity-100 scale-100 translate-x-0"
-          leave="transition duration-150 ease-in"
-          leaveFrom="opacity-100 scale-100 translate-x-0"
-          leaveTo="opacity-0 scale-95 translate-x-2"
-        >
-          <PopoverPanel
-            static
-            anchor={{ to: 'left', gap: 16 }}
-            className="z-[9999] w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 p-3 focus:outline-none !overflow-visible"
-          >
-            <div className="flex items-center justify-between mb-3 border-b border-gray-50 dark:border-gray-700 pb-2">
-              <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Máquinas Alocadas</h4>
-              <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                {machines.length}
-              </span>
-            </div>
-            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
-              {machines.map((machine: any) => (
-                <div 
-                  key={machine.id} 
-                  className="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50"
-                >
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {machine.unit_number}
+        {/* Popover Customizado com Portal para evitar clipping e sobrepor header */}
+        {isOpen && allMachines.length > 0 && (
+          <Portal>
+            <div
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+              style={{
+                position: 'fixed',
+                top: `${coords.top}px`,
+                left: `${coords.left}px`,
+                transform: 'translate(-100%, -50%)',
+                zIndex: 10010, // Maior que o Header (10005)
+              }}
+              className="mr-2 animate-in fade-in slide-in-from-right-2 duration-200"
+            >
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 w-64 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Histórico de Máquinas
                   </span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                    machine.status === 'maintenance' 
-                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' 
-                      : machine.status === 'allocated'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                      : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                  }`}>
-                    {MACHINE_STATUS_LABELS[machine.status] || machine.status}
+                  <span className="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                    {allMachines.length}
                   </span>
                 </div>
-              ))}
+
+                <div className="p-2 max-h-80 overflow-y-auto custom-scrollbar">
+                  <div className="space-y-1">
+                    {allMachines.map((machine: any) => {
+                      const isActive = activeMachinesIds.has(machine.id)
+                      return (
+                        <div 
+                          key={machine.id} 
+                          className={`flex items-center justify-between p-2 rounded-xl border transition-all hover:bg-white dark:hover:bg-gray-700 hover:shadow-sm ${
+                            isActive 
+                              ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-100/50 dark:border-blue-900/30' 
+                              : 'bg-gray-50/50 dark:bg-gray-700/30 border-transparent opacity-70'
+                          }`}
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                              {machine.unit_number}
+                            </span>
+                            {!isActive && (
+                              <span className="text-[9px] text-gray-500 dark:text-gray-400 leading-none">
+                                Anterior
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                            machine.status === 'maintenance' 
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' 
+                              : isActive
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                              : 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300'
+                          }`}>
+                            {isActive ? (MACHINE_STATUS_LABELS[machine.status] || machine.status) : 'Inativo'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+              {/* Arrow */}
+              <div className="absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 bg-white dark:bg-gray-800 border-r border-t border-gray-100 dark:border-gray-700 rotate-45" />
             </div>
-            {/* Arrow */}
-            <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white dark:bg-gray-800 border-r border-t border-gray-100 dark:border-gray-700 rotate-45" />
-          </PopoverPanel>
-        </Transition>
+          </Portal>
+        )}
       </div>
-    </Popover>
+    </div>
   )
 }
 

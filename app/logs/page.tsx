@@ -244,7 +244,7 @@ export default function LogsPage() {
       <div className="flex md:flex-1 md:overflow-hidden">
         <Sidebar />
         <main className={`flex-1 p-4 md:p-6 md:overflow-hidden md:flex md:flex-col transition-all duration-300 ease-in-out ${isExpanded ? 'md:ml-52' : 'md:ml-16'}`}>
-          <div className="max-w-7xl md:flex md:flex-col md:flex-1 md:overflow-hidden md:w-full">
+          <div className="w-full md:flex md:flex-col md:flex-1 md:overflow-hidden">
             {/* Logs List Header */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
               <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 gap-4">
