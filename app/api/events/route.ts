@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         machine:machines(id, unit_number),
+        requested_machine_type:machine_types!machine_type_id(id, nome),
         site:sites(id, title),
         extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),
@@ -73,10 +74,20 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // Validações básicas
-    const requiresMachineId = body.event_type !== 'extension_attach'
+    const isRequest = body.event_type === 'request_allocation'
+    const requiresMachineId = body.event_type !== 'extension_attach' && !isRequest
+    
     if (!body.event_type || (requiresMachineId && !body.machine_id) || !body.event_date || !body.created_by) {
       return NextResponse.json(
-        { success: false, message: 'Campos obrigatórios: event_type, event_date, created_by e machine_id (exceto para extensão)' },
+        { success: false, message: 'Campos obrigatórios: event_type, event_date, created_by e machine_id (exceto para extensão e solicitações)' },
+        { status: 400 }
+      )
+    }
+
+    // Para solicitações, machine_id pode ser nulo se machine_type_id estiver presente
+    if (isRequest && !body.machine_id && !body.machine_type_id) {
+      return NextResponse.json(
+        { success: false, message: 'Para solicitações, informe o tipo de máquina' },
         { status: 400 }
       )
     }
@@ -114,6 +125,7 @@ export async function POST(request: NextRequest) {
         downtime_reason: body.downtime_reason || null,
         downtime_description: body.downtime_description || null,
         supplier_id: body.supplier_id || null,
+        machine_type_id: body.machine_type_id || null,
         corrects_event_id: body.corrects_event_id || null,
         correction_description: body.correction_description || null,
         notas: body.notas || null,
@@ -123,6 +135,7 @@ export async function POST(request: NextRequest) {
       .select(`
         *,
         machine:machines(id, unit_number),
+        requested_machine_type:machine_types!machine_type_id(id, nome),
         site:sites(id, title),
         extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),

@@ -63,11 +63,12 @@ export const getClusterStatusColor = (sites: Site[], isDark: boolean) => {
       const endDateStr = machine.end_date ? machine.end_date.split('T')[0] : null
       let status = machine.status
 
-      if (status === 'allocated' && startDateStr && startDateStr > todayStr) {
+      // Se for uma extensão, o status pode vir de forma diferente
+      if (machine.status === 'allocated' && startDateStr && startDateStr > todayStr) {
         status = 'scheduled'
       }
 
-      if (status === 'allocated' && endDateStr && todayStr > endDateStr) {
+      if ((status === 'allocated' || status === 'active') && endDateStr && todayStr > endDateStr) {
         status = 'exceeded'
       }
       
@@ -79,7 +80,7 @@ export const getClusterStatusColor = (sites: Site[], isDark: boolean) => {
         hasMaintenance = true
       } else if (status === 'exceeded') {
         hasExceeded = true
-      } else if (status === 'allocated') {
+      } else if (status === 'allocated' || status === 'active') {
         hasActive = true
       } else if (status === 'scheduled') {
         hasScheduled = true
@@ -207,16 +208,17 @@ export const groupNearbySites = (sites: Site[], mapInstance: mapboxgl.Map, thres
 // Criar marcador com ícone map-pin do Phosphor Icons para jobsites individuais
 export const createLocationMarker = (site: Site, currentIsDark: boolean, onClick: (e?: Event) => void, isSelected: boolean = false) => {
   const machines = site.all_machines || site.machines || []
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const todayStr = today.toISOString().split('T')[0]
-
-  let hasMaintenance = false
-  let hasExceeded = false
+  // Determine status flags
   let hasActive = false
+  let hasExceeded = false
+  let hasMaintenance = false
   let hasScheduled = false
   let hasMoved = false
   let hasHistory = false
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayStr = today.toISOString().split('T')[0]
 
   machines.forEach((machine: any) => {
     const startDateStr = machine.start_date ? machine.start_date.split('T')[0] : null
@@ -227,7 +229,7 @@ export const createLocationMarker = (site: Site, currentIsDark: boolean, onClick
       status = 'scheduled'
     }
 
-    if (status === 'allocated' && endDateStr && todayStr > endDateStr) {
+    if ((status === 'allocated' || status === 'active') && endDateStr && todayStr > endDateStr) {
       status = 'exceeded'
     }
 
@@ -237,7 +239,7 @@ export const createLocationMarker = (site: Site, currentIsDark: boolean, onClick
 
     if (status === 'maintenance') hasMaintenance = true
     else if (status === 'exceeded') hasExceeded = true
-    else if (status === 'allocated') hasActive = true
+    else if (status === 'allocated' || status === 'active') hasActive = true
     else if (status === 'scheduled') hasScheduled = true
     else if (isMoved) hasMoved = true
     else if (status === 'inactive') hasHistory = true
@@ -328,11 +330,11 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
                 if (finalStatus === 'allocated' && startDateStr && startDateStr > todayStr) {
                   finalStatus = 'scheduled';
                 }
-                if (finalStatus === 'allocated' && endDateStr && todayStr > endDateStr) {
+                if ((finalStatus === 'allocated' || finalStatus === 'active') && endDateStr && todayStr > endDateStr) {
                   finalStatus = 'exceeded';
                 }
                 
-                return finalStatus === 'allocated' || finalStatus === 'exceeded';
+                return finalStatus === 'allocated' || finalStatus === 'active' || finalStatus === 'exceeded';
               }).length;
               
               return `Equipamentos (${workingCount} ativos de ${machines.length})`;
@@ -351,13 +353,14 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
                 // Prioridade para o status vindo da API, mas validamos com a data se necessário
                 let finalStatus = machine.status;
                 
-                // Se a API diz que é 'allocated' mas a data de início é futura, tratamos como agendada
+                // No dia do fim da alocação, ela ainda é considerada ativa
+                // A regra de 'dia seguinte' do stateCalculation já deve vir tratada da API,
+                // mas garantimos a consistência visual aqui.
                 if (finalStatus === 'allocated' && startDateStr && startDateStr > todayStr) {
                   finalStatus = 'scheduled';
                 }
 
-                // Se a alocação está ativa mas passou da data final, é excedida
-                if (finalStatus === 'allocated' && endDateStr && todayStr > endDateStr) {
+                if ((finalStatus === 'allocated' || finalStatus === 'active') && endDateStr && todayStr > endDateStr) {
                   finalStatus = 'exceeded';
                 }
 
@@ -369,9 +372,9 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
                                 machine.current_site_id !== site.id;
 
                 if (isMoved) {
-        label = 'MOVIDA';
-        statusColor = `background: ${currentIsDark ? '#831843' : '#fce7f3'}; color: ${currentIsDark ? '#f9a8d4' : '#9d174d'}; border: 1px solid ${currentIsDark ? '#db2777' : '#fbcfe8'}; font-weight: 700;`;
-      } else if (finalStatus === 'allocated') {
+                  label = 'MOVIDA';
+                  statusColor = `background: ${currentIsDark ? '#831843' : '#fce7f3'}; color: ${currentIsDark ? '#f9a8d4' : '#9d174d'}; border: 1px solid ${currentIsDark ? '#db2777' : '#fbcfe8'}; font-weight: 700;`;
+                } else if (finalStatus === 'allocated' || finalStatus === 'active') {
                   label = 'Ativa';
                   statusColor = `background: ${currentIsDark ? '#064e3b' : '#dcfce7'}; color: ${currentIsDark ? '#6ee7b7' : '#166534'};`;
                 } else if (finalStatus === 'exceeded') {

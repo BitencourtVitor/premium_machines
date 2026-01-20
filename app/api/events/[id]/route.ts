@@ -14,6 +14,7 @@ export async function GET(
       .select(`
         *,
         machine:machines(id, unit_number),
+        requested_machine_type:machine_types!machine_type_id(id, nome),
         site:sites(id, title),
         extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),
@@ -98,6 +99,7 @@ export async function PUT(
     delete updateData.site
     delete updateData.extension
     delete updateData.supplier
+    delete updateData.machine_type
     delete updateData.created_by_user
 
     const { data: updatedEvent, error: updateError } = await supabaseServer
@@ -107,6 +109,7 @@ export async function PUT(
       .select(`
         *,
         machine:machines(id, unit_number),
+        machine_type:machine_types!machine_type_id(id, nome),
         site:sites(id, title),
         extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),

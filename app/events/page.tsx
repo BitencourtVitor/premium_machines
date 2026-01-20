@@ -31,7 +31,9 @@ export default function EventsPage() {
   const [events, setEvents] = useState<AllocationEvent[]>([])
   const [machines, setMachines] = useState<any[]>([])
   const [sites, setSites] = useState<any[]>([])
+  const [suppliers, setSuppliers] = useState<any[]>([])
   const [extensions, setExtensions] = useState<any[]>([])
+  const [machineTypes, setMachineTypes] = useState<any[]>([])
   const [filterStatus, setFilterStatus] = useState<string[]>([])
   const [filterType, setFilterType] = useState<string[]>([])
   const [startDate, setStartDate] = useState<string>('')
@@ -94,6 +96,8 @@ export default function EventsPage() {
     corrects_event_id: '',
     correction_description: '',
     notas: '',
+    supplier_id: '',
+    machine_type_id: '',
   })
 
   const loadEvents = useCallback(async () => {
@@ -141,6 +145,18 @@ export default function EventsPage() {
     }
   }, [])
 
+  const loadSuppliers = useCallback(async () => {
+    try {
+      const response = await fetch('/api/suppliers')
+      const data = await response.json()
+      if (data.success) {
+        setSuppliers(data.suppliers)
+      }
+    } catch (error) {
+      console.error('Error loading suppliers:', error)
+    }
+  }, [])
+
   const loadExtensions = useCallback(async () => {
     try {
       const response = await fetch('/api/extensions?status=available')
@@ -150,6 +166,18 @@ export default function EventsPage() {
       }
     } catch (error) {
       console.error('Error loading extensions:', error)
+    }
+  }, [])
+
+  const loadMachineTypes = useCallback(async () => {
+    try {
+      const response = await fetch('/api/machine-types')
+      const data = await response.json()
+      if (data.success) {
+        setMachineTypes(data.machineTypes)
+      }
+    } catch (error) {
+      console.error('Error loading machine types:', error)
     }
   }, [])
 
@@ -185,9 +213,11 @@ export default function EventsPage() {
     loadEvents()
     loadMachines()
     loadSites()
+    loadSuppliers()
     loadExtensions()
+    loadMachineTypes()
     loadActiveAllocations()
-  }, [user, sessionLoading, router, loadEvents, loadMachines, loadSites, loadExtensions, loadActiveAllocations])
+  }, [user, sessionLoading, router, loadEvents, loadMachines, loadSites, loadSuppliers, loadExtensions, loadMachineTypes, loadActiveAllocations])
 
   const handleCreateEvent = async () => {
     // Basic safety check
@@ -208,7 +238,7 @@ export default function EventsPage() {
       }
 
       // Fields that must be null if empty string (UUIDs and Enum/Text fields)
-      const nullableFields = ['site_id', 'machine_id', 'extension_id', 'corrects_event_id', 'construction_type', 'lot_building_number', 'downtime_reason']
+      const nullableFields = ['site_id', 'machine_id', 'extension_id', 'corrects_event_id', 'construction_type', 'lot_building_number', 'downtime_reason', 'supplier_id', 'machine_type_id']
       nullableFields.forEach(field => {
         if (payload[field as keyof typeof payload] === '') {
           // @ts-ignore
@@ -249,6 +279,8 @@ export default function EventsPage() {
           corrects_event_id: '',
           correction_description: '',
           notas: '',
+          supplier_id: '',
+          machine_type_id: '',
         })
         loadEvents()
         if (activeTab === 'allocations') loadActiveAllocations()
@@ -287,10 +319,12 @@ export default function EventsPage() {
       event_date: getLocalDateTimeForInput(),
       downtime_reason: '',
       downtime_description: '',
+      end_date: '',
       corrects_event_id: '',
       correction_description: '',
       notas: '',
-      end_date: '',
+      supplier_id: '',
+      machine_type_id: '',
     })
     setShowCreateModal(true)
   }
@@ -324,6 +358,8 @@ export default function EventsPage() {
       correction_description: event.correction_description || '',
       notas: event.notas || '',
       end_date: localEndDateString,
+      machine_type_id: event.machine_type_id || '',
+      supplier_id: event.supplier_id || '',
     })
     setShowCreateModal(true)
   }
@@ -568,7 +604,7 @@ export default function EventsPage() {
   }
 
   const filteredEvents = events.filter(event => {
-    // Apenas abastecimentos confirmados devem aparecer no sistema
+    // Para o abastecimento em particular, apenas os aprovados sejam levados em consideração
     if (event.event_type === 'refueling' && event.status !== 'approved') {
       return false
     }
@@ -665,6 +701,7 @@ export default function EventsPage() {
                 handleNewEvent={handleNewEvent}
                 handleEditEvent={handleEditEvent}
                 handleDeleteEvent={handleDeleteEvent}
+                machineTypes={machineTypes}
               />
             )}
           </div>
@@ -697,8 +734,10 @@ export default function EventsPage() {
           setNewEvent={setNewEvent}
           machines={machines}
           sites={sites}
-          extensions={extensions}
-          activeAllocations={activeAllocations}
+          suppliers={suppliers}
+        extensions={extensions}
+        machineTypes={machineTypes}
+        activeAllocations={activeAllocations}
           activeDowntimes={activeDowntimes}
           events={events}
           creating={creating}

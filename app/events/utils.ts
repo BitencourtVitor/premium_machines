@@ -99,6 +99,7 @@ export const getEventConfig = (type: string) => {
         textColor: 'text-purple-600 dark:text-purple-400',
         borderColor: 'border-purple-200 dark:border-purple-800'
       }
+
     case 'extension_attach':
       return { 
         icon: LuPuzzle, 
@@ -178,8 +179,6 @@ export const filterMachinesForEvent = (
         // e o último evento relevante foi algo que a colocou lá (start, arrival, etc)
         return ['available', 'maintenance', 'allocated'].includes(m.status) && m.current_site
       })
-    case 'refueling':
-      return machines
       
     case 'downtime_start':
       // Permitir manutenção para qualquer máquina que não esteja em trânsito e não esteja já em manutenção

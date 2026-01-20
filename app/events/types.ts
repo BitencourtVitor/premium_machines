@@ -2,6 +2,8 @@ export interface AllocationEvent {
   id: string
   event_type: string
   machine: { id: string; unit_number: string }
+  requested_machine_type?: { id: string; nome: string }
+  supplier?: { id: string; nome: string }
   site?: { id: string; title: string }
   extension?: { id: string; unit_number: string }
   event_date: string
@@ -15,6 +17,8 @@ export interface AllocationEvent {
   construction_type?: string
   lot_building_number?: string
   extension_id?: string
+  supplier_id?: string
+  machine_type_id?: string
   corrects_event_id?: string
   correction_description?: string
   rejection_reason?: string
@@ -63,5 +67,7 @@ export interface NewEventState {
   downtime_description: string
   corrects_event_id: string
   correction_description: string
+  supplier_id: string
+  machine_type_id: string
   notas: string
 }

@@ -8,9 +8,16 @@ export async function validateEvent(event: Partial<AllocationEvent>): Promise<{
   valid: boolean
   reason?: string
 }> {
-  const requiresMachineId = event.event_type !== 'extension_attach'
+  const isRequest = event.event_type === 'request_allocation'
+  const requiresMachineId = event.event_type !== 'extension_attach' && !isRequest
+  
   if (requiresMachineId && !event.machine_id) {
     return { valid: false, reason: 'machine_id é obrigatório' }
+  }
+
+  // Para solicitações sem machine_id específico, validamos o machine_type_id
+  if (isRequest && !event.machine_id && !event.machine_type_id) {
+    return { valid: false, reason: 'Tipo de máquina é obrigatório para solicitações' }
   }
 
   const state = event.machine_id

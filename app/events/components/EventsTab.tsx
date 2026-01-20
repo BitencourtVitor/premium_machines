@@ -33,6 +33,7 @@ interface EventsTabProps {
   handleNewEvent: () => void
   handleEditEvent: (event: AllocationEvent) => void
   handleDeleteEvent: (event: AllocationEvent) => void
+  machineTypes: any[]
   startDate: string
   setStartDate: (date: string) => void
   endDate: string
@@ -52,6 +53,7 @@ export default function EventsTab({
   handleNewEvent,
   handleEditEvent,
   handleDeleteEvent,
+  machineTypes,
   startDate,
   setStartDate,
   endDate,
@@ -171,7 +173,13 @@ export default function EventsTab({
             <div className="flex-1 min-w-0 w-full">
               <div className="flex items-center justify-between md:justify-start gap-3 mb-1">
                 <span className="text-lg font-bold text-gray-900 dark:text-white">
-                  {event.machine?.unit_number}
+                  {event.event_type === 'request_allocation' 
+                    ? (
+                      event.requested_machine_type?.nome || 
+                      machineTypes.find(t => t.id === event.machine_type_id)?.nome ||
+                      'Solicitação'
+                    ) 
+                    : (event.machine?.unit_number || 'Sem Identificação')}
                 </span>
                 <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                   {config.label}
@@ -179,17 +187,12 @@ export default function EventsTab({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-1 gap-x-6 text-sm">
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                    <FiCalendar className="flex-shrink-0" />
-                    <span>{formatDateOnly(event.event_date)}</span>
-                  </div>
-                  {event.end_date && (
-                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-medium">
-                      <FiCalendar className="flex-shrink-0" />
-                      <span>Vencimento: {formatDateOnly(event.end_date)}</span>
-                    </div>
-                  )}
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                  <FiCalendar className="flex-shrink-0" />
+                  <span>
+                    {formatDateOnly(event.event_date)}
+                    {event.end_date && ` - ${formatDateOnly(event.end_date)}`}
+                  </span>
                 </div>
                 
                 {event.site && (
@@ -199,25 +202,33 @@ export default function EventsTab({
                   </div>
                 )}
 
-                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                  <FiUser className="flex-shrink-0" />
-                  <span>{event.created_by_user?.nome}</span>
+                {event.supplier && (
+                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                    <FiTool className="flex-shrink-0" />
+                    <span className="truncate">{event.supplier.nome}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-4 text-gray-500 dark:text-gray-400 lg:col-span-2">
+                  <div className="flex items-center gap-2">
+                    <FiUser className="flex-shrink-0" />
+                    <span>{event.created_by_user?.nome}</span>
+                  </div>
+                  {event.notas && (
+                    <div className="flex items-center gap-2 text-gray-400 italic border-l border-gray-200 dark:border-gray-700 pl-4">
+                      <FiInfo className="flex-shrink-0 text-xs" />
+                      <span className="truncate">{event.notas}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {(event.downtime_reason || event.notas) && (
+              {event.downtime_reason && (
                 <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 flex items-start gap-2">
                   <FiInfo className="mt-0.5 flex-shrink-0 text-gray-400" />
-                  <div className="flex flex-wrap gap-x-4">
-                    {event.downtime_reason && (
-                      <span className={`${config.textColor}`}>
-                        Motivo: {DOWNTIME_REASON_LABELS[event.downtime_reason]}
-                      </span>
-                    )}
-                    {event.notas && (
-                      <span className="italic">{event.notas}</span>
-                    )}
-                  </div>
+                  <span className={`${config.textColor}`}>
+                    Motivo: {DOWNTIME_REASON_LABELS[event.downtime_reason]}
+                  </span>
                 </div>
               )}
             </div>

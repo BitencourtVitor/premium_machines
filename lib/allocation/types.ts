@@ -6,6 +6,7 @@ export interface AllocationEvent {
   site_id: string | null
   extension_id: string | null
   supplier_id: string | null
+  machine_type_id: string | null
   construction_type: 'lot' | 'building' | null
   lot_building_number: string | null
   event_date: string

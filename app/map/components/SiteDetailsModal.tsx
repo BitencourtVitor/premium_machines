@@ -243,7 +243,7 @@ export default function SiteDetailsModal({
       return {
         isActive: true,
         label: 'Ativa (Excedida)',
-        className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-bold'
+        className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-semibold'
       }
     }
 
@@ -255,7 +255,7 @@ export default function SiteDetailsModal({
         return {
           isActive: true,
           label: 'Ativa (Excedida)',
-          className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-bold border border-red-200'
+          className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-semibold border border-red-200'
         }
       }
 
@@ -353,11 +353,11 @@ export default function SiteDetailsModal({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010] p-6"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010] p-4 md:p-6"
       onClick={onClose}
     >
       <div 
-        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-6xl h-[90vh] min-h-[600px] overflow-hidden flex flex-col"
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-7xl h-[90vh] min-h-[600px] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -459,15 +459,18 @@ export default function SiteDetailsModal({
 
                           {/* Informações da máquina (Esquerda) */}
                           <div className="flex-1 min-w-0">
-                            <span className={`font-bold text-lg block ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+                            <span className={`font-semibold text-lg block ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
                               {allocation.machine_unit_number}
                             </span>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate uppercase tracking-tight">
                               {allocation.machine_type}
                             </p>
-                            <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium mt-1 whitespace-nowrap">
-                              {cycleStart} — {cycleEnd}
-                            </p>
+                            <div className="flex items-center gap-1.5 mt-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600"></span>
+                              <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold whitespace-nowrap uppercase">
+                                {cycleStart} — {cycleEnd}
+                              </p>
+                            </div>
                           </div>
                           
                           {/* Status da máquina (Direita) */}
@@ -768,18 +771,18 @@ export default function SiteDetailsModal({
                         )}
                       </div>
 
-                      {/* Lado Direito: Grade do Calendário */}
-                      <div className="flex-1 min-w-0 flex flex-col">
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm flex-1 flex flex-col">
-                          <div className="grid grid-cols-7 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                              <div key={day} className="py-3 text-center text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                                {day}
-                              </div>
-                            ))}
-                          </div>
+              {/* Lado Direito: Grade do Calendário */}
+              <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
+                  <div className="grid grid-cols-7 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 flex-shrink-0">
+                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                      <div key={day} className="py-4 text-center text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
 
-                          <div className="grid grid-cols-7 flex-1 bg-gray-50 dark:bg-gray-900/50 gap-[1px]">
+                  <div className="grid grid-cols-7 grid-rows-6 flex-1 bg-gray-50 dark:bg-gray-900/50 gap-[1px] min-h-0">
                             {(() => {
                               const year = calendarMonth.getFullYear()
                               const month = calendarMonth.getMonth()
@@ -803,12 +806,12 @@ export default function SiteDetailsModal({
                                 const isStartDay = dateStr === startDateStr
 
                                 const statusConfig = {
-                                  'working': 'bg-emerald-500 dark:bg-emerald-400 text-white dark:text-emerald-950 font-bold border-emerald-600 dark:border-emerald-300',
-                                  'working-exceeded': 'bg-red-600 dark:bg-red-400 text-white dark:text-red-950 font-black border-red-700 dark:border-red-300 shadow-md',
-                                  'maintenance': 'bg-orange-600 dark:bg-orange-400 text-white dark:text-orange-950 font-bold border-orange-700 dark:border-orange-300',
-                                  'in-transit': 'bg-purple-600 dark:bg-purple-400 text-white dark:text-purple-950 font-bold border-purple-700 dark:border-purple-300',
-                                  'scheduled': 'bg-blue-600 dark:bg-blue-400 text-white dark:text-blue-950 font-bold border-blue-700 dark:border-blue-300 border-dashed',
-                                  'not-allocated': 'text-gray-400 dark:text-gray-500'
+                                  'working': 'bg-emerald-500 dark:bg-emerald-500 text-white dark:text-white font-semibold border-emerald-600 dark:border-emerald-400',
+                                  'working-exceeded': 'bg-red-600 dark:bg-red-500 text-white dark:text-white font-semibold border-red-700 dark:border-red-400 shadow-md',
+                                  'maintenance': 'bg-orange-600 dark:bg-orange-500 text-white dark:text-white font-semibold border-orange-700 dark:border-orange-400',
+                                  'in-transit': 'bg-purple-600 dark:bg-purple-500 text-white dark:text-white font-semibold border-purple-700 dark:border-purple-400',
+                                  'scheduled': 'bg-blue-600 dark:bg-blue-500 text-white dark:text-white font-semibold border-blue-700 dark:border-blue-400 border-dashed',
+                                  'not-allocated': 'text-gray-500 dark:text-gray-400'
                                 }
 
                                 days.push(
@@ -816,35 +819,35 @@ export default function SiteDetailsModal({
                                     key={dayDate.toISOString()}
                                     onClick={() => setSelectedDate(dayDate)}
                                     className={`
-                                      relative flex items-center justify-center transition-all duration-200 cursor-pointer group aspect-square
-                                      ${!isCurrentMonth ? 'bg-gray-50/50 dark:bg-gray-900/50' : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/30'}
-                                      ${selectedDate && getSystemDateStr(selectedDate) === dateStr ? 'bg-gray-50 dark:bg-gray-800/80' : ''}
+                                      relative flex items-center justify-center transition-all duration-200 cursor-pointer group
+                                      ${!isCurrentMonth ? 'bg-gray-100/50 dark:bg-gray-900/30 opacity-40' : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50'}
+                                      ${selectedDate && getSystemDateStr(selectedDate) === dateStr ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}
                                     `}
                                   >
                                     {/* Indicador de Seleção (Borda Externa) */}
                                     {selectedDate && getSystemDateStr(selectedDate) === dateStr && (
-                                      <div className="absolute inset-0 border-2 border-gray-300 dark:border-gray-600 z-30 pointer-events-none" />
+                                      <div className="absolute inset-0 border-2 border-blue-500/50 dark:border-blue-400/50 z-30 pointer-events-none" />
                                     )}
 
-                                    {/* Indicador de Hoje (Quadrado Oco Amarelo) */}
+                                    {/* Indicador de Hoje (Borda Amarela) */}
                                     {isToday && (
-                                      <div className="absolute w-[85%] h-[85%] border-2 border-yellow-400 rounded-md z-0" />
+                                      <div className="absolute inset-1 border-2 border-yellow-400 rounded-lg z-0" />
                                     )}
 
                                     {/* Indicador de Início (Círculo Azul) */}
                                     {isStartDay && (
-                                      <div className="absolute w-11 h-11 border-2 border-blue-600 dark:border-blue-400 rounded-full z-20 pointer-events-none" />
+                                      <div className="absolute w-10 h-10 sm:w-12 sm:h-12 border-2 border-blue-600 dark:border-blue-400 rounded-full z-20 pointer-events-none animate-pulse" />
                                     )}
 
                                     {/* Indicador de Vencimento (Círculo Vermelho) */}
                                     {isExpirationDay && (
-                                      <div className="absolute w-11 h-11 border-2 border-red-600 dark:border-red-400 rounded-full z-20 pointer-events-none" />
+                                      <div className="absolute w-10 h-10 sm:w-12 sm:h-12 border-2 border-red-600 dark:border-red-400 rounded-full z-20 pointer-events-none" />
                                     )}
 
                                     <div className={`
-                                      w-10 h-10 flex items-center justify-center rounded-full text-sm font-medium transition-all relative border-2 z-10
-                                      ${isCurrentMonth ? statusConfig[dayStatus] : 'text-gray-300 dark:text-gray-700 border-transparent'}
-                                      ${isCurrentMonth && dayStatus === 'not-allocated' ? 'border-transparent' : ''}
+                                      w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full text-sm sm:text-base font-semibold transition-all relative border-2 z-10
+                                      ${isCurrentMonth ? statusConfig[dayStatus] : 'text-gray-300 dark:text-gray-600 border-transparent'}
+                                      ${isCurrentMonth && dayStatus === 'not-allocated' ? 'border-transparent group-hover:bg-gray-100 dark:group-hover:bg-gray-700' : ''}
                                     `}>
                                       {dayDate.getDate()}
                                     </div>

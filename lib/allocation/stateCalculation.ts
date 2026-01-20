@@ -64,14 +64,18 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
       case 'end_allocation':
         // Só encerra se o site corresponder
         if (state.current_site_id && (!event.site_id || state.current_site_id === event.site_id)) {
-          // Mantemos o current_site_id pois a máquina continua fisicamente no local
-          // até que um transporte seja registrado.
-          state.status = 'available'
-          state.current_allocation_event_id = null
-          state.construction_type = null
-          state.lot_building_number = null
-          state.allocation_start = null
-          state.end_date = null
+          // A máquina só deixa de estar alocada no dia SEGUINTE ao fim real (conforme SiteDetailsModal)
+          if (eventDateStr < refDateStr) {
+            state.status = 'available'
+            state.current_allocation_event_id = null
+            state.construction_type = null
+            state.lot_building_number = null
+            state.allocation_start = null
+            state.end_date = null
+          } else {
+            // No dia do evento de fim, ela ainda é considerada 'allocated' (ou 'exceeded' se passar da data)
+            state.status = 'allocated'
+          }
         }
         break
 

@@ -128,20 +128,20 @@ export async function GET(request: NextRequest) {
             })
 
             // Add attached extensions
-            alloc.attached_extensions.forEach(ext => {
-                if (!activeMachinesMap.has(ext.extension_id)) {
-                    activeMachinesMap.set(ext.extension_id, {
-                        id: ext.extension_id,
-                        unit_number: ext.extension_unit_number,
-                        status: 'allocated',
-                        ownership_type: 'owned',
-                        machine_type: ext.extension_type,
-                        start_date: alloc.allocation_start, // Extension follows machine start
-                        end_date: alloc.end_date,
-                        current_site_id: alloc.site_id
-                    })
-                }
-            })
+                alloc.attached_extensions.forEach(ext => {
+                    if (!activeMachinesMap.has(ext.extension_id)) {
+                        activeMachinesMap.set(ext.extension_id, {
+                            id: ext.extension_id,
+                            unit_number: ext.extension_unit_number,
+                            status: alloc.status, // Extensão herda o status da máquina (ex: exceeded)
+                            ownership_type: 'owned',
+                            machine_type: ext.extension_type,
+                            start_date: alloc.allocation_start, // Extension follows machine start
+                            end_date: alloc.end_date,
+                            current_site_id: alloc.site_id
+                        })
+                    }
+                })
         })
 
         // If this is headquarters, also add all machines that are NOT currently allocated anywhere

@@ -6,7 +6,6 @@ import { formatDateOnly } from '@/lib/timezone'
 import { filterMachinesForEvent } from '../utils'
 import { GiKeyCard } from "react-icons/gi"
 import { LuPuzzle } from "react-icons/lu"
-import { PiGasCanBold } from "react-icons/pi"
 
 interface CreateEventModalProps {
   showCreateModal: boolean
@@ -15,7 +14,9 @@ interface CreateEventModalProps {
   setNewEvent: (event: NewEventState) => void
   machines: any[]
   sites: any[]
+  suppliers: any[]
   extensions: any[]
+  machineTypes: any[]
   activeAllocations: ActiveAllocation[]
   activeDowntimes: ActiveDowntime[]
   events?: AllocationEvent[]
@@ -31,7 +32,9 @@ export default function CreateEventModal({
   setNewEvent,
   machines,
   sites,
+  suppliers,
   extensions,
+  machineTypes,
   activeAllocations,
   activeDowntimes,
   events = [],
@@ -68,23 +71,39 @@ export default function CreateEventModal({
         .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())[0]
 
       if (lastSiteEvent) {
-        setNewEvent({
-          ...newEvent,
-          site_id: lastSiteEvent.site?.id || '',
-          construction_type: lastSiteEvent.construction_type || '',
-          lot_building_number: lastSiteEvent.lot_building_number || ''
-        })
+        const newSiteId = lastSiteEvent.site?.id || ''
+        const newConstructionType = lastSiteEvent.construction_type || ''
+        const newLotBuildingNumber = lastSiteEvent.lot_building_number || ''
+
+        // Só atualiza se for diferente para evitar loops infinitos se newEvent for adicionado às dependências
+        if (
+          newEvent.site_id !== newSiteId ||
+          newEvent.construction_type !== newConstructionType ||
+          newEvent.lot_building_number !== newLotBuildingNumber
+        ) {
+          setNewEvent({
+            ...newEvent,
+            site_id: newSiteId,
+            construction_type: newConstructionType,
+            lot_building_number: newLotBuildingNumber
+          })
+        }
       }
     }
-  }, [newEvent.machine_id, newEvent.event_type, showCreateModal, events, editingEventId])
+  }, [newEvent, showCreateModal, events, editingEventId, setNewEvent])
 
   const validateForm = () => {
     if (!newEvent.event_date) return 'A data do evento é obrigatória.'
     
-    if (!newEvent.machine_id) {
-      return newEvent.event_type === 'extension_attach' 
-        ? 'A seleção de extensão é obrigatória.' 
-        : 'A seleção de máquina é obrigatória.'
+    if (newEvent.event_type === 'request_allocation') {
+      if (!newEvent.supplier_id) return 'A seleção do fornecedor é obrigatória para solicitações.'
+      if (!newEvent.machine_type_id) return 'A seleção do tipo de máquina é obrigatória.'
+    } else {
+      if (!newEvent.machine_id) {
+        return newEvent.event_type === 'extension_attach' 
+          ? 'A seleção de extensão é obrigatória.' 
+          : 'A seleção de máquina é obrigatória.'
+      }
     }
 
     if (['start_allocation', 'request_allocation', 'extension_attach', 'transport_start', 'transport_arrival'].includes(newEvent.event_type)) {
@@ -135,7 +154,13 @@ export default function CreateEventModal({
   // Ensure selected machine is in the list when editing
   let machinesToDisplay: any[] = []
 
-  if (newEvent.event_type === 'extension_attach') {
+  if (newEvent.event_type === 'request_allocation') {
+    // Para solicitações, mostramos todos os tipos de máquinas disponíveis no sistema
+    machinesToDisplay = (machineTypes || []).map(t => ({
+      id: t.id,
+      nome: t.nome
+    }))
+  } else if (newEvent.event_type === 'extension_attach') {
     // Para alocação de extensão, mostrar apenas extensões disponíveis
     // Agora tratamos extensões como máquinas independentes neste fluxo
     machinesToDisplay = (extensions || []).filter(e => e.status === 'available')
@@ -171,9 +196,6 @@ export default function CreateEventModal({
     
     if (type === 'extension_attach') {
       return extensions.length
-    }
-    if (type === 'refueling') {
-      return allItems.length
     }
     return filterMachinesForEvent(type, allItems, activeAllocations, activeDowntimes, events).length
   }
@@ -220,26 +242,56 @@ export default function CreateEventModal({
   const renderSelection = () => {
     const counts = {
       start_allocation: getAvailableCount('start_allocation'),
-      end_allocation: getAvailableCount('end_allocation'),
       request_allocation: getAvailableCount('request_allocation'),
+      end_allocation: getAvailableCount('end_allocation'),
       downtime_start: getAvailableCount('downtime_start'),
       downtime_end: getAvailableCount('downtime_end'),
-      refueling: getAvailableCount('refueling'),
       extension_attach: getAvailableCount('extension_attach'),
       transport_start: getAvailableCount('transport_start'),
       transport_arrival: getAvailableCount('transport_arrival')
     }
 
-    const Button = ({ type, label, desc, color, icon, count, customStyle }: any) => {
-      // Default classes based on color prop
-      const defaultClasses = {
-        button: `hover:bg-${color}-50 dark:hover:bg-${color}-900/20 hover:border-${color}-200 dark:hover:border-${color}-800`,
-        iconBox: `bg-${color}-100 dark:bg-${color}-900/40 text-${color}-600 dark:text-${color}-400 group-hover:bg-${color}-200 dark:group-hover:bg-${color}-800`
+    const Button = ({ type, label, desc, color, icon, count }: any) => {
+      // Definindo as classes de cor de forma literal para o Tailwind processar corretamente
+      const styles: Record<string, { button: string, iconBox: string }> = {
+        request_allocation: {
+          button: "hover:bg-[#8E44AD]/10 dark:hover:bg-[#8E44AD]/20 hover:border-[#8E44AD]/30",
+          iconBox: "bg-[#8E44AD]/10 dark:bg-[#8E44AD]/20 text-[#8E44AD] group-hover:bg-[#8E44AD]/20"
+        },
+        start_allocation: {
+          button: "hover:bg-[#2E86C1]/10 dark:hover:bg-[#2E86C1]/20 hover:border-[#2E86C1]/30",
+          iconBox: "bg-[#2E86C1]/10 dark:bg-[#2E86C1]/20 text-[#2E86C1] group-hover:bg-[#2E86C1]/20"
+        },
+        extension_attach: {
+          button: "hover:bg-[#F39C12]/10 dark:hover:bg-[#F39C12]/20 hover:border-[#F39C12]/30",
+          iconBox: "bg-[#F39C12]/10 dark:bg-[#F39C12]/20 text-[#F39C12] group-hover:bg-[#F39C12]/20"
+        },
+        end_allocation: {
+          button: "hover:bg-[#E74C3C]/10 dark:hover:bg-[#E74C3C]/20 hover:border-[#E74C3C]/30",
+          iconBox: "bg-[#E74C3C]/10 dark:bg-[#E74C3C]/20 text-[#E74C3C] group-hover:bg-[#E74C3C]/20"
+        },
+        transport_start: {
+          button: "hover:bg-[#16A085]/10 dark:hover:bg-[#16A085]/20 hover:border-[#16A085]/30",
+          iconBox: "bg-[#16A085]/10 dark:bg-[#16A085]/20 text-[#16A085] group-hover:bg-[#16A085]/20"
+        },
+        transport_arrival: {
+          button: "hover:bg-[#1ABC9C]/10 dark:hover:bg-[#1ABC9C]/20 hover:border-[#1ABC9C]/30",
+          iconBox: "bg-[#1ABC9C]/10 dark:bg-[#1ABC9C]/20 text-[#1ABC9C] group-hover:bg-[#1ABC9C]/20"
+        },
+        downtime_start: {
+          button: "hover:bg-[#D35400]/10 dark:hover:bg-[#D35400]/20 hover:border-[#D35400]/30",
+          iconBox: "bg-[#D35400]/10 dark:bg-[#D35400]/20 text-[#D35400] group-hover:bg-[#D35400]/20"
+        },
+        downtime_end: {
+          button: "hover:bg-[#27AE60]/10 dark:hover:bg-[#27AE60]/20 hover:border-[#27AE60]/30",
+          iconBox: "bg-[#27AE60]/10 dark:bg-[#27AE60]/20 text-[#27AE60] group-hover:bg-[#27AE60]/20"
+        }
       }
 
-      // Use custom styles if provided, otherwise default
-      const buttonClass = customStyle?.button || defaultClasses.button
-      const iconBoxClass = customStyle?.iconBox || defaultClasses.iconBox
+      const activeStyle = styles[type] || {
+        button: "hover:bg-gray-500/10 hover:border-gray-500/30",
+        iconBox: "bg-gray-500/10 text-gray-500"
+      }
 
       const shouldDisable =
         ['end_allocation', 'downtime_start', 'downtime_end', 'transport_arrival'].includes(type) && count === 0
@@ -248,9 +300,9 @@ export default function CreateEventModal({
         <button
           onClick={() => handleTypeSelect(type)}
           disabled={shouldDisable}
-          className={`w-full flex items-center p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl transition-all group shadow-sm disabled:opacity-50 disabled:cursor-not-allowed text-left mb-3 ${buttonClass}`}
+          className={`w-full flex items-center p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl transition-all group shadow-sm disabled:opacity-50 disabled:cursor-not-allowed text-left mb-3 ${activeStyle.button}`}
         >
-          <div className={`p-2 rounded-lg mr-3 transition-colors ${iconBoxClass}`}>
+          <div className={`p-2 rounded-lg mr-3 transition-colors ${activeStyle.iconBox}`}>
             {icon}
           </div>
           <div className="flex-1">
@@ -266,10 +318,10 @@ export default function CreateEventModal({
 
     return (
       <div className="flex flex-col md:flex-row gap-6 p-2">
-        {/* Section 1: Eventos de Alocação */}
+        {/* Section 1: Alocação */}
         <div className="flex-1">
           <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-1 border-b border-gray-100 dark:border-gray-700 pb-2">
-            Eventos de Alocação
+            Alocação
           </h3>
           <div className="mt-3">
             <Button 
@@ -286,10 +338,6 @@ export default function CreateEventModal({
               desc="Iniciar nova alocação" 
               color="blue" 
               count={counts.start_allocation}
-              customStyle={{
-                button: "hover:bg-[#2E86C1]/10 dark:hover:bg-[#2E86C1]/20 hover:border-[#2E86C1]/30",
-                iconBox: "bg-[#2E86C1]/10 dark:bg-[#2E86C1]/20 text-[#2E86C1] group-hover:bg-[#2E86C1]/20"
-              }}
               icon={<GiKeyCard className="w-5 h-5" aria-label="Ícone de servidor" title="Alocação de Máquina" />}
             />
             <Button 
@@ -298,10 +346,6 @@ export default function CreateEventModal({
               desc="Vincular extensão a uma obra" 
               color="indigo" 
               count={counts.extension_attach}
-              customStyle={{
-                button: "hover:bg-[#F39C12]/10 dark:hover:bg-[#F39C12]/20 hover:border-[#F39C12]/30",
-                iconBox: "bg-[#F39C12]/10 dark:bg-[#F39C12]/20 text-[#F39C12] group-hover:bg-[#F39C12]/20"
-              }}
               icon={<LuPuzzle className="w-5 h-5" aria-label="Ícone de quebra-cabeça" title="Alocação de Extensão" />}
             />
             <Button 
@@ -315,10 +359,10 @@ export default function CreateEventModal({
           </div>
         </div>
 
-        {/* Section 2: Demais Eventos */}
+        {/* Section 2: Transporte */}
         <div className="flex-1">
           <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 px-1 border-b border-gray-100 dark:border-gray-700 pb-2">
-            Logística e Transporte
+            Transporte
           </h3>
           <div className="mt-3">
             <Button 
@@ -340,17 +384,9 @@ export default function CreateEventModal({
           </div>
 
           <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 mt-6 px-1 border-b border-gray-100 dark:border-gray-700 pb-2">
-            Demais Eventos
+            Manutenção
           </h3>
           <div className="mt-3">
-            <Button 
-              type="refueling" 
-              label="Abastecimento de Combustível" 
-              desc="Registrar abastecimento" 
-              color="yellow" 
-              count={counts.refueling}
-              icon={<PiGasCanBold className="w-5 h-5" aria-label="Abastecimento de Combustível" title="Abastecimento de Combustível" />}
-            />
             <Button 
               type="downtime_start" 
               label="Início de Manutenção" 
@@ -384,7 +420,6 @@ export default function CreateEventModal({
       case 'request_allocation': return `${prefix}Solicitação de Alocação`
       case 'downtime_start': return `${prefix}Início de Manutenção`
       case 'downtime_end': return `${prefix}Fim de Manutenção`
-      case 'refueling': return `${prefix}Abastecimento de Combustível`
       case 'extension_attach': return `${prefix}Alocação de Extensão`
       case 'transport_start': return `${prefix}Início de Transporte`
       case 'transport_arrival': return `${prefix}Chegada em Obra`
@@ -481,23 +516,60 @@ export default function CreateEventModal({
               )}
 
               {/* Machine/Extension Selection */}
-              <CustomDropdown
-                label={
-                  newEvent.event_type === 'request_allocation' ? "Máquina (Tipo) *" : 
-                  newEvent.event_type === 'extension_attach' ? "Extensão *" : "Máquina *"
-                }
-                value={newEvent.machine_id}
-                onChange={(value) => setNewEvent({ ...newEvent, machine_id: value })}
-                options={[
-                  { value: '', label: 'Selecione...' },
-                  ...machinesToDisplay.map((item) => ({
-                    value: item.id,
-                    label: `${item.unit_number} - ${item.machine_type?.nome || item.extension_type?.nome || ''}`
-                  }))
-                ]}
-                placeholder={newEvent.event_type === 'extension_attach' ? "Selecione uma extensão" : "Selecione uma máquina"}
-                required
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <CustomDropdown
+                  label={
+                    newEvent.event_type === 'request_allocation' ? "Tipo de Máquina *" : 
+                    newEvent.event_type === 'extension_attach' ? "Extensão *" : "Máquina *"
+                  }
+                  value={newEvent.event_type === 'request_allocation' ? newEvent.machine_type_id : newEvent.machine_id}
+                  onChange={(value) => {
+                    if (newEvent.event_type === 'request_allocation') {
+                      setNewEvent({ ...newEvent, machine_type_id: value, machine_id: '' })
+                    } else {
+                      setNewEvent({ ...newEvent, machine_id: value, machine_type_id: '' })
+                    }
+                  }}
+                  options={[
+                    { value: '', label: 'Selecione...' },
+                    ...machinesToDisplay.map((item) => ({
+                      value: item.id,
+                      label: newEvent.event_type === 'request_allocation' 
+                        ? item.nome 
+                        : `${item.unit_number} - ${item.machine_type?.nome || item.extension_type?.nome || ''}`
+                    }))
+                  ]}
+                  placeholder={
+                    newEvent.event_type === 'request_allocation' ? "Selecione o tipo" :
+                    newEvent.event_type === 'extension_attach' ? "Selecione uma extensão" : "Selecione uma máquina"
+                  }
+                  required
+                />
+
+                {newEvent.event_type === 'request_allocation' && (
+                  <CustomDropdown
+                    label="Fornecedor *"
+                    value={newEvent.supplier_id}
+                    onChange={(value) => setNewEvent({ ...newEvent, supplier_id: value })}
+                    options={[
+                      { value: '', label: 'Selecione...' },
+                      ...suppliers
+                        .filter(s => {
+                          if (newEvent.event_type === 'request_allocation') {
+                            return s.supplier_type === 'rental' || s.supplier_type === 'both';
+                          }
+                          return true;
+                        })
+                        .map((s) => ({
+                          value: s.id,
+                          label: s.nome
+                        }))
+                    ]}
+                    placeholder="Selecione o fornecedor"
+                    required
+                  />
+                )}
+              </div>
 
               {/* Feedback Info Boxes */}
               
@@ -563,18 +635,7 @@ export default function CreateEventModal({
                 </div>
               )}
 
-              {/* Refueling: Show location info */}
-              {newEvent.event_type === 'refueling' && activeAlloc && (
-                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                   <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                     <span className="font-semibold">Local de Registro:</span> {activeAlloc.site_title}
-                   </p>
-                </div>
-              )}
-
-
-
-              {/* Standard Site Selection (Only for request/start) */}
+              {/* End Maintenance: Show maintenance info */}
               {['request_allocation', 'start_allocation'].includes(newEvent.event_type) && (
                 <>
                   <CustomDropdown
@@ -627,16 +688,16 @@ export default function CreateEventModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {newEvent.event_type === 'request_allocation' ? "Data/Hora de Necessidade *" : "Data/Hora do Evento *"}
+                    {newEvent.event_type === 'request_allocation' ? "Data de Necessidade *" : "Data/Hora do Evento *"}
                   </label>
                   <input
-                    type="datetime-local"
+                    type={newEvent.event_type === 'request_allocation' ? "date" : "datetime-local"}
                     value={newEvent.event_date}
                     onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                   {newEvent.event_type === 'request_allocation' && (
-                    <p className="text-xs text-gray-500 mt-1">Informe quando a máquina será necessária na obra.</p>
+                    <p className="text-xs text-gray-500 mt-1">Informe quando a máquina deverá chegar na obra.</p>
                   )}
                 </div>
 
@@ -651,7 +712,11 @@ export default function CreateEventModal({
                       onChange={(e) => setNewEvent({ ...newEvent, end_date: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Data final do aluguel/alocação.</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {newEvent.event_type === 'request_allocation' 
+                        ? "Data limite da validade desta solicitação." 
+                        : "Data final do aluguel/alocação."}
+                    </p>
                   </div>
                 )}
               </div>
