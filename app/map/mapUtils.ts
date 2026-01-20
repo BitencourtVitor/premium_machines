@@ -124,7 +124,7 @@ export const getGeoDistance = (lng1: number, lat1: number, lng2: number, lat2: n
 }
 
 // Função para agrupar sites próximos baseado na distância visual (pixels) na tela
-export const groupNearbySites = (sites: Site[], mapInstance: mapboxgl.Map, thresholdPixels: number = 80) => {
+export const groupNearbySites = (sites: Site[], mapInstance: mapboxgl.Map, thresholdPixels: number = 40) => {
   const groups: { center: { lng: number; lat: number }; sites: Site[]; id: string }[] = []
   const processed = new Set<string>()
 

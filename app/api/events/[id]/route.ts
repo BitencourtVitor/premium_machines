@@ -198,6 +198,30 @@ export async function DELETE(
       usuario_id: userId || 'unknown',
     })
 
+    // Delete files from storage
+    try {
+      // 1. List all files in the folder
+      const { data: files, error: listError } = await supabaseServer.storage
+        .from('Allocation Documents')
+        .list(id)
+
+      if (!listError && files && files.length > 0) {
+        // 2. Prepare paths for deletion
+        const filesToDelete = files.map(file => `${id}/${file.name}`)
+        
+        // 3. Remove all files (this effectively deletes the folder)
+        const { error: storageDeleteError } = await supabaseServer.storage
+          .from('Allocation Documents')
+          .remove(filesToDelete)
+
+        if (storageDeleteError) {
+          console.error('Error deleting files from storage:', storageDeleteError)
+        }
+      }
+    } catch (storageError) {
+      console.error('Unexpected error deleting storage folder:', storageError)
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error:', error)

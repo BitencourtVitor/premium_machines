@@ -114,14 +114,17 @@ export function useMapMarkers({
     // Agrupar sites próximos baseado na distância visual (pixels) na tela
     let groups: { center: { lng: number; lat: number }; sites: Site[]; id: string }[] = []
     try {
-      if (mapInstance && mapInstance.isStyleLoaded()) {
-        groups = groupNearbySites(regularSites, mapInstance, 80)
+      const currentZoom = mapInstance?.getZoom() || 0
+      
+      // Se o zoom for maior que 15, não agrupar (mostrar todos individualmente)
+      if (mapInstance && mapInstance.isStyleLoaded() && currentZoom <= 15) {
+        groups = groupNearbySites(regularSites, mapInstance, 40)
       } else {
-        // Se o mapa não está pronto, criar grupos individuais como fallback
+        // Se o mapa não está pronto ou zoom é alto, criar grupos individuais
         groups = regularSites.map(site => ({
           center: { lng: Number(site.longitude), lat: Number(site.latitude) },
           sites: [site],
-          id: site.id
+          id: `single-${site.id}`
         }))
       }
     } catch (error) {
@@ -183,7 +186,8 @@ export function useMapMarkers({
         el.addEventListener('click', (e) => {
           e.stopPropagation()
           const currentZoom = mapInstance.getZoom()
-          const targetZoom = Math.min(currentZoom + 2, 18)
+          // Aumentar o salto de zoom para garantir a separação
+          const targetZoom = Math.min(currentZoom + 3, 22)
           mapInstance.easeTo({
             center: [group.center.lng, group.center.lat],
             zoom: targetZoom,

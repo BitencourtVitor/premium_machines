@@ -219,7 +219,7 @@ export default function EventsPage() {
     loadActiveAllocations()
   }, [user, sessionLoading, router, loadEvents, loadMachines, loadSites, loadSuppliers, loadExtensions, loadMachineTypes, loadActiveAllocations])
 
-  const handleCreateEvent = async () => {
+  const handleCreateEvent = async (files: File[] = []) => {
     // Basic safety check
     if (!newEvent.event_date) {
       return
@@ -263,6 +263,38 @@ export default function EventsPage() {
       const data = await response.json()
 
       if (data.success) {
+        const eventId = data.event?.id || editingEventId
+        
+        // Upload de documentos se houver, ou criar pasta vazia (via .keep)
+        if (eventId) {
+          const { supabase } = await import('@/lib/supabase')
+          
+          if (files.length > 0) {
+            for (const file of files) {
+              const fileName = `${Date.now()}_${file.name}`
+              const filePath = `${eventId}/${fileName}`
+              
+              const { error: uploadError } = await supabase.storage
+                .from('Allocation Documents')
+                .upload(filePath, file)
+              
+              if (uploadError) {
+                console.error('Error uploading file:', uploadError)
+              }
+            }
+          } else {
+            // Criar "pasta vazia" usando um arquivo placeholder .keep
+            // Isso garante que a pasta com o ID do evento exista no Storage
+            const { error: placeholderError } = await supabase.storage
+              .from('Allocation Documents')
+              .upload(`${eventId}/.keep`, new Blob([''], { type: 'text/plain' }))
+              
+            if (placeholderError) {
+              console.error('Error creating empty folder placeholder:', placeholderError)
+            }
+          }
+        }
+
         setShowCreateModal(false)
         setEditingEventId(null)
         setNewEvent({

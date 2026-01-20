@@ -109,6 +109,15 @@ export const getEventConfig = (type: string) => {
         textColor: 'text-[#F39C12]',
         borderColor: 'border-[#F39C12]/20 dark:border-[#F39C12]/30'
       }
+    case 'extension_detach':
+      return { 
+        icon: LuPuzzle, 
+        color: 'orange', 
+        label: 'Fim de Alocação de Extensão',
+        bgColor: 'bg-[#E67E22]/10 dark:bg-[#E67E22]/20',
+        textColor: 'text-[#E67E22]',
+        borderColor: 'border-[#E67E22]/20 dark:border-[#E67E22]/30'
+      }
     case 'transport_start':
       return { 
         icon: FiTruck, 
@@ -154,7 +163,12 @@ export const filterMachinesForEvent = (
     case 'request_allocation':
       return machines.filter(m => !allocatedIds.includes(m.id))
     case 'extension_attach':
-      return machines
+      // Mostrar apenas extensões disponíveis
+      return machines.filter(m => m.extension_type && m.status === 'available')
+      
+    case 'extension_detach':
+      // Mostrar apenas extensões que estão atualmente alocadas
+      return machines.filter(m => m.extension_type && m.status === 'allocated')
       
     case 'end_allocation':
       // Agora permitimos encerrar qualquer máquina que tenha um histórico de local, 

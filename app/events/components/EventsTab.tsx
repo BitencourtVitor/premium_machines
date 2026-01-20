@@ -16,6 +16,8 @@ import {
 } from 'react-icons/fi'
 import { GiKeyCard } from "react-icons/gi"
 import { LuPuzzle, LuFilterX } from "react-icons/lu"
+import EventDocuments from './EventDocuments'
+import EventDocumentPopover from './EventDocumentPopover'
 
 import BaseList from '@/app/components/BaseList'
 import ListActionButton from '@/app/components/ListActionButton'
@@ -231,11 +233,16 @@ export default function EventsTab({
                   </span>
                 </div>
               )}
+
             </div>
 
             {/* Actions */}
             {(user?.can_register_events || user?.role === 'admin' || user?.role === 'dev') && (
               <div className="flex items-center gap-2 self-start md:self-center border-t md:border-t-0 border-gray-100 dark:border-gray-700 pt-3 md:pt-0 w-full md:w-auto mt-2 md:mt-0 justify-end md:justify-start">
+                <EventDocumentPopover 
+                  eventId={event.id} 
+                  unitNumber={event.machine?.unit_number || 'S/N'} 
+                />
                 <ListActionButton
                   icon="edit"
                   onClick={() => handleEditEvent(event)}
