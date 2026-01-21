@@ -3,6 +3,8 @@ import { supabaseServer } from '@/lib/supabase-server'
 import { validateEvent, getActiveDowntimeByMachine } from '@/lib/allocationService'
 import { createAuditLog } from '@/lib/auditLog'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     console.log('API: GET /api/events')

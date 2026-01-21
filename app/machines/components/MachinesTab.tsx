@@ -8,9 +8,8 @@ interface MachinesTabProps {
   loadingMachines: boolean
   loadMachines: () => void
   machines: Machine[]
-  setShowCreateModal: (show: boolean) => void
-  setEditingMachine: (machine: Machine | null) => void
-  setNewMachine: (machine: any) => void
+  onAddMachine: () => void
+  handleEditMachine: (machine: Machine) => void
   handleDeleteMachine: (machine: Machine) => void
   handleExportExcel: () => void
   onMachineClick?: (machine: Machine) => void
@@ -20,9 +19,8 @@ export default function MachinesTab({
   loadingMachines,
   loadMachines,
   machines,
-  setShowCreateModal,
-  setEditingMachine,
-  setNewMachine,
+  onAddMachine,
+  handleEditMachine,
   handleDeleteMachine,
   handleExportExcel,
   onMachineClick
@@ -30,20 +28,14 @@ export default function MachinesTab({
   const renderMachineItem = (machine: Machine) => {
     // Determinar o caminho da imagem baseado no tipo de máquina
     const getMachineImagePath = () => {
-      if (!machine.machine_type) return null
-
-      let imageName = ''
-
-      if (machine.machine_type.nome) {
-        // Converter nome do tipo para slug
-        imageName = machine.machine_type.nome.toLowerCase().replace(/\s+/g, '-')
-      }
-
-      // Alguns tipos usam JPG ao invés de PNG
+      const icon = machine.machine_type?.icon
+      if (!icon) return null
+      
+      if (icon.includes('.')) return `/${icon}`
+      
       const jpgTypes = ['fork-extensions', 'man-basket', 'truss-boom']
-      const extension = jpgTypes.includes(imageName) ? '.jpg' : '.png'
-
-      return imageName ? `/${imageName}${extension}` : null
+      const extension = jpgTypes.includes(icon) ? '.jpg' : '.png'
+      return `/${icon}${extension}`
     }
 
     const machineImagePath = getMachineImagePath()
@@ -136,10 +128,7 @@ export default function MachinesTab({
           <div className="flex items-center gap-2">
             <ListActionButton
               icon="edit"
-              onClick={() => {
-                setEditingMachine(machine)
-                setShowCreateModal(true)
-              }}
+              onClick={() => handleEditMachine(machine)}
               variant="blue"
               title="Editar"
             />
@@ -161,14 +150,14 @@ export default function MachinesTab({
       items={machines}
       loading={loadingMachines}
       renderItem={renderMachineItem}
+      showSearch
+      searchFields={['unit_number', 'machine_type.nome', 'current_site.title']}
       showRefresh
       onRefresh={loadMachines}
       showAdd
-      onAdd={() => setShowCreateModal(true)}
+      onAdd={onAddMachine}
       showDownload
       onDownload={handleExportExcel}
-      searchTerm=""
-      onSearchChange={() => {}}
       searchPlaceholder="Pesquisar máquinas..."
       emptyMessage="Nenhuma máquina cadastrada"
     />

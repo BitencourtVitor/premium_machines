@@ -7,9 +7,7 @@ interface MachineTypesTabProps {
   loadingTypes: boolean
   loadTypes: () => void
   types: MachineType[]
-  setShowTypeModal: (show: boolean) => void
-  setEditingType: (type: MachineType | null) => void
-  setNewType: (type: any) => void
+  onAddType: () => void
   handleEditType: (type: MachineType) => void
   handleDeleteType: (type: MachineType) => void
   loadMachineTypes: () => void
@@ -19,31 +17,22 @@ export default function MachineTypesTab({
   loadingTypes,
   loadTypes,
   types,
-  setShowTypeModal,
-  setEditingType,
-  setNewType,
+  onAddType,
   handleEditType,
   handleDeleteType,
   loadMachineTypes
 }: MachineTypesTabProps) {
   const renderTypeItem = (type: MachineType) => {
-    // Determinar o caminho da imagem baseado no campo icon ou nome
+    // Determinar o caminho da imagem baseado no campo icon
     const getImagePath = () => {
-      let imageName = ''
+      const icon = type.icon
+      if (!icon) return null
       
-      if (type.icon && type.icon.trim() !== '') {
-        // Se tem icon definido, usar ele (remover extensão se houver)
-        imageName = type.icon.toLowerCase().replace(/\s+/g, '-').replace(/\.(png|jpg|jpeg)$/i, '')
-      } else {
-        // Se não tem icon, usar o nome do tipo convertido para slug
-        imageName = type.nome.toLowerCase().replace(/\s+/g, '-')
-      }
-
-      // Alguns tipos usam JPG ao invés de PNG
+      if (icon.includes('.')) return `/${icon}`
+      
       const jpgTypes = ['fork-extensions', 'man-basket', 'truss-boom']
-      const extension = jpgTypes.includes(imageName) ? '.jpg' : '.png'
-
-      return `/${imageName}${extension}`
+      const extension = jpgTypes.includes(icon) ? '.jpg' : '.png'
+      return `/${icon}${extension}`
     }
 
     const imagePath = getImagePath()
@@ -101,20 +90,12 @@ export default function MachineTypesTab({
       items={types}
       loading={loadingTypes}
       renderItem={renderTypeItem}
+      showSearch
+      searchFields={['nome']}
       showRefresh
       onRefresh={loadTypes}
       showAdd
-      onAdd={() => {
-        setEditingType(null)
-        setNewType({
-          nome: '',
-          icon: '',
-          is_attachment: false,
-        })
-        setShowTypeModal(true)
-      }}
-      searchTerm=""
-      onSearchChange={() => {}}
+      onAdd={onAddType}
       searchPlaceholder="Pesquisar tipos..."
       emptyMessage="Nenhum tipo cadastrado"
     />

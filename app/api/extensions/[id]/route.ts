@@ -3,6 +3,8 @@ import { supabaseServer } from '@/lib/supabase-server'
 import { calculateExtensionState } from '@/lib/allocationService'
 import { createAuditLog } from '@/lib/auditLog'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/extensions/[id]
  * 

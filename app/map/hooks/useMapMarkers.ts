@@ -44,8 +44,12 @@ export function useMapMarkers({
       const lng = Number(site.longitude)
       return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0
     })
-    const headquarters = validSites.find(site => site.is_headquarters)
-    const regularSites = validSites.filter(site => !site.is_headquarters)
+    const headquarters = validSites.find(site => 
+      site.is_headquarters || 
+      site.title === 'Premium Group Inc.' || 
+      site.address?.includes('1B Landing Lane')
+    )
+    const regularSites = validSites.filter(site => site.id !== headquarters?.id)
 
     // Remover todos os marcadores anteriores
     markersRef.current.forEach(marker => marker.remove())
@@ -58,7 +62,7 @@ export function useMapMarkers({
 
     // Adicionar marcador especial para sede da empresa
     if (headquarters) {
-      const colors = getThemeColors('neutral', currentIsDark)
+      const colors = getClusterStatusColor([headquarters], currentIsDark)
       const isSelected = selectedSite?.id === headquarters.id
 
       // Criar marcador da sede

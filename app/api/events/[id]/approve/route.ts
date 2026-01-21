@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+
+export const dynamic = 'force-dynamic'
 import { processEventApproval } from '@/lib/eventProcessor'
 import { createAuditLog } from '@/lib/auditLog'
 

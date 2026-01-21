@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getActiveAllocations, getActiveDowntimes } from '@/lib/allocationService'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/allocations/active
  * 

@@ -3,6 +3,8 @@ import { supabaseServer } from '@/lib/supabase-server'
 import { createAuditLog } from '@/lib/auditLog'
 import { syncMachineState, syncExtensionState } from '@/lib/allocation/synchronization'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

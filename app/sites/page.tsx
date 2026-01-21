@@ -61,7 +61,13 @@ export default function SitesPage() {
     setLoadingSites(true)
     try {
       const archivedParam = showArchivedSites ? 'true' : 'false'
-      const response = await fetch(`/api/sites?archived=${archivedParam}&with_machines=true`)
+      const response = await fetch(`/api/sites?archived=${archivedParam}&with_machines=true`, {
+        cache: 'no-store',
+        headers: {
+          'Pragma': 'no-cache',
+          'Cache-Control': 'no-cache'
+        }
+      })
       const data = await response.json()
 
       if (data.success) {
@@ -78,7 +84,13 @@ export default function SitesPage() {
   const loadMetrics = useCallback(async () => {
     setLoadingMetrics(true)
     try {
-      const response = await fetch('/api/sites/metrics')
+      const response = await fetch('/api/sites/metrics', {
+        cache: 'no-store',
+        headers: {
+          'Pragma': 'no-cache',
+          'Cache-Control': 'no-cache'
+        }
+      })
       const data = await response.json()
 
       if (data.success) {
@@ -90,6 +102,10 @@ export default function SitesPage() {
       setLoadingMetrics(false)
     }
   }, [])
+
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([loadSites(), loadMetrics()])
+  }, [loadSites, loadMetrics])
 
   useEffect(() => {
     if (sessionLoading) return
@@ -104,22 +120,20 @@ export default function SitesPage() {
       return
     }
 
-    loadSites()
-    loadMetrics()
+    handleRefresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, sessionLoading])
 
   useEffect(() => {
     if (!loading && user) {
-      loadSites()
+      handleRefresh()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showArchivedSites, loading, user])
 
   // Atualizar automaticamente quando alocações mudam
   useAllocationDataRefresh(() => {
-    loadSites()
-    loadMetrics()
+    handleRefresh()
   })
 
   const handleArchiveSite = (site: Site) => {
@@ -315,7 +329,7 @@ export default function SitesPage() {
                 loadingSites={loadingSites}
                 showArchivedSites={showArchivedSites}
                 setShowArchivedSites={setShowArchivedSites}
-                loadSites={loadSites}
+                handleRefresh={handleRefresh}
                 handleOpenModal={handleOpenModal}
                 handleArchiveSite={handleArchiveSite}
               />

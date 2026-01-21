@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 
-// Forçar rota dinâmica para evitar cache
 export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
 // Headers para evitar cache
 const noCacheHeaders = {

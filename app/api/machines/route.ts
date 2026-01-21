@@ -3,6 +3,8 @@ import { supabaseServer } from '@/lib/supabase-server'
 import { getActiveAllocations } from '@/lib/allocation/queries'
 import { createAuditLog } from '@/lib/auditLog'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -11,11 +13,11 @@ export async function GET(request: NextRequest) {
     let query = supabaseServer
       .from('machines')
       .select(`
-        *,
-        machine_type:machine_types(id, nome, is_attachment),
-        supplier:suppliers(id, nome),
-        current_site:sites(id, title)
-      `)
+          *,
+          machine_type:machine_types(id, nome, icon, is_attachment),
+          supplier:suppliers(id, nome),
+          current_site:sites(id, title)
+        `)
 
     if (ativoOnly) {
       query = query.eq('ativo', true)

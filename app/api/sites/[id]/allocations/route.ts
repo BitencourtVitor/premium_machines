@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSiteAllocationSummary, getHistoricalSiteAllocations } from '@/lib/allocationService'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/sites/[id]/allocations
  * 

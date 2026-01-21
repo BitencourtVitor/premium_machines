@@ -414,11 +414,14 @@ export default function SiteDetailsModal({
 
                       // Determinar o caminho da imagem baseada no tipo de máquina
                       const getMachineImagePath = () => {
-                        if (!allocation.machine_type) return null
-                        let imageName = allocation.machine_type.toLowerCase().replace(/\s+/g, '-')
+                        const icon = allocation.machine_type_icon
+                        if (!icon) return null
+                        
+                        if (icon.includes('.')) return `/${icon}`
+                        
                         const jpgTypes = ['fork-extensions', 'man-basket', 'truss-boom']
-                        const extension = jpgTypes.includes(imageName) ? '.jpg' : '.png'
-                        return `/${imageName}${extension}`
+                        const extension = jpgTypes.includes(icon) ? '.jpg' : '.png'
+                        return `/${icon}${extension}`
                       }
 
                       const machineImagePath = getMachineImagePath()
@@ -579,9 +582,9 @@ export default function SiteDetailsModal({
                       </div>
                     </div>
 
-                    <div className="flex-1 p-6 flex flex-col xl:flex-row gap-8 overflow-y-auto min-h-0">
+                    <div className="flex-1 p-6 flex flex-col lg:flex-row gap-8 overflow-y-auto min-h-0">
                       {/* Lado Esquerdo: Legenda e Detalhes do Dia */}
-                      <div className="xl:w-64 flex-shrink-0 flex flex-col gap-6">
+                      <div className="lg:w-64 flex-shrink-0 flex flex-col gap-6">
                         {/* Legenda (Sempre visível) */}
                         <div>
                           <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3">
@@ -602,11 +605,7 @@ export default function SiteDetailsModal({
                             </div>
                             <div className="flex items-center gap-2.5">
                               <div className="w-3 h-3 bg-purple-600 dark:bg-purple-400 rounded-full shadow-sm"></div>
-                              <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Encerrada / Transporte</span>
-                            </div>
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-3 h-3 bg-pink-600 dark:bg-pink-400 rounded-full shadow-sm"></div>
-                              <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Movida</span>
+                              <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Em trânsito</span>
                             </div>
                             <div className="flex items-center gap-2.5">
                               <div className="w-3 h-3 bg-gray-500 dark:bg-gray-400/80 rounded-full"></div>
@@ -771,18 +770,18 @@ export default function SiteDetailsModal({
                         )}
                       </div>
 
-              {/* Lado Direito: Grade do Calendário */}
-              <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
-                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
-                  <div className="grid grid-cols-7 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 flex-shrink-0">
-                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-                      <div key={day} className="py-4 text-center text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
-                        {day}
-                      </div>
-                    ))}
-                  </div>
+                      {/* Lado Direito: Grade do Calendário */}
+                      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
+                          <div className="grid grid-cols-7 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 flex-shrink-0">
+                            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                              <div key={day} className="py-4 text-center text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+                                {day}
+                              </div>
+                            ))}
+                          </div>
 
-                  <div className="grid grid-cols-7 grid-rows-6 flex-1 bg-gray-50 dark:bg-gray-900/50 gap-[1px] min-h-0">
+                          <div className="grid grid-cols-7 flex-shrink-0 bg-gray-50 dark:bg-gray-900/50 gap-[1px] min-h-0">
                             {(() => {
                               const year = calendarMonth.getFullYear()
                               const month = calendarMonth.getMonth()
@@ -798,8 +797,8 @@ export default function SiteDetailsModal({
                               for (let i = 0; i < 42; i++) {
                                 const dayDate = new Date(currentDate)
                                 const dateStr = getSystemDateStr(dayDate)
-                                // Passamos 'events' (prop) em vez de 'filteredEvents'
-                                const dayStatus = getDayStatus(dayDate, selectedMachineId, events)
+                                // Passamos 'filteredEvents' para consistência visual com o restante da modal
+                                const dayStatus = getDayStatus(dayDate, selectedMachineId, filteredEvents)
                                 const isCurrentMonth = dayDate.getMonth() === month
                                 const isToday = dateStr === getSystemDateStr(new Date())
                                 const isExpirationDay = dateStr === expirationDateStr
@@ -819,7 +818,7 @@ export default function SiteDetailsModal({
                                     key={dayDate.toISOString()}
                                     onClick={() => setSelectedDate(dayDate)}
                                     className={`
-                                      relative flex items-center justify-center transition-all duration-200 cursor-pointer group
+                                      relative aspect-square flex items-center justify-center transition-all duration-200 cursor-pointer group
                                       ${!isCurrentMonth ? 'bg-gray-100/50 dark:bg-gray-900/30 opacity-40' : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50'}
                                       ${selectedDate && getSystemDateStr(selectedDate) === dateStr ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}
                                     `}
@@ -836,16 +835,16 @@ export default function SiteDetailsModal({
 
                                     {/* Indicador de Início (Círculo Azul) */}
                                     {isStartDay && (
-                                      <div className="absolute w-10 h-10 sm:w-12 sm:h-12 border-2 border-blue-600 dark:border-blue-400 rounded-full z-20 pointer-events-none animate-pulse" />
+                                      <div className="absolute w-[85%] h-[85%] border-2 border-blue-600 dark:border-blue-400 rounded-full z-20 pointer-events-none animate-pulse" />
                                     )}
 
                                     {/* Indicador de Vencimento (Círculo Vermelho) */}
                                     {isExpirationDay && (
-                                      <div className="absolute w-10 h-10 sm:w-12 sm:h-12 border-2 border-red-600 dark:border-red-400 rounded-full z-20 pointer-events-none" />
+                                      <div className="absolute w-[85%] h-[85%] border-2 border-red-600 dark:border-red-400 rounded-full z-20 pointer-events-none" />
                                     )}
 
                                     <div className={`
-                                      w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full text-sm sm:text-base font-semibold transition-all relative border-2 z-10
+                                      w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center rounded-full text-xs sm:text-sm font-semibold transition-all relative border-2 z-10
                                       ${isCurrentMonth ? statusConfig[dayStatus] : 'text-gray-300 dark:text-gray-600 border-transparent'}
                                       ${isCurrentMonth && dayStatus === 'not-allocated' ? 'border-transparent group-hover:bg-gray-100 dark:group-hover:bg-gray-700' : ''}
                                     `}>

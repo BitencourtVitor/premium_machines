@@ -76,7 +76,7 @@ export function useMapInitialization({
     mapRef.current = new mapboxgl.Map({
       container: container,
       style: styleUrl,
-      center: [-71.5412, 42.1301], // Hopedale, MA - Sede da empresa
+      center: [-71.5119217, 42.1031736], // 1B Landing Lane, Hopedale, MA 01747 - Sede Real
       zoom: initialZoom,
       touchZoomRotate: true,
       touchPitch: true,

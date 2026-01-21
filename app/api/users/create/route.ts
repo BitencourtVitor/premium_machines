@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+
+export const dynamic = 'force-dynamic'
 import { hashPin } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {

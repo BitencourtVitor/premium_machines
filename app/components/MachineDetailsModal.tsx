@@ -129,11 +129,14 @@ export default function MachineDetailsModal({
             <div className="flex-shrink-0 w-16 h-16 relative rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700">
               {(() => {
                 const getMachineImagePath = () => {
-                  if (!machine?.machine_type) return null
-                  let imageName = machine.machine_type.nome.toLowerCase().replace(/\s+/g, '-')
+                  const icon = machine?.machine_type?.icon
+                  if (!icon) return null
+                  
+                  if (icon.includes('.')) return `/${icon}`
+                  
                   const jpgTypes = ['fork-extensions', 'man-basket', 'truss-boom']
-                  const extension = jpgTypes.includes(imageName) ? '.jpg' : '.png'
-                  return `/${imageName}${extension}`
+                  const extension = jpgTypes.includes(icon) ? '.jpg' : '.png'
+                  return `/${icon}${extension}`
                 }
                 const imagePath = getMachineImagePath()
                 return imagePath ? (

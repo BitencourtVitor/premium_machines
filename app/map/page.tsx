@@ -44,35 +44,99 @@ export default function MapPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedSearchQuery = useDebounce(searchQuery, 300)
 
-  // Filter sites based on search query
-  const filteredSites = useMemo(() => {
-    if (!debouncedSearchQuery) return sites
-    
-    const query = debouncedSearchQuery.toLowerCase().trim()
-    if (!query) return sites
+  // Filter state
+  const [mapFilters, setMapFilters] = useState({
+    showHeadquarters: true,
+    showJobsites: true,
+    statuses: ['maintenance', 'exceeded', 'active', 'scheduled', 'moved', 'finished', 'none']
+  })
 
-    return sites.filter(site => {
-      // 1. Jobsite Name
-      if (site.title?.toLowerCase().includes(query)) return true
-      
-      // 2. Address
-      if (site.address?.toLowerCase().includes(query)) return true
-      
-      // 3. Machines/Extensions (Current, Past and Future)
-      const machinesToSearch = site.all_machines || site.machines
-      if (machinesToSearch && Array.isArray(machinesToSearch)) {
-         return machinesToSearch.some((machine: any) => {
-            const unitNumber = machine.unit_number?.toLowerCase() || ''
-            const typeName = typeof machine.machine_type === 'object' ? machine.machine_type?.nome : machine.machine_type
-            const typeStr = String(typeName || '').toLowerCase()
-            
-            return unitNumber.includes(query) || typeStr.includes(query)
-         })
+  // Filter sites based on search query and map filters
+  const filteredSites = useMemo(() => {
+    let result = sites
+
+    // Apply Search Query
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase().trim()
+      if (query) {
+        result = result.filter(site => {
+          // 1. Jobsite Name
+          if (site.title?.toLowerCase().includes(query)) return true
+          
+          // 2. Address
+          if (site.address?.toLowerCase().includes(query)) return true
+          
+          // 3. Machines/Extensions (Current, Past and Future)
+          const machinesToSearch = site.all_machines || site.machines
+          if (machinesToSearch && Array.isArray(machinesToSearch)) {
+            return machinesToSearch.some((machine: any) => {
+              const unitNumber = machine.unit_number?.toLowerCase() || ''
+              const typeName = typeof machine.machine_type === 'object' ? machine.machine_type?.nome : machine.machine_type
+              const typeStr = String(typeName || '').toLowerCase()
+              
+              return unitNumber.includes(query) || typeStr.includes(query)
+            })
+          }
+          
+          return false
+        })
       }
+    }
+
+    // Get current date for status logic
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayStr = today.toISOString().split('T')[0]
+
+    // Apply Map Filters
+    result = result.filter(site => {
+      const isHQ = site.is_headquarters || site.title === 'Premium Group Inc.'
       
-      return false
+      // Headquarters filter
+      if (isHQ && !mapFilters.showHeadquarters) return false
+      
+      // Jobsites filter (non-headquarters)
+      if (!isHQ && !mapFilters.showJobsites) return false
+      
+      // Status filter
+      const machines = site.all_machines || site.machines || []
+      
+      if (machines.length === 0) {
+        return mapFilters.statuses.includes('none')
+      }
+
+      const hasMatchingStatus = machines.some((machine: any) => {
+        const startDateStr = machine.start_date ? machine.start_date.split('T')[0] : null
+        const endDateStr = machine.end_date ? machine.end_date.split('T')[0] : null
+        let status = machine.status
+
+        if (status === 'allocated' && startDateStr && startDateStr > todayStr) {
+          status = 'scheduled'
+        }
+
+        if ((status === 'allocated' || status === 'active') && endDateStr && todayStr > endDateStr) {
+          status = 'exceeded'
+        }
+        
+        const isMoved = (status === 'inactive' || status === 'available') && 
+                        machine.current_site_id && 
+                        machine.current_site_id !== site.id;
+
+        if (status === 'maintenance' && mapFilters.statuses.includes('maintenance')) return true
+        if (status === 'exceeded' && mapFilters.statuses.includes('exceeded')) return true
+        if ((status === 'allocated' || status === 'active') && mapFilters.statuses.includes('active')) return true
+        if (status === 'scheduled' && mapFilters.statuses.includes('scheduled')) return true
+        if (isMoved && mapFilters.statuses.includes('moved')) return true
+        if (status === 'inactive' && !isMoved && mapFilters.statuses.includes('finished')) return true
+        
+        return false
+      })
+
+      return hasMatchingStatus
     })
-  }, [sites, debouncedSearchQuery])
+
+    return result
+  }, [sites, debouncedSearchQuery, mapFilters])
 
   // Detect theme
   const isDark = useThemeDetector()
@@ -101,6 +165,18 @@ export default function MapPage() {
     markersRef,
     headquartersMarkerRef
   })
+
+  // Update updateMarkersRef
+  useEffect(() => {
+    updateMarkersRef.current = updateMarkers
+  }, [updateMarkers])
+
+  // Refresh markers when filtered sites change
+  useEffect(() => {
+    if (mapLoaded && markersInitialized) {
+      updateMarkers()
+    }
+  }, [filteredSites, mapLoaded, markersInitialized, updateMarkers])
 
   // Load Sites
   const loadSites = useCallback(async () => {
@@ -321,7 +397,13 @@ export default function MapPage() {
             )}
 
             {/* Controls */}
-            <MapControls mapStyle={mapStyle} toggleMapStyle={toggleMapStyle} onSearch={setSearchQuery} />
+            <MapControls 
+              mapStyle={mapStyle} 
+              toggleMapStyle={toggleMapStyle} 
+              onSearch={setSearchQuery} 
+              filters={mapFilters}
+              setFilters={setMapFilters}
+            />
             
             {/* Legend */}
             <MapLegend isDark={isDark} />

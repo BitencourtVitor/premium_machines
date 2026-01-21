@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 import { getActiveAllocations } from '@/lib/allocation/queries'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     // Get machines stats based on allocation engine (events)

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 import { getActiveAllocations } from '@/lib/allocationService'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/test/system
  *

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { syncAllMachineStates } from '@/lib/allocationService'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * POST /api/sync/all
  *

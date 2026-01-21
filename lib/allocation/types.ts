@@ -29,6 +29,7 @@ export interface AttachedExtension {
   extension_id: string
   extension_unit_number: string
   extension_type: string
+  extension_type_icon: string | null
   attach_event_id: string
   attached_at: string
 }
@@ -38,6 +39,7 @@ export interface ActiveAllocation {
   machine_id: string
   machine_unit_number: string
   machine_type: string
+  machine_type_icon: string | null
   machine_ownership: 'owned' | 'rented'
   machine_supplier_id: string | null
   machine_supplier_name: string | null

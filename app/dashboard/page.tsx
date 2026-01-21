@@ -46,7 +46,13 @@ export default function DashboardPage() {
   const loadStats = useCallback(async () => {
     setLoadingStats(true)
     try {
-      const response = await fetch('/api/dashboard/stats')
+      const response = await fetch('/api/dashboard/stats', {
+        cache: 'no-store',
+        headers: {
+          'Pragma': 'no-cache',
+          'Cache-Control': 'no-cache'
+        }
+      })
       const data = await response.json()
 
       if (data.success) {

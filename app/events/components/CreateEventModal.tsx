@@ -175,11 +175,19 @@ export default function CreateEventModal({
     setValidationError(null)
   }
 
+  // Deduplicar máquinas e extensões por ID, dando preferência ao objeto em 'extensions' se disponível
+  // pois ele pode conter campos extras como 'extension_type'
+  const allItemsMap = new Map();
+  [...(machines || []), ...(extensions || [])].forEach(item => {
+    if (item && item.id) {
+      allItemsMap.set(item.id, { ...allItemsMap.get(item.id), ...item });
+    }
+  });
+  const allPossibleItems = Array.from(allItemsMap.values());
+
   const filteredMachines = filterMachinesForEvent(
     newEvent.event_type,
-    ['end_allocation', 'downtime_start', 'downtime_end', 'transport_start', 'transport_arrival'].includes(newEvent.event_type) 
-      ? [...(machines || []), ...(extensions || [])]
-      : machines,
+    allPossibleItems,
     activeAllocations,
     activeDowntimes,
     events
@@ -189,52 +197,29 @@ export default function CreateEventModal({
   let machinesToDisplay: any[] = []
 
   if (newEvent.event_type === 'request_allocation') {
-    // Para solicitações, mostramos todos os tipos de máquinas disponíveis no sistema
-    machinesToDisplay = (machineTypes || []).map(t => ({
-      id: t.id,
-      nome: t.nome
-    }))
-  } else if (newEvent.event_type === 'extension_attach' || newEvent.event_type === 'extension_detach') {
-    // Para alocação/desalocação de extensão, mostrar apenas extensões relevantes
-    machinesToDisplay = (extensions || []).filter(e => {
-      if (newEvent.event_type === 'extension_attach') return e.status === 'available'
-      if (newEvent.event_type === 'extension_detach') return e.status === 'allocated'
-      return true
-    })
-    
-    if (editingEventId && newEvent.machine_id) {
-      const selectedExtension = extensions.find(e => e.id === newEvent.machine_id)
-      if (selectedExtension && !machinesToDisplay.find(e => e.id === selectedExtension.id)) {
-        machinesToDisplay.unshift(selectedExtension)
-      }
-    }
+    // Para solicitações, mostramos apenas tipos de máquinas (não extensões)
+    machinesToDisplay = (machineTypes || [])
+      .filter(t => !t.is_attachment)
+      .map(t => ({
+        id: t.id,
+        nome: t.nome
+      }))
   } else {
+    // Para todos os outros eventos, usar a lista filtrada pelo utils.ts
+    // que já separa máquinas e extensões corretamente
     machinesToDisplay = [...filteredMachines]
     
     if (editingEventId && newEvent.machine_id) {
-      const selectedMachine = machines.find(m => m.id === newEvent.machine_id)
-      if (selectedMachine && !machinesToDisplay.find(m => m.id === selectedMachine.id)) {
-        machinesToDisplay.unshift(selectedMachine)
+      // Garantir que o item selecionado apareça na lista mesmo que não passasse no filtro (ex: já alocado)
+      const selectedItem = allPossibleItems.find(m => m.id === newEvent.machine_id)
+      if (selectedItem && !machinesToDisplay.find(m => m.id === selectedItem.id)) {
+        machinesToDisplay.unshift(selectedItem)
       }
-    }
-  }
-
-  const availableExtensions = (extensions || []).filter((ext) => ext.status === 'available')
-  const extensionsToDisplay = [...availableExtensions]
-  if (editingEventId && newEvent.extension_id) {
-    const selectedExtension = extensions.find((e) => e.id === newEvent.extension_id)
-    if (selectedExtension && !extensionsToDisplay.find((e) => e.id === selectedExtension.id)) {
-      extensionsToDisplay.unshift(selectedExtension)
     }
   }
 
   const getAvailableCount = (type: string) => {
-    const allItems = [...(machines || []), ...(extensions || [])]
-    
-    if (type === 'extension_attach') {
-      return extensions.length
-    }
-    return filterMachinesForEvent(type, allItems, activeAllocations, activeDowntimes, events).length
+    return filterMachinesForEvent(type, allPossibleItems, activeAllocations, activeDowntimes, events).length
   }
 
   // Helpers for auto-filling and feedback
@@ -509,61 +494,12 @@ export default function CreateEventModal({
         <div className="p-6 space-y-4 flex-1 overflow-y-auto">
           {step === 'selection' ? renderSelection() : (
             <>
-              {/* Special Case: Extension Attach and Transport Arrival shows Site FIRST */}
-              {['extension_attach', 'transport_arrival'].includes(newEvent.event_type) && (
-                <>
-                  <CustomDropdown
-                    label="Jobsite *"
-                    value={newEvent.site_id}
-                    onChange={(value) => setNewEvent({ ...newEvent, site_id: value })}
-                    options={[
-                      { value: '', label: 'Selecione...' },
-                      ...sites.map((site) => ({
-                        value: site.id,
-                        label: site.title,
-                        description: site.address
-                      }))
-                    ]}
-                    placeholder="Selecione um jobsite"
-                    required
-                  />
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <CustomDropdown
-                      label="Tipo de Construção"
-                      value={newEvent.construction_type || ''}
-                      onChange={(value) => setNewEvent({ ...newEvent, construction_type: value as any, lot_building_number: value ? newEvent.lot_building_number : '' })}
-                      options={[
-                        { value: '', label: 'Nenhum' },
-                        { value: 'lot', label: 'Lote' },
-                        { value: 'building', label: 'Prédio' }
-                      ]}
-                      placeholder="Selecione..."
-                    />
-                    {newEvent.construction_type && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Número *
-                        </label>
-                        <input
-                          type="text"
-                          value={newEvent.lot_building_number || ''}
-                          onChange={(e) => setNewEvent({ ...newEvent, lot_building_number: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Ex: 123"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* Machine/Extension Selection */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Seção Principal de Seleção (Item e Jobsite) */}
+              <div className="grid grid-cols-1 gap-4">
                 <CustomDropdown
                   label={
                     newEvent.event_type === 'request_allocation' ? "Tipo de Máquina *" : 
-                    newEvent.event_type === 'extension_attach' ? "Extensão *" : "Máquina *"
+                    ['extension_attach', 'extension_detach'].includes(newEvent.event_type) ? "Extensão *" : "Máquina *"
                   }
                   value={newEvent.event_type === 'request_allocation' ? newEvent.machine_type_id : newEvent.machine_id}
                   onChange={(value) => {
@@ -584,103 +520,12 @@ export default function CreateEventModal({
                   ]}
                   placeholder={
                     newEvent.event_type === 'request_allocation' ? "Selecione o tipo" :
-                    newEvent.event_type === 'extension_attach' ? "Selecione uma extensão" : "Selecione uma máquina"
+                    ['extension_attach', 'extension_detach'].includes(newEvent.event_type) ? "Selecione uma extensão" : "Selecione uma máquina"
                   }
                   required
                 />
 
-                {newEvent.event_type === 'request_allocation' && (
-                  <CustomDropdown
-                    label="Fornecedor *"
-                    value={newEvent.supplier_id}
-                    onChange={(value) => setNewEvent({ ...newEvent, supplier_id: value })}
-                    options={[
-                      { value: '', label: 'Selecione...' },
-                      ...suppliers
-                        .filter(s => {
-                          if (newEvent.event_type === 'request_allocation') {
-                            return s.supplier_type === 'rental' || s.supplier_type === 'both';
-                          }
-                          return true;
-                        })
-                        .map((s) => ({
-                          value: s.id,
-                          label: s.nome
-                        }))
-                    ]}
-                    placeholder="Selecione o fornecedor"
-                    required
-                  />
-                )}
-              </div>
-
-              {/* Feedback Info Boxes */}
-              
-              {/* Transport Start: Show current site */}
-              {newEvent.event_type === 'transport_start' && machineCurrentSiteTitle && (
-                <div className="p-3 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg">
-                  <p className="text-sm text-teal-800 dark:text-teal-200">
-                    <span className="font-semibold">Saindo de:</span> {machineCurrentSiteTitle}
-                  </p>
-                </div>
-              )}
-
-              {/* Transport Arrival: Show target site info if selected */}
-              {newEvent.event_type === 'transport_arrival' && newEvent.site_id && (
-                <div className="p-3 bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg">
-                  <p className="text-sm text-cyan-800 dark:text-cyan-200">
-                    <span className="font-semibold">Destino:</span> {sites.find(s => s.id === newEvent.site_id)?.title}
-                  </p>
-                </div>
-              )}
-
-              {/* End Allocation: Show current allocation info */}
-              {newEvent.event_type === 'end_allocation' && currentSiteInfo && (
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                   <p className="text-sm text-red-800 dark:text-red-200">
-                     <span className="font-semibold">Local Atual (Último Evento):</span> {currentSiteInfo.title}
-                   </p>
-                   {currentSiteInfo.construction_type && (
-                      <p className="text-xs text-red-600 dark:text-red-300 mt-1">
-                        Tipo: {currentSiteInfo.construction_type === 'lot' ? 'Lote' : 'Prédio'} {currentSiteInfo.lot_building_number}
-                      </p>
-                   )}
-                </div>
-              )}
-
-              {/* Start Maintenance: Show current status */}
-              {newEvent.event_type === 'downtime_start' && activeAlloc && (
-                <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-                   <p className="text-sm text-orange-800 dark:text-orange-200">
-                     <span className="font-semibold">Status Atual:</span> Alocado em {activeAlloc.site_title}
-                   </p>
-                </div>
-              )}
-
-              {/* Transport Arrival: Show in transit info */}
-              {newEvent.event_type === 'transport_arrival' && !newEvent.site_id && (
-                <div className="p-3 bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg">
-                   <p className="text-sm text-cyan-800 dark:text-cyan-200">
-                     <span className="font-semibold">Destino:</span> Selecione a nova obra abaixo.
-                   </p>
-                </div>
-              )}
-
-              {/* End Maintenance: Show maintenance info */}
-              {newEvent.event_type === 'downtime_end' && activeDowntime && (
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                   <p className="text-sm text-green-800 dark:text-green-200">
-                     <span className="font-semibold">Em manutenção em:</span> {activeDowntime.site_title}
-                   </p>
-                   <p className="text-xs text-green-600 dark:text-green-300 mt-1">
-                     Motivo: {DOWNTIME_REASON_LABELS[activeDowntime.downtime_reason] || activeDowntime.downtime_reason}
-                   </p>
-                </div>
-              )}
-
-              {/* End Maintenance: Show maintenance info */}
-              {['request_allocation', 'start_allocation'].includes(newEvent.event_type) && (
-                <>
+                {['start_allocation', 'request_allocation', 'extension_attach', 'transport_arrival'].includes(newEvent.event_type) && (
                   <CustomDropdown
                     label="Jobsite *"
                     value={newEvent.site_id}
@@ -696,36 +541,109 @@ export default function CreateEventModal({
                     placeholder="Selecione um jobsite"
                     required
                   />
+                )}
+              </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <CustomDropdown
-                      label="Tipo de Construção"
-                      value={newEvent.construction_type || ''}
-                      onChange={(value) => setNewEvent({ ...newEvent, construction_type: value as any, lot_building_number: value ? newEvent.lot_building_number : '' })}
-                      options={[
-                        { value: '', label: 'Nenhum' },
-                        { value: 'lot', label: 'Lote' },
-                        { value: 'building', label: 'Prédio' }
-                      ]}
-                      placeholder="Selecione..."
-                    />
+              {/* Informações Complementares de Obra */}
+              {['start_allocation', 'request_allocation', 'extension_attach', 'transport_arrival'].includes(newEvent.event_type) && (
+                <div className="grid grid-cols-2 gap-4">
+                  <CustomDropdown
+                    label="Tipo de Construção"
+                    value={newEvent.construction_type || ''}
+                    onChange={(value) => setNewEvent({ ...newEvent, construction_type: value as any, lot_building_number: value ? newEvent.lot_building_number : '' })}
+                    options={[
+                      { value: '', label: 'Nenhum' },
+                      { value: 'lot', label: 'Lote' },
+                      { value: 'building', label: 'Prédio' }
+                    ]}
+                    placeholder="Selecione..."
+                  />
+                  {newEvent.construction_type && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Número *
+                      </label>
+                      <input
+                        type="text"
+                        value={newEvent.lot_building_number || ''}
+                        onChange={(e) => setNewEvent({ ...newEvent, lot_building_number: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder={newEvent.construction_type === 'lot' ? "Nº do Lote" : "Nº do Prédio"}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
-                    {newEvent.construction_type && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Número *
-                        </label>
-                        <input
-                          type="text"
-                          value={newEvent.lot_building_number || ''}
-                          onChange={(e) => setNewEvent({ ...newEvent, lot_building_number: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder={`Número do ${newEvent.construction_type === 'lot' ? 'lote' : 'prédio'}`}
-                        />
-                      </div>
-                    )}
+              {/* Feedback Info Boxes */}
+              <div className="space-y-3">
+                {/* Transport Start: Show current site */}
+                {newEvent.event_type === 'transport_start' && machineCurrentSiteTitle && (
+                  <div className="p-3 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg">
+                    <p className="text-sm text-teal-800 dark:text-teal-200">
+                      <span className="font-semibold">Saindo de:</span> {machineCurrentSiteTitle}
+                    </p>
                   </div>
-                </>
+                )}
+
+                {/* End Allocation: Show current allocation info */}
+                {newEvent.event_type === 'end_allocation' && currentSiteInfo && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                     <p className="text-sm text-red-800 dark:text-red-200">
+                       <span className="font-semibold">Local Atual (Último Evento):</span> {currentSiteInfo.title}
+                     </p>
+                     {currentSiteInfo.construction_type && (
+                        <p className="text-xs text-red-600 dark:text-red-300 mt-1">
+                          Tipo: {currentSiteInfo.construction_type === 'lot' ? 'Lote' : 'Prédio'} {currentSiteInfo.lot_building_number}
+                        </p>
+                     )}
+                  </div>
+                )}
+
+                {/* Start Maintenance: Show current status */}
+                {newEvent.event_type === 'downtime_start' && activeAlloc && (
+                  <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                     <p className="text-sm text-orange-800 dark:text-orange-200">
+                       <span className="font-semibold">Status Atual:</span> Alocado em {activeAlloc.site_title}
+                     </p>
+                  </div>
+                )}
+
+                {/* End Maintenance: Show maintenance info */}
+                {newEvent.event_type === 'downtime_end' && activeDowntime && (
+                  <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                     <p className="text-sm text-green-800 dark:text-green-200">
+                       <span className="font-semibold">Em manutenção em:</span> {activeDowntime.site_title}
+                     </p>
+                     <p className="text-xs text-green-600 dark:text-green-300 mt-1">
+                       Motivo: {DOWNTIME_REASON_LABELS[activeDowntime.downtime_reason] || activeDowntime.downtime_reason}
+                     </p>
+                  </div>
+                )}
+              </div>
+
+              {newEvent.event_type === 'request_allocation' && (
+                <CustomDropdown
+                  label="Fornecedor *"
+                  value={newEvent.supplier_id}
+                  onChange={(value) => setNewEvent({ ...newEvent, supplier_id: value })}
+                  options={[
+                    { value: '', label: 'Selecione...' },
+                    ...suppliers
+                      .filter(s => {
+                        if (newEvent.event_type === 'request_allocation') {
+                          return s.supplier_type === 'rental' || s.supplier_type === 'both';
+                        }
+                        return true;
+                      })
+                      .map((s) => ({
+                        value: s.id,
+                        label: s.nome
+                      }))
+                  ]}
+                  placeholder="Selecione o fornecedor"
+                  required
+                />
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -105,6 +105,7 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
               extension_id: event.extension_id,
               extension_unit_number: event.extension?.unit_number || '',
               extension_type: event.extension?.machine_type?.nome || '',
+              extension_type_icon: event.extension?.machine_type?.icon || null,
               attach_event_id: event.id,
               attached_at: event.event_date,
             })

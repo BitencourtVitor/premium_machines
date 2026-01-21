@@ -13,6 +13,7 @@ interface CreateMachineModalProps {
   creating: boolean
   machineTypes: MachineType[]
   suppliers: any[]
+  machines: Machine[]
   error?: string | null
 }
 
@@ -27,9 +28,15 @@ export default function CreateMachineModal({
   creating,
   machineTypes,
   suppliers,
+  machines,
   error
 }: CreateMachineModalProps) {
   if (!showCreateModal) return null
+
+  const isDuplicate = machines.some(m => 
+    m.unit_number.trim().toLowerCase() === newMachine.unit_number.trim().toLowerCase() && 
+    (!editingMachine || m.id !== editingMachine.id)
+  )
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010] p-6">
@@ -75,9 +82,18 @@ export default function CreateMachineModal({
               type="text"
               value={newMachine.unit_number}
               onChange={(e) => setNewMachine({ ...newMachine, unit_number: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                isDuplicate 
+                  ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
+                  : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500'
+              }`}
               placeholder="Ex: EXC-001"
             />
+            {isDuplicate && (
+              <p className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">
+                Unidade já cadastrada.
+              </p>
+            )}
           </div>
 
           <CustomDropdown
@@ -228,7 +244,7 @@ export default function CreateMachineModal({
           </button>
           <button
             onClick={handleCreateMachine}
-            disabled={creating}
+            disabled={creating || isDuplicate}
             className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {creating ? (editingMachine ? 'Salvando...' : 'Criando...') : (editingMachine ? 'Salvar Alterações' : 'Criar Máquina')}

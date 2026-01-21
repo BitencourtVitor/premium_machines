@@ -313,36 +313,35 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
         ${site.address || site.city || 'Localização não disponível'}
       </p>
 
-      ${!site.is_headquarters ? `
-        <div style="border-top: 1px solid ${currentIsDark ? '#374151' : '#e5e7eb'}; padding-top: 12px;">
-          <p style="font-size: 12px; font-weight: 500; color: ${currentIsDark ? '#d1d5db' : '#374151'}; margin-bottom: 8px;">
-            ${(() => {
-              const machines = site.all_machines || site.machines || [];
-              const today = new Date();
-              today.setHours(0, 0, 0, 0);
-              const todayStr = today.toISOString().split('T')[0];
+      <div style="border-top: 1px solid ${currentIsDark ? '#374151' : '#e5e7eb'}; padding-top: 12px;">
+        <p style="font-size: 12px; font-weight: 500; color: ${currentIsDark ? '#d1d5db' : '#374151'}; margin-bottom: 8px;">
+          ${(() => {
+            const machines = site.all_machines || site.machines || [];
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayStr = today.toISOString().split('T')[0];
+            
+            const workingCount = machines.filter((m: any) => {
+              const startDateStr = m.start_date ? m.start_date.split('T')[0] : null;
+              const endDateStr = m.end_date ? m.end_date.split('T')[0] : null;
               
-              const workingCount = machines.filter((m: any) => {
-                const startDateStr = m.start_date ? m.start_date.split('T')[0] : null;
-                const endDateStr = m.end_date ? m.end_date.split('T')[0] : null;
-                
-                let finalStatus = m.status;
-                if (finalStatus === 'allocated' && startDateStr && startDateStr > todayStr) {
-                  finalStatus = 'scheduled';
-                }
-                if ((finalStatus === 'allocated' || finalStatus === 'active') && endDateStr && todayStr > endDateStr) {
-                  finalStatus = 'exceeded';
-                }
-                
-                return finalStatus === 'allocated' || finalStatus === 'active' || finalStatus === 'exceeded';
-              }).length;
+              let finalStatus = m.status;
+              if (finalStatus === 'allocated' && startDateStr && startDateStr > todayStr) {
+                finalStatus = 'scheduled';
+              }
+              if ((finalStatus === 'allocated' || finalStatus === 'active') && endDateStr && todayStr > endDateStr) {
+                finalStatus = 'exceeded';
+              }
               
-              return `Equipamentos (${workingCount} ativos de ${machines.length})`;
-            })()}
-          </p>
-          ${(site.all_machines?.length || site.machines?.length) > 0 ? `
-            <div style="max-height: 120px; overflow-y: auto; gap: 4px; display: flex; flex-direction: column;">
-              ${(site.all_machines || site.machines).map((machine: any) => {
+              return finalStatus === 'allocated' || finalStatus === 'active' || finalStatus === 'exceeded';
+            }).length;
+            
+            return `Equipamentos (${workingCount} ativos de ${machines.length})`;
+          })()}
+        </p>
+        ${(site.all_machines?.length || site.machines?.length) > 0 ? `
+          <div style="max-height: 120px; overflow-y: auto; gap: 4px; display: flex; flex-direction: column;">
+            ${(site.all_machines || site.machines).map((machine: any) => {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
                 const todayStr = today.toISOString().split('T')[0];
@@ -353,9 +352,6 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
                 // Prioridade para o status vindo da API, mas validamos com a data se necessário
                 let finalStatus = machine.status;
                 
-                // No dia do fim da alocação, ela ainda é considerada ativa
-                // A regra de 'dia seguinte' do stateCalculation já deve vir tratada da API,
-                // mas garantimos a consistência visual aqui.
                 if (finalStatus === 'allocated' && startDateStr && startDateStr > todayStr) {
                   finalStatus = 'scheduled';
                 }
@@ -414,23 +410,16 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
                   </span>
                 </div>`;
               }).join('')}
-            </div>
-          ` : `
-            <p style="font-size: 12px; color: ${currentIsDark ? '#9ca3af' : '#6b7280'};">
-              Nenhuma máquina alocada
-            </p>
-          `}
-          <div style="margin-top: 8px; width: 100%; padding: 6px; background: ${currentIsDark ? '#374151' : '#f3f4f6'}; color: ${currentIsDark ? '#9ca3af' : '#6b7280'}; border-radius: 6px; font-size: 12px; font-weight: 500; text-align: center; cursor: pointer;" onclick="event.stopPropagation(); window.dispatchEvent(new CustomEvent('openSiteDetails', { detail: '${site.id}' }));">
-            Ver Detalhes
           </div>
-        </div>
-      ` : `
-        <div style="border-top: 1px solid ${currentIsDark ? '#374151' : '#e5e7eb'}; padding-top: 12px;">
+        ` : `
           <p style="font-size: 12px; color: ${currentIsDark ? '#9ca3af' : '#6b7280'}; font-style: italic;">
-            Esta é a sede da empresa Premium Group Inc.
+            ${site.is_headquarters ? 'Sede da empresa Premium Group Inc.' : 'Nenhuma máquina alocada neste jobsite.'}
           </p>
+        `}
+        <div style="margin-top: 8px; width: 100%; padding: 6px; background: ${currentIsDark ? '#374151' : '#f3f4f6'}; color: ${currentIsDark ? '#9ca3af' : '#6b7280'}; border-radius: 6px; font-size: 12px; font-weight: 500; text-align: center; cursor: pointer;" onclick="event.stopPropagation(); window.dispatchEvent(new CustomEvent('openSiteDetails', { detail: '${site.id}' }));">
+          Ver Detalhes
         </div>
-      `}
+      </div>
     </div>
   `
   return el

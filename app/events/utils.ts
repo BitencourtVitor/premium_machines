@@ -158,22 +158,33 @@ export const filterMachinesForEvent = (
   const allocatedIds = activeAllocations.map(a => a.machine_id)
   const downtimeIds = activeDowntimes.map(d => d.machine_id)
 
+  // Identificar se o evento é específico de extensão
+  const isExtensionEvent = ['extension_attach', 'extension_detach'].includes(eventType);
+
+  // Filtrar a lista base: se for evento de extensão, manter só extensões. 
+  // Se for evento de máquina, manter só máquinas.
+  const baseFiltered = machines.filter(m => {
+    const isExtension = m.extension_type || m.machine_type?.is_attachment;
+    return isExtensionEvent ? isExtension : !isExtension;
+  });
+
   switch (eventType) {
     case 'start_allocation':
     case 'request_allocation':
-      return machines.filter(m => !allocatedIds.includes(m.id))
+      // Mostrar apenas máquinas disponíveis para alocação
+      return baseFiltered.filter(m => !allocatedIds.includes(m.id))
+      
     case 'extension_attach':
       // Mostrar apenas extensões disponíveis
-      return machines.filter(m => m.extension_type && m.status === 'available')
+      return baseFiltered.filter(m => m.status === 'available')
       
     case 'extension_detach':
       // Mostrar apenas extensões que estão atualmente alocadas
-      return machines.filter(m => m.extension_type && m.status === 'allocated')
+      return baseFiltered.filter(m => m.status === 'allocated')
       
     case 'end_allocation':
-      // Agora permitimos encerrar qualquer máquina que tenha um histórico de local, 
-      // MAS que não tenha um fim de alocação mais recente que o último início de alocação/chegada.
-      return machines.filter(m => {
+      // Máquinas que podem ter sua alocação encerrada
+      return baseFiltered.filter(m => {
         // Buscar eventos relevantes aprovados para esta máquina
         const machineEvents = events
           .filter(e => e.machine?.id === m.id && e.status === 'approved')
@@ -183,36 +194,33 @@ export const filterMachinesForEvent = (
 
         const lastEvent = machineEvents[0]
         
-        // Se o evento mais recente já for um fim de alocação (normal ou extensão), não pode encerrar de novo
+        // Se o evento mais recente já for um fim de alocação, não pode encerrar de novo
         if (['end_allocation', 'extension_detach'].includes(lastEvent.event_type)) return false
 
         // Se ela está em alocações ativas, permite
         if (allocatedIds.includes(m.id)) return true
         
-        // Se ela tem um status que indica presença em obra (mesmo que não oficializada por start_allocation)
-        // e o último evento relevante foi algo que a colocou lá (start, arrival, etc)
+        // Se ela tem um status que indica presença em obra e o último evento relevante foi algo que a colocou lá
         return ['available', 'maintenance', 'allocated'].includes(m.status) && m.current_site
       })
       
     case 'downtime_start':
-      // Permitir manutenção para qualquer máquina que não esteja em trânsito e não esteja já em manutenção
-      return machines.filter(m => m.status !== 'in_transit' && !downtimeIds.includes(m.id))
+      // Máquinas que podem entrar em manutenção
+      return baseFiltered.filter(m => m.status !== 'in_transit' && !downtimeIds.includes(m.id))
 
     case 'downtime_end':
-      // Apenas máquinas que estão em manutenção
-      return machines.filter(m => downtimeIds.includes(m.id))
+      // Máquinas que estão em manutenção
+      return baseFiltered.filter(m => downtimeIds.includes(m.id))
       
     case 'transport_start':
-      // VALIDAÇÃO: Máquina precisa estar em algum local (obra/pátio) para sair em transporte
-      // E não pode estar já em trânsito
-      return machines.filter(m => m.status !== 'in_transit' && m.current_site)
+      // Máquinas que podem iniciar transporte
+      return baseFiltered.filter(m => m.status !== 'in_transit' && m.current_site)
       
     case 'transport_arrival':
-      // VALIDAÇÃO CRÍTICA: Só permite registrar chegada para máquinas que estão atualmente em trânsito
-      // (ou seja, que possuem um "Início de Transporte" aprovado e sem chegada correspondente)
-      return machines.filter(m => m.status === 'in_transit')
+      // Máquinas que estão em trânsito
+      return baseFiltered.filter(m => m.status === 'in_transit')
       
     default:
-      return machines
+      return baseFiltered
   }
 }

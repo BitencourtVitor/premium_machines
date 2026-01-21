@@ -1,7 +1,7 @@
 export interface Machine {
   id: string
   unit_number: string
-  machine_type: { id: string; nome: string }
+  machine_type: { id: string; nome: string; icon?: string }
   ownership_type: 'owned' | 'rented'
   supplier?: { id: string; nome: string }
   current_site?: { id: string; title: string }

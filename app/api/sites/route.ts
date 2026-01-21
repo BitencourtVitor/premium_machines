@@ -3,6 +3,8 @@ import { supabaseServer } from '@/lib/supabase-server'
 import { createAuditLog } from '@/lib/auditLog'
 import { getActiveAllocations } from '@/lib/allocation/queries'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest) {
       // Get all machines in the system to identify available ones
       const { data: allSystemMachines } = await supabaseServer
         .from('machines')
-        .select('id, unit_number, machine_type:machine_types(nome)')
+        .select('id, unit_number, machine_type:machine_types(nome, icon)')
         .eq('ativo', true)
 
       // Fetch all historical and future associations (all events with site_id)
@@ -64,7 +66,7 @@ export async function GET(request: NextRequest) {
           event_type,
           machine:machines(
             unit_number,
-            machine_type:machine_types(nome)
+            machine_type:machine_types(nome, icon)
           )
         `)
         .in('event_type', ['start_allocation', 'extension_attach'])
@@ -98,6 +100,7 @@ export async function GET(request: NextRequest) {
               id: event.machine_id,
               unit_number: machine.unit_number,
               machine_type: machine.machine_type?.nome || '',
+              machine_type_icon: machine.machine_type?.icon || null,
               start_date: event.event_date,
               end_date: event.end_date,
               status: isFuture ? 'scheduled' : 'inactive',
@@ -122,6 +125,7 @@ export async function GET(request: NextRequest) {
                 status: alloc.status,
                 ownership_type: alloc.machine_ownership,
                 machine_type: alloc.machine_type,
+                machine_type_icon: alloc.machine_type_icon,
                 start_date: alloc.allocation_start,
                 end_date: alloc.end_date,
                 current_site_id: alloc.site_id
@@ -136,6 +140,7 @@ export async function GET(request: NextRequest) {
                             status: alloc.status, // Extensão herda o status da máquina (ex: exceeded)
                             ownership_type: 'owned',
                             machine_type: ext.extension_type,
+                            machine_type_icon: ext.extension_type_icon,
                             start_date: alloc.allocation_start, // Extension follows machine start
                             end_date: alloc.end_date,
                             current_site_id: alloc.site_id
@@ -156,6 +161,7 @@ export async function GET(request: NextRequest) {
                 status: 'available',
                 ownership_type: 'owned', // Default
                 machine_type: (m.machine_type as any)?.nome || '',
+                machine_type_icon: (m.machine_type as any)?.icon || null,
                 start_date: null,
                 current_site_id: site.id // At HQ
               })

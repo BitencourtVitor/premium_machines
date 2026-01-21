@@ -155,7 +155,7 @@ interface SiteListProps {
   loadingSites: boolean
   showArchivedSites: boolean
   setShowArchivedSites: (show: boolean) => void
-  loadSites: () => void
+  handleRefresh: () => void
   handleOpenModal: (site?: Site) => void
   handleArchiveSite: (site: Site) => void
 }
@@ -165,7 +165,7 @@ export default function SiteList({
   loadingSites,
   showArchivedSites,
   setShowArchivedSites,
-  loadSites,
+  handleRefresh,
   handleOpenModal,
   handleArchiveSite,
 }: SiteListProps) {
@@ -178,7 +178,7 @@ export default function SiteList({
       searchFields={['title', 'address', 'city', 'state']}
       searchPlaceholder="Buscar jobsites..."
       showRefresh={true}
-      onRefresh={loadSites}
+      onRefresh={handleRefresh}
       showArchive={true}
       onArchive={() => setShowArchivedSites(!showArchivedSites)}
       isArchivedView={showArchivedSites}

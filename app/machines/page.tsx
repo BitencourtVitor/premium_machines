@@ -210,6 +210,17 @@ export default function MachinesPage() {
       return
     }
 
+    // Validação de número da unidade único (apenas no front)
+    const isDuplicate = machines.some(m => 
+      m.unit_number.trim().toLowerCase() === newMachine.unit_number.trim().toLowerCase() && 
+      (!editingMachine || m.id !== editingMachine.id)
+    )
+
+    if (isDuplicate) {
+      setModalError(`O número de unidade "${newMachine.unit_number}" já está em uso`)
+      return
+    }
+
     if (newMachine.ownership_type === 'rented' && !newMachine.supplier_id) {
       setModalError('Selecione um fornecedor para máquina alugada')
       return
@@ -349,6 +360,21 @@ export default function MachinesPage() {
     setShowCreateModal(true)
   }
 
+  const handleAddNewMachine = () => {
+    setEditingMachine(null)
+    setNewMachine({
+      unit_number: '',
+      machine_type_id: '',
+      ownership_type: 'owned',
+      supplier_id: '',
+      billing_type: 'daily',
+      daily_rate: '',
+      weekly_rate: '',
+      monthly_rate: '',
+    })
+    setShowCreateModal(true)
+  }
+
   const handleDeleteType = (type: MachineType) => {
     setError(null)
     setConfirmModal({
@@ -390,6 +416,16 @@ export default function MachinesPage() {
       nome: type.nome,
       icon: type.icon || '',
       is_attachment: type.is_attachment,
+    })
+    setShowTypeModal(true)
+  }
+
+  const handleAddNewType = () => {
+    setEditingType(null)
+    setNewType({
+      nome: '',
+      icon: '',
+      is_attachment: false,
     })
     setShowTypeModal(true)
   }
@@ -472,9 +508,8 @@ export default function MachinesPage() {
                 loadingMachines={loadingMachines}
                 loadMachines={loadMachines}
                 machines={filteredMachines}
-                setShowCreateModal={setShowCreateModal}
-                setEditingMachine={setEditingMachine}
-                setNewMachine={setNewMachine}
+                onAddMachine={handleAddNewMachine}
+                handleEditMachine={handleEditMachine}
                 handleDeleteMachine={handleDeleteMachine}
                 handleExportExcel={handleExportExcel}
                 onMachineClick={handleMachineClick}
@@ -487,9 +522,7 @@ export default function MachinesPage() {
                 loadingTypes={loadingTypes}
                 loadTypes={loadTypes}
                 types={types}
-                setShowTypeModal={setShowTypeModal}
-                setEditingType={setEditingType}
-                setNewType={setNewType}
+                onAddType={handleAddNewType}
                 handleEditType={handleEditType}
                 handleDeleteType={handleDeleteType}
                 loadMachineTypes={loadMachineTypes}
@@ -516,6 +549,7 @@ export default function MachinesPage() {
         creating={creating}
         machineTypes={machineTypes}
         suppliers={suppliers}
+        machines={machines}
         error={modalError}
       />
 
