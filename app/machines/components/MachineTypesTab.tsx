@@ -35,7 +35,7 @@ export default function MachineTypesTab({
       return `/${icon}${extension}`
     }
 
-    const imagePath = getImagePath()
+    const imagePath = getImagePath() || ''
 
     return (
       <div
