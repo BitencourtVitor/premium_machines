@@ -20,6 +20,8 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
     allocation_start: null,
     end_date: null,
     downtime_start: null,
+    current_downtime_reason: null,
+    current_downtime_start: null,
     attached_extensions: [],
     previous_site_id: null,
     destination_site_id: null,
@@ -94,6 +96,8 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
         state.is_in_downtime = true
         state.current_downtime_event_id = event.id
         state.downtime_start = event.event_date
+        state.current_downtime_start = event.event_date
+        state.current_downtime_reason = event.downtime_reason || null
         state.status = 'maintenance'
         break
 
@@ -102,6 +106,8 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
           state.is_in_downtime = false
           state.current_downtime_event_id = null
           state.downtime_start = null
+          state.current_downtime_start = null
+          state.current_downtime_reason = null
           state.status = state.current_site_id ? 'allocated' : 'available'
         }
         break

@@ -87,6 +87,8 @@ export interface MachineAllocationState {
   allocation_start: string | null
   end_date?: string | null
   downtime_start: string | null
+  current_downtime_reason: string | null
+  current_downtime_start: string | null
   attached_extensions: AttachedExtension[]
   previous_site_id?: string | null
   destination_site_id?: string | null
