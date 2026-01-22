@@ -15,7 +15,7 @@ import {
   getLocalDateForInput,
   adjustDateToSystemTimezone 
 } from '@/lib/timezone'
-import { AllocationEvent, ActiveAllocation, ActiveDowntime } from './types'
+import { AllocationEvent, ActiveAllocation, ActiveDowntime, NewEventState } from './types'
 import AllocationsTab from './components/AllocationsTab'
 import EventsTab from './components/EventsTab'
 import CreateEventModal from './components/CreateEventModal'
@@ -82,7 +82,7 @@ export default function EventsPage() {
   const [activeDowntimes, setActiveDowntimes] = useState<ActiveDowntime[]>([])
   const [loadingAllocations, setLoadingAllocations] = useState(false)
   
-  const [newEvent, setNewEvent] = useState({
+  const [newEvent, setNewEvent] = useState<NewEventState>({
     event_type: 'start_allocation',
     machine_id: '',
     site_id: '',
@@ -98,6 +98,7 @@ export default function EventsPage() {
     notas: '',
     supplier_id: '',
     machine_type_id: '',
+    sharepoint_links: [],
   })
 
   const loadEvents = useCallback(async () => {
