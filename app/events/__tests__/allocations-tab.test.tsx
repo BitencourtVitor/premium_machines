@@ -72,6 +72,7 @@ describe('AllocationsTab', () => {
     handleStartDowntime: jest.fn(),
     handleEndAllocation: jest.fn(),
     handleEndDowntime: jest.fn(),
+    handleNewEvent: jest.fn(),
     activeDowntimes: [],
     creating: false,
   }

@@ -1,5 +1,5 @@
 import { supabaseServer } from '../supabase-server'
-import { ActiveAllocation, ActiveDowntime, SiteAllocationSummary } from './types'
+import { ActiveAllocation, ActiveDowntime, SiteAllocationSummary, MachineAllocationState } from './types'
 import { calculateMachineAllocationState, calculateStateFromEvents } from './stateCalculation'
 
 /**
@@ -307,10 +307,10 @@ export async function getHistoricalSiteAllocations(siteId: string): Promise<Acti
           const firstEvent = currentCycleEvents[0]
           
           // Calcular estado ao final deste ciclo específico
-          const cycleState = calculateStateFromEvents(machine.id, currentCycleEvents)
+          const cycleState: MachineAllocationState = calculateStateFromEvents(machine.id, currentCycleEvents)
           
           // Verificar se a máquina AINDA está neste site HOJE (usando histórico COMPLETO)
-          const currentState = calculateStateFromEvents(machine.id, mEvents)
+          const currentState: MachineAllocationState = calculateStateFromEvents(machine.id, mEvents)
           
           // Regra de presença física conforme feedback do usuário:
           // 1. Se a máquina está em trânsito hoje:

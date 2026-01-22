@@ -55,7 +55,7 @@ describe('EventsTab', () => {
   const defaultProps = {
     filterStatus: '',
     setFilterStatus: jest.fn(),
-    filterType: '',
+    filterType: [] as string[],
     setFilterType: jest.fn(),
     filteredEvents: mockEvents,
     loadingEvents: false,
@@ -68,6 +68,11 @@ describe('EventsTab', () => {
     setStartDate: jest.fn(),
     endDate: '',
     setEndDate: jest.fn(),
+    searchTerm: '',
+    setSearchTerm: jest.fn(),
+    handleNewEvent: jest.fn(),
+    handleStartFromRequest: jest.fn(),
+    machineTypes: [],
   }
 
   it('renders event cards with correct information', () => {
