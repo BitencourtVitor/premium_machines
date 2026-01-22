@@ -9,7 +9,11 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const userId = searchParams.get('userId')
 
-    const now = new Date().toISOString()
+    // Notificações são exibidas se o trigger_date for hoje ou nos próximos 3 dias
+    const futureLimit = new Date()
+    futureLimit.setDate(futureLimit.getDate() + 3)
+    const now = futureLimit.toISOString()
+
     let query = supabaseServer
       .from('notifications')
       .select('*')
@@ -19,11 +23,8 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query
 
-    console.log(`[Notifications API] Found ${data?.length || 0} notifications`)
-    if (error) {
-      console.error('[Notifications API] Error fetching notifications:', error)
-      return NextResponse.json({ success: false, message: 'Error fetching notifications' }, { status: 500 })
-    }
+
+
 
     // Filtrar no servidor se o userId for fornecido (para evitar carregar dados arquivados desnecessariamente)
     let notifications = data || []

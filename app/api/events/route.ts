@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
-import { validateEvent, getActiveDowntimeByMachine } from '@/lib/allocationService'
+import { validateEvent } from '@/lib/allocationService'
 import { createAuditLog } from '@/lib/auditLog'
+import { getActiveDowntimeByMachine } from '@/lib/allocationService'
+import { updateAllocationNotification } from '@/lib/notificationService'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
         *,
         machine:machines(id, unit_number),
         requested_machine_type:machine_types!machine_type_id(id, nome),
-        site:sites(id, title),
+        site:sites(id, title, address),
         extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),
         created_by_user:users!allocation_events_created_by_fkey(id, nome),
@@ -131,6 +133,7 @@ export async function POST(request: NextRequest) {
         corrects_event_id: body.corrects_event_id || null,
         correction_description: body.correction_description || null,
         notas: body.notas || null,
+        sharepoint_links: body.sharepoint_links || [],
         created_by: body.created_by,
         status: body.event_type === 'refueling' ? 'pending' : 'approved',
       })
@@ -158,6 +161,9 @@ export async function POST(request: NextRequest) {
       dados_depois: event,
       usuario_id: body.created_by,
     })
+
+    // Update notifications if applicable
+    await updateAllocationNotification(event)
 
     return NextResponse.json({ success: true, event })
   } catch (error) {

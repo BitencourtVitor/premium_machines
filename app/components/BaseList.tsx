@@ -255,6 +255,7 @@ export default function BaseList<T>({
                     className={`
                       bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus:ring-offset-0 text-sm p-0 ml-2
                       transition-all duration-300 w-full placeholder-gray-400 cursor-text
+                      text-black dark:text-white
                       ${isSearchExpanded ? 'opacity-100' : 'opacity-0 w-0 pointer-events-none'}
                     `}
                     autoFocus={isSearchExpanded}

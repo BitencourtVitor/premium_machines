@@ -34,8 +34,8 @@ export default function EventsPage() {
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [extensions, setExtensions] = useState<any[]>([])
   const [machineTypes, setMachineTypes] = useState<any[]>([])
-  const [filterStatus, setFilterStatus] = useState<string[]>([])
   const [filterType, setFilterType] = useState<string[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -138,7 +138,7 @@ export default function EventsPage() {
       const response = await fetch('/api/sites?archived=false')
       const data = await response.json()
       if (data.success) {
-        setSites(data.sites)
+        setSites(data.sites || [])
       }
     } catch (error) {
       console.error('Error loading sites:', error)
@@ -313,6 +313,7 @@ export default function EventsPage() {
           notas: '',
           supplier_id: '',
           machine_type_id: '',
+          sharepoint_links: [],
         })
         loadEvents()
         if (activeTab === 'allocations') loadActiveAllocations()
@@ -357,6 +358,7 @@ export default function EventsPage() {
       notas: '',
       supplier_id: '',
       machine_type_id: '',
+      sharepoint_links: [],
     })
     setShowCreateModal(true)
   }
@@ -364,11 +366,13 @@ export default function EventsPage() {
   const handleEditEvent = (event: AllocationEvent) => {
     setEditingEventId(event.id)
     
-    // Ajustar data para o formato esperado pelo input datetime-local (horário local)
+    // Ajustar data para o formato esperado pelo input (date ou datetime-local)
     let localDateString = ''
     if (event.event_date) {
       const date = new Date(event.event_date)
-      localDateString = getLocalDateTimeForInput(date)
+      localDateString = event.event_type === 'request_allocation' 
+        ? getLocalDateForInput(date)
+        : getLocalDateTimeForInput(date)
     }
 
     let localEndDateString = ''
@@ -392,67 +396,45 @@ export default function EventsPage() {
       end_date: localEndDateString,
       machine_type_id: event.machine_type_id || '',
       supplier_id: event.supplier_id || '',
+      sharepoint_links: event.sharepoint_links || [],
     })
     setShowCreateModal(true)
   }
 
-  const handleApproveEvent = async (eventId: string) => {
-    const event = events.find(e => e.id === eventId)
-    if (!event) return
-
-    const approve = async () => {
-      setConfirmModal(prev => ({ ...prev, isLoading: true }))
-      setError(null)
-      try {
-        const response = await fetch(`/api/events/${eventId}/approve`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ approved_by: user?.id }),
-        })
-
-        const data = await response.json()
-        if (data.success) {
-          setConfirmModal(prev => ({ ...prev, isOpen: false }))
-          loadEvents()
-          refreshAfterAllocation()
-
-          if (event.event_type === 'request_allocation') {
-            setNewEvent({
-              ...newEvent,
-              event_type: 'start_allocation',
-              machine_id: event.machine?.id || '',
-              site_id: event.site?.id || '',
-              construction_type: event.construction_type || '',
-              lot_building_number: event.lot_building_number || '',
-              event_date: getLocalDateTimeForInput(),
-              end_date: event.end_date ? getLocalDateForInput(event.end_date) : '',
-            })
-            setShowCreateModal(true)
-          }
-        } else {
-          setError(data.message || 'Erro ao aprovar evento')
-        }
-      } catch (error) {
-        console.error('Error approving event:', error)
-        setError('Erro ao conectar com o servidor')
-      } finally {
-        setConfirmModal(prev => ({ ...prev, isLoading: false }))
-      }
+  const handleStartFromRequest = (request: AllocationEvent) => {
+    setEditingEventId(null)
+    
+    // Ajustar datas para o formato esperado pelo input
+    let localDateString = ''
+    if (request.event_date) {
+      localDateString = getLocalDateTimeForInput(new Date(request.event_date))
     }
 
-    // Eliminar confirmação redundante para solicitação de alocação
-    if (event.event_type !== 'request_allocation') {
-      setError(null)
-      setConfirmModal({
-        isOpen: true,
-        title: 'Aprovar Evento',
-        message: 'Deseja aprovar este evento?',
-        confirmButtonText: 'Aprovar',
-        onConfirm: approve
-      })
-    } else {
-      await approve()
+    let localEndDateString = ''
+    if (request.end_date) {
+      localEndDateString = getLocalDateForInput(new Date(request.end_date))
     }
+
+    setNewEvent({
+      event_type: 'start_allocation',
+      machine_id: '',
+      site_id: request.site?.id || '',
+      extension_id: '',
+      construction_type: '',
+      lot_building_number: '',
+      event_date: localDateString,
+      downtime_reason: '',
+      downtime_description: '',
+      end_date: localEndDateString,
+      corrects_event_id: '',
+      correction_description: '',
+      notas: request.notas || '',
+      supplier_id: request.supplier_id || '',
+      machine_type_id: request.machine_type_id || '',
+      sharepoint_links: [],
+      from_request_id: request.id
+    })
+    setShowCreateModal(true)
   }
 
   const handleRejectEvent = async (eventId: string) => {
@@ -641,7 +623,6 @@ export default function EventsPage() {
       return false
     }
 
-    const matchesStatus = filterStatus.length === 0 || filterStatus.includes(event.status)
     const matchesType = filterType.length === 0 || filterType.includes(event.event_type)
     
     let matchesDate = true
@@ -662,8 +643,24 @@ export default function EventsPage() {
         matchesDate = matchesDate && eventDate.getTime() <= endDateTime.getTime()
       }
     }
+
+    let matchesSearch = true
+    if (searchTerm) {
+      const search = searchTerm.toLowerCase()
+      const unitNumber = event.machine?.unit_number?.toLowerCase() || ''
+      const siteTitle = event.site?.title?.toLowerCase() || ''
+      const machineTypeName = event.requested_machine_type?.nome?.toLowerCase() || ''
+      const creatorName = event.created_by_user?.nome?.toLowerCase() || ''
+      const notes = event.notas?.toLowerCase() || ''
+
+      matchesSearch = unitNumber.includes(search) || 
+                      siteTitle.includes(search) || 
+                      machineTypeName.includes(search) ||
+                      creatorName.includes(search) ||
+                      notes.includes(search)
+    }
     
-    return matchesStatus && matchesType && matchesDate
+    return matchesType && matchesDate && matchesSearch
   })
 
 
@@ -717,10 +714,10 @@ export default function EventsPage() {
             {/* Tab: Histórico de Eventos */}
             {activeTab === 'events' && (
               <EventsTab
-                filterStatus={filterStatus}
-                setFilterStatus={setFilterStatus}
                 filterType={filterType}
                 setFilterType={setFilterType}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
                 startDate={startDate}
                 setStartDate={setStartDate}
                 endDate={endDate}
@@ -732,6 +729,7 @@ export default function EventsPage() {
                 setShowCreateModal={setShowCreateModal}
                 handleNewEvent={handleNewEvent}
                 handleEditEvent={handleEditEvent}
+                handleStartFromRequest={handleStartFromRequest}
                 handleDeleteEvent={handleDeleteEvent}
                 machineTypes={machineTypes}
               />

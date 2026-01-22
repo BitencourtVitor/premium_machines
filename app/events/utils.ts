@@ -158,13 +158,17 @@ export const filterMachinesForEvent = (
   const allocatedIds = activeAllocations.map(a => a.machine_id)
   const downtimeIds = activeDowntimes.map(d => d.machine_id)
 
-  // Identificar se o evento é específico de extensão
+  // Identificar se o evento é específico de extensão ou transporte
   const isExtensionEvent = ['extension_attach', 'extension_detach'].includes(eventType);
+  const isTransportEvent = ['transport_start', 'transport_arrival'].includes(eventType);
 
-  // Filtrar a lista base: se for evento de extensão, manter só extensões. 
-  // Se for evento de máquina, manter só máquinas.
+  // Filtrar a lista base: 
+  // - Se for evento de transporte, manter ambos (máquina e extensão)
+  // - Se for evento de extensão, manter só extensões. 
+  // - Se for evento de máquina, manter só máquinas.
   const baseFiltered = machines.filter(m => {
     const isExtension = m.extension_type || m.machine_type?.is_attachment;
+    if (isTransportEvent) return true;
     return isExtensionEvent ? isExtension : !isExtension;
   });
 
@@ -217,8 +221,21 @@ export const filterMachinesForEvent = (
       return baseFiltered.filter(m => m.status !== 'in_transit' && m.current_site)
       
     case 'transport_arrival':
-      // Máquinas que estão em trânsito
-      return baseFiltered.filter(m => m.status === 'in_transit')
+      // Máquinas que estão em trânsito ou cujo último evento de transporte foi um início
+      // (considerando toda a linha do tempo, inclusive eventos futuros)
+      return baseFiltered.filter(m => {
+        // Se o status atual já é in_transit, ok
+        if (m.status === 'in_transit') return true
+
+        // Caso contrário, verificamos se há um transporte "aberto" na história completa
+        const transportEvents = events
+          .filter(e => e.machine?.id === m.id && 
+                       e.status === 'approved' && 
+                       ['transport_start', 'transport_arrival'].includes(e.event_type))
+          .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
+
+        return transportEvents.length > 0 && transportEvents[0].event_type === 'transport_start'
+      })
       
     default:
       return baseFiltered

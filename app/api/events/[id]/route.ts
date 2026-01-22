@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 import { createAuditLog } from '@/lib/auditLog'
 import { syncMachineState, syncExtensionState } from '@/lib/allocation/synchronization'
+import { updateAllocationNotification } from '@/lib/notificationService'
 
 export const dynamic = 'force-dynamic'
 
@@ -135,6 +136,9 @@ export async function PUT(
       await syncExtensionState(updatedEvent.extension_id)
     }
 
+    // Update notifications if necessary
+    await updateAllocationNotification(updatedEvent)
+
     // Log action
     await createAuditLog({
       entidade: 'allocation_events',
@@ -190,6 +194,13 @@ export async function DELETE(
         { status: 500 }
       )
     }
+
+    // Delete associated notifications
+    await supabaseServer
+      .from('notifications')
+      .delete()
+      .eq('event_id', id)
+      .eq('root_type', 'allocation_due')
 
     // Log action
     await createAuditLog({

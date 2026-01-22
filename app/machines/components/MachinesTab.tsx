@@ -46,11 +46,21 @@ export default function MachinesTab({
         case 'available':
           return 'text-green-600 dark:text-green-400'
         case 'allocated':
+        case 'active':
           return 'text-blue-600 dark:text-blue-400'
         case 'maintenance':
           return 'text-yellow-600 dark:text-yellow-400'
         case 'in_transit':
           return 'text-teal-600 dark:text-teal-400'
+        case 'exceeded':
+          return 'text-red-600 dark:text-red-400'
+        case 'moved':
+          return 'text-pink-600 dark:text-pink-400'
+        case 'scheduled':
+          return 'text-blue-500 dark:text-blue-300'
+        case 'finished':
+        case 'inactive':
+          return 'text-indigo-600 dark:text-indigo-400'
         default:
           return 'text-gray-600 dark:text-gray-400'
       }
@@ -90,13 +100,17 @@ export default function MachinesTab({
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
                   <div className={`w-2 h-2 rounded-full ${
                     machine.status === 'available' ? 'bg-green-500' :
-                    machine.status === 'allocated' ? 'bg-blue-500' :
+                    machine.status === 'allocated' || machine.status === 'active' ? 'bg-blue-500' :
                     machine.status === 'maintenance' ? 'bg-yellow-500' :
                     machine.status === 'in_transit' ? 'bg-teal-500' :
+                    machine.status === 'exceeded' ? 'bg-red-500' :
+                    machine.status === 'moved' ? 'bg-pink-500' :
+                    machine.status === 'scheduled' ? 'bg-blue-400' :
+                    machine.status === 'finished' || machine.status === 'inactive' ? 'bg-indigo-500' :
                     'bg-gray-500'
                   }`}></div>
                   <span className={`text-xs font-semibold ${getStatusColor()}`}>
-                    {MACHINE_STATUS_LABELS[machine.status]}
+                    {MACHINE_STATUS_LABELS[machine.status] || machine.status}
                   </span>
                 </div>
                 {/* Ownership com bolinha + texto */}

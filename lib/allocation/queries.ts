@@ -46,8 +46,15 @@ export async function getActiveAllocations(): Promise<ActiveAllocation[]> {
 
   // 3. Agrupar eventos por machine_id e extension_id para processamento rápido
   const eventsByMachine = new Map<string, any[]>()
+  const siteTitles = new Map<string, string>()
+
   if (allEvents) {
     for (const event of allEvents) {
+      // Coletar nomes de sites
+      if (event.site_id && event.site?.title) {
+        siteTitles.set(event.site_id, event.site.title)
+      }
+
       // Adicionar para a máquina principal
       if (event.machine_id) {
         if (!eventsByMachine.has(event.machine_id)) {
@@ -57,7 +64,6 @@ export async function getActiveAllocations(): Promise<ActiveAllocation[]> {
       }
       
       // Adicionar também para a extensão (se houver uma e for diferente da máquina principal)
-      // Isso garante que manutenções e outros eventos registrados via extension_id não sejam perdidos
       if (event.extension_id && event.extension_id !== event.machine_id) {
         if (!eventsByMachine.has(event.extension_id)) {
           eventsByMachine.set(event.extension_id, [])
@@ -78,52 +84,52 @@ export async function getActiveAllocations(): Promise<ActiveAllocation[]> {
 
       // Se a máquina está alocada, em trânsito, em manutenção OU em uma obra, adicionar à lista
       if (state.current_allocation_event_id || state.status === 'in_transit' || state.is_in_downtime || state.current_site_id) {
-        activeAllocations.push({
+        // Objeto base da alocação
+        const baseAllocation: ActiveAllocation = {
           allocation_event_id: state.current_allocation_event_id,
           machine_id: machine.id,
           machine_unit_number: machine.unit_number,
           machine_type: (() => {
             const type = machine.machine_type;
-            if (Array.isArray(type)) {
-              return (type[0] as any)?.nome || '';
-            }
+            if (Array.isArray(type)) return (type[0] as any)?.nome || '';
             return (type as any)?.nome || '';
           })(),
           machine_type_icon: (() => {
             const type = machine.machine_type;
-            if (Array.isArray(type)) {
-              return (type[0] as any)?.icon || null;
-            }
+            if (Array.isArray(type)) return (type[0] as any)?.icon || null;
             return (type as any)?.icon || null;
           })(),
           machine_ownership: machine.ownership_type,
           machine_supplier_id: (() => {
             const supplier = machine.supplier;
-            if (Array.isArray(supplier)) {
-              return (supplier[0] as any)?.id || null;
-            }
+            if (Array.isArray(supplier)) return (supplier[0] as any)?.id || null;
             return (supplier as any)?.id || null;
           })(),
           machine_supplier_name: (() => {
             const supplier = machine.supplier;
-            if (Array.isArray(supplier)) {
-              return (supplier[0] as any)?.nome || null;
-            }
+            if (Array.isArray(supplier)) return (supplier[0] as any)?.nome || null;
             return (supplier as any)?.nome || null;
           })(),
           site_id: state.current_site_id,
-          site_title: state.current_site_title || '',
+          site_title: state.current_site_title || siteTitles.get(state.current_site_id || '') || '',
           construction_type: state.construction_type,
           lot_building_number: state.lot_building_number,
           allocation_start: state.allocation_start || '',
           end_date: state.end_date,
           is_in_downtime: state.is_in_downtime,
           current_downtime_event_id: state.current_downtime_event_id,
-          current_downtime_reason: null, // Será preenchido abaixo se houver
+          current_downtime_reason: null,
           current_downtime_start: state.downtime_start,
           attached_extensions: state.attached_extensions,
           status: state.status,
-        })
+          is_currently_at_site: !!state.current_site_id && state.status !== 'in_transit',
+          previous_site_id: state.previous_site_id,
+          origin_site_id: state.status === 'in_transit' ? state.current_site_id : null,
+          destination_site_id: state.status === 'in_transit' ? state.destination_site_id : null,
+          physical_site_id: state.status !== 'in_transit' ? state.current_site_id : null
+        }
+
+        activeAllocations.push(baseAllocation)
       }
     } catch (error) {
       console.error(`Erro ao calcular estado da máquina ${machine.id}:`, error)
@@ -265,108 +271,108 @@ export async function getHistoricalSiteAllocations(siteId: string): Promise<Acti
 
   const historicalAllocations: ActiveAllocation[] = []
 
-  // 4. Para cada máquina, processar sua linha do tempo de eventos
+  // 4. Para cada máquina, processar sua linha do tempo de eventos em ciclos
   for (const [mId, mEvents] of Array.from(eventsByMachine.entries())) {
-    let currentCycle: ActiveAllocation | null = null
-    let wasAtThisSiteInCycle = false
     const machine = machinesMap.get(mId)
-    
     if (!machine) continue
 
-    for (const event of mEvents) {
-      const isStart = event.event_type === 'start_allocation' || 
-                      event.event_type === 'transport_arrival' ||
-                      (event.event_type === 'extension_attach' && event.extension_id === mId)
+    let currentCycleEvents: any[] = []
+    let rootAllocationId: string | null = null
+    
+    for (let i = 0; i < mEvents.length; i++) {
+      const event = mEvents[i]
       
-      const isEnd = event.event_type === 'end_allocation' || 
-                    event.event_type === 'transport_start' ||
-                    (event.event_type === 'extension_detach' && event.extension_id === mId)
+      // Se estamos começando um novo ciclo, guardamos o ID do evento raiz
+      if (currentCycleEvents.length === 0) {
+        rootAllocationId = event.id
+      }
       
-      const isDowntimeStart = event.event_type === 'downtime_start'
-      const isDowntimeEnd = event.event_type === 'downtime_end'
+      currentCycleEvents.push(event)
 
-      if (isStart) {
-        // Se já havia um ciclo aberto, verificamos se este novo start é na verdade 
-        // uma continuação do ciclo (ex: transporte manual ou erro de entrada de dados)
-        if (currentCycle) {
-          // Preservamos a data de início original mas atualizamos dados do contrato
-          if (event.construction_type) currentCycle.construction_type = event.construction_type
-          if (event.lot_building_number) currentCycle.lot_building_number = event.lot_building_number
+      // Uma alocação só termina de fato no end_allocation, extension_detach ou se o histórico acabar.
+      // transport_start NÃO termina a alocação comercial, apenas muda a máquina de lugar físico.
+      const isCycleEnd = event.event_type === 'end_allocation' || 
+                         event.event_type === 'extension_detach' || 
+                         i === mEvents.length - 1;
+
+      if (isCycleEnd) {
+        // Verificamos se este site participou de alguma forma deste ciclo
+        // Participação = evento no site OU destino de um transporte
+        const siteParticipated = currentCycleEvents.some(e => 
+          e.site_id === siteId || 
+          (e.event_type === 'transport_start' && e.site_id === siteId)
+        )
+        
+        if (siteParticipated && rootAllocationId) {
+          const firstEvent = currentCycleEvents[0]
           
-          // O usuário ressaltou que o vencimento vem da alocação original.
-          // Só atualizamos o end_date se ele estiver vazio no ciclo atual.
-          if (event.end_date && !currentCycle.end_date) currentCycle.end_date = event.end_date
+          // Calcular estado ao final deste ciclo específico
+          const cycleState = calculateStateFromEvents(machine.id, currentCycleEvents)
           
-          // Marcamos que o ciclo tocou este site
-          if (event.site_id === siteId) {
-            wasAtThisSiteInCycle = true
+          // Verificar se a máquina AINDA está neste site HOJE (usando histórico COMPLETO)
+          const currentState = calculateStateFromEvents(machine.id, mEvents)
+          
+          // Regra de presença física conforme feedback do usuário:
+          // 1. Se a máquina está em trânsito hoje:
+          //    - Na obra de DESTINO: ela está "Em trânsito" (isCurrentlyAtSite = true)
+          //    - Na obra de ORIGEM: ela já saiu, portanto "Movida" (isCurrentlyAtSite = false)
+          // 2. Se a máquina NÃO está em trânsito hoje:
+          //    - Está presente apenas se o siteId for o site atual (currentState.current_site_id)
+          //    - E se a alocação não tiver sido encerrada (status !== 'available')
+
+          let isCurrentlyAtSite = false;
+          
+          if (currentState.status === 'in_transit') {
+            // Se está em trânsito, só é considerada "presente" (para fins de status ativo/em trânsito) na obra de DESTINO
+            isCurrentlyAtSite = currentState.destination_site_id === siteId;
+          } else {
+            // Se não está em trânsito, está presente apenas se este for o site atual
+            isCurrentlyAtSite = currentState.current_site_id === siteId && currentState.status !== 'available';
           }
-          
-          continue // Pula a criação de um novo ciclo
-        }
 
-        const machineType = machine.machine_type ? (Array.isArray(machine.machine_type) ? machine.machine_type[0] : machine.machine_type) : null
-        const supplier = machine.supplier ? (Array.isArray(machine.supplier) ? machine.supplier[0] : machine.supplier) : null
+          // Evitar duplicidade: Usar o ID da alocação raiz (start_allocation)
+          const isDuplicate = historicalAllocations.some(a => 
+            a.machine_id === machine.id && 
+            a.site_id === siteId && 
+            a.allocation_event_id === rootAllocationId
+          );
 
-        currentCycle = {
-          allocation_event_id: event.id,
-          machine_id: mId,
-          machine_unit_number: machine.unit_number || '',
-          machine_type: machineType?.nome || '',
-          machine_type_icon: machineType?.icon || null,
-          machine_ownership: machine.ownership_type || 'rented',
-          machine_supplier_id: supplier?.id || null,
-          machine_supplier_name: supplier?.nome || null,
-          site_id: event.site_id,
-          site_title: event.site?.title || '',
-          construction_type: event.construction_type,
-          lot_building_number: event.lot_building_number,
-          allocation_start: event.event_date,
-          start_date: event.event_date,
-          end_date: event.end_date || null,
-          is_in_downtime: false,
-          current_downtime_event_id: null,
-          current_downtime_reason: null,
-          current_downtime_start: null,
-          attached_extensions: [],
-          status: 'allocated'
-        }
-        wasAtThisSiteInCycle = event.site_id === siteId
-      } else if (currentCycle) {
-        // Marcamos se o ciclo tocou o site em algum momento
-        if (event.site_id === siteId) {
-          wasAtThisSiteInCycle = true
-        }
+          if (!isDuplicate) {
+            // Tentar encontrar a data de início específica para ESTE site dentro do ciclo
+            const siteFirstEvent = currentCycleEvents.find(e => 
+              e.site_id === siteId || (e.event_type === 'transport_start' && e.site_id === siteId)
+            );
 
-        if (isEnd) {
-          // Se o ciclo já tinha um end_date planejado (da alocação original), mantemos ele
-          // Mas para o histórico de alocação realizada, a data de fim é o evento de fim
-          if (!currentCycle.end_date) {
-            currentCycle.end_date = event.event_date
+            historicalAllocations.push({
+              allocation_event_id: rootAllocationId,
+              machine_id: machine.id,
+              machine_unit_number: machine.unit_number,
+              machine_type: machine.machine_type?.nome || '',
+              machine_type_icon: machine.machine_type?.icon || null,
+              machine_ownership: machine.ownership_type,
+              machine_supplier_id: machine.supplier?.id || null,
+              machine_supplier_name: machine.supplier?.nome || null,
+              site_id: siteId,
+              site_title: currentCycleEvents.find(e => e.site_id === siteId)?.site?.title || '',
+              construction_type: siteFirstEvent?.construction_type || firstEvent.construction_type,
+              lot_building_number: siteFirstEvent?.lot_building_number || firstEvent.lot_building_number,
+              allocation_start: siteFirstEvent?.event_date || firstEvent.event_date,
+              end_date: event.event_type === 'end_allocation' || event.event_type === 'extension_detach' ? event.event_date : null,
+              status: cycleState.status,
+              is_in_downtime: cycleState.is_in_downtime,
+              attached_extensions: [],
+              is_currently_at_site: isCurrentlyAtSite,
+              destination_site_id: currentState.destination_site_id || undefined
+            })
           }
-          
-          if (wasAtThisSiteInCycle) {
-            historicalAllocations.push({ ...currentCycle })
-          }
-          currentCycle = null
-          wasAtThisSiteInCycle = false
-        } else if (isDowntimeStart) {
-          currentCycle.is_in_downtime = true
-          currentCycle.current_downtime_event_id = event.id
-          currentCycle.current_downtime_reason = event.downtime_reason
-          currentCycle.current_downtime_start = event.event_date
-        } else if (isDowntimeEnd) {
-          currentCycle.is_in_downtime = false
-          currentCycle.current_downtime_event_id = null
-          currentCycle.current_downtime_reason = null
-          currentCycle.current_downtime_start = null
+        }
+        
+        // Se foi um evento de encerramento de ciclo, limpamos para o próximo
+        if (event.event_type === 'end_allocation' || event.event_type === 'extension_detach') {
+          currentCycleEvents = []
+          rootAllocationId = null
         }
       }
-    }
-
-    // Se o último ciclo da máquina foi neste site e ainda está aberto
-    if (currentCycle && wasAtThisSiteInCycle) {
-      historicalAllocations.push(currentCycle)
     }
   }
 

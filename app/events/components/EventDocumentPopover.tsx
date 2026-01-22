@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { FiFile, FiImage, FiDownload, FiEye, FiLoader, FiPaperclip } from 'react-icons/fi'
+import { FiFile, FiImage, FiDownload, FiEye, FiLoader, FiPaperclip, FiExternalLink } from 'react-icons/fi'
 import DocumentViewerModal from './DocumentViewerModal'
 
 interface EventDocumentPopoverProps {
   eventId: string
   unitNumber: string
+  sharepointLinks?: { label: string; url: string }[]
 }
 
 interface FileObject {
@@ -19,7 +20,7 @@ interface FileObject {
   metadata: any
 }
 
-export default function EventDocumentPopover({ eventId, unitNumber }: EventDocumentPopoverProps) {
+export default function EventDocumentPopover({ eventId, unitNumber, sharepointLinks = [] }: EventDocumentPopoverProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [files, setFiles] = useState<FileObject[]>([])
   const [loading, setLoading] = useState(false)
@@ -117,9 +118,9 @@ export default function EventDocumentPopover({ eventId, unitNumber }: EventDocum
         title="Ver documentos"
       >
         <FiPaperclip className="w-5 h-5" />
-        {files.length > 0 && (
+        {(files.length > 0 || sharepointLinks.length > 0) && (
           <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white ring-2 ring-white dark:ring-gray-800">
-            {files.length}
+            {files.length + sharepointLinks.length}
           </span>
         )}
       </button>
@@ -134,7 +135,7 @@ export default function EventDocumentPopover({ eventId, unitNumber }: EventDocum
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 w-72 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
               <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Documentos ({files.length})
+                Anexos ({files.length + sharepointLinks.length})
               </span>
             </div>
 
@@ -144,12 +145,40 @@ export default function EventDocumentPopover({ eventId, unitNumber }: EventDocum
                   <FiLoader className="animate-spin w-6 h-6" />
                   <span className="text-xs">Carregando...</span>
                 </div>
-              ) : files.length === 0 ? (
+              ) : (files.length === 0 && sharepointLinks.length === 0) ? (
                 <div className="py-8 text-center text-gray-400 text-xs">
-                  Nenhum documento anexado
+                  Nenhum anexo encontrado
                 </div>
               ) : (
                 <div className="space-y-1">
+                  {/* SharePoint Links */}
+                   {sharepointLinks.map((linkObj, idx) => (
+                     <a 
+                       key={`sp-${idx}`}
+                       href={linkObj.url}
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       className="flex items-center justify-between gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors group"
+                     >
+                       <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <img 
+                          src="https://img.icons8.com/?size=100&id=qjbTrcfmKDpq&format=png&color=0078d4" 
+                          alt="SharePoint"
+                          className="w-4 h-4 flex-shrink-0 object-contain"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300 truncate font-medium">
+                          {linkObj.label || `SharePoint Link ${sharepointLinks.length > 1 ? idx + 1 : ''}`}
+                        </span>
+                      </div>
+                     </a>
+                   ))}
+
+                  {/* Divider if both exist */}
+                  {sharepointLinks.length > 0 && files.length > 0 && (
+                    <div className="border-t border-gray-100 dark:border-gray-700 my-1 mx-2" />
+                  )}
+
+                  {/* Files */}
                   {files.map((file) => {
                     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)
                     return (

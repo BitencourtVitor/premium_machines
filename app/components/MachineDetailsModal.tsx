@@ -64,11 +64,21 @@ export default function MachineDetailsModal({
       case 'available':
         return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800'
       case 'allocated':
+      case 'active':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800'
       case 'maintenance':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
       case 'in_transit':
         return 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300 border-teal-200 dark:border-teal-800'
+      case 'exceeded':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800 font-bold'
+      case 'moved':
+        return 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300 border-pink-200 dark:border-pink-800 font-bold'
+      case 'scheduled':
+        return 'bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300 border-blue-100 dark:border-blue-800'
+      case 'finished':
+      case 'inactive':
+        return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700'
     }
@@ -190,9 +200,14 @@ export default function MachineDetailsModal({
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium border ${getStatusBadgeStyle(machine?.status)}`}>
                     <span className={`w-2 h-2 rounded-full mr-2 ${
                       machine?.status === 'available' ? 'bg-green-500' :
-                      machine?.status === 'allocated' ? 'bg-blue-500' :
+                      machine?.status === 'allocated' || machine?.status === 'active' ? 'bg-blue-500' :
                       machine?.status === 'maintenance' ? 'bg-yellow-500' :
-                      machine?.status === 'in_transit' ? 'bg-teal-500' : 'bg-gray-500'
+                      machine?.status === 'in_transit' ? 'bg-teal-500' : 
+                      machine?.status === 'exceeded' ? 'bg-red-500' :
+                      machine?.status === 'moved' ? 'bg-pink-500' :
+                      machine?.status === 'scheduled' ? 'bg-blue-400' :
+                      machine?.status === 'finished' || machine?.status === 'inactive' ? 'bg-indigo-500' :
+                      'bg-gray-500'
                     }`}></span>
                     {MACHINE_STATUS_LABELS[machine?.status] || machine?.status || 'Desconhecido'}
                   </span>
@@ -239,7 +254,7 @@ export default function MachineDetailsModal({
                 ) : (
                   <div className="relative border-l-2 border-gray-200 dark:border-gray-700 ml-3 space-y-8">
                     {filteredEvents
-                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                      .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
                       .map((event) => {
                         const eventColors = getEventColors(event.event_type)
                         
@@ -252,26 +267,40 @@ export default function MachineDetailsModal({
                             
                             {/* Event Card */}
                             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-all hover:border-blue-200 dark:hover:border-blue-800">
-                              <div className="flex flex-wrap items-center gap-3 mb-3">
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
-                                  event.event_type === 'start_allocation' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
-                                  event.event_type === 'end_allocation' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' :
-                                  event.event_type === 'downtime_start' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300' :
-                                  event.event_type === 'downtime_end' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
-                                  event.event_type === 'request_allocation' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' :
-                                  'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-                                }`}>
-                                  {EVENT_TYPE_LABELS[event.event_type] || event.event_type?.replace(/_/g, ' ')}
-                                </span>
-                                <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1">
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                  </svg>
-                                  {formatDateOnly(event.event_date)}
-                                </span>
+                              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
+                                    event.event_type === 'start_allocation' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
+                                    event.event_type === 'end_allocation' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' :
+                                    event.event_type === 'downtime_start' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300' :
+                                    event.event_type === 'downtime_end' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' :
+                                    event.event_type === 'request_allocation' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' :
+                                    'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                                  }`}>
+                                    {EVENT_TYPE_LABELS[event.event_type] || event.event_type?.replace(/_/g, ' ')}
+                                  </span>
+                                  <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    {formatDateOnly(event.event_date)}
+                                  </span>
+                                </div>
                               </div>
                               
                               <div className="text-sm text-gray-600 dark:text-gray-300 space-y-2">
+                                  {event.site?.title && (
+                                      <p className="flex items-start gap-2">
+                                        <span className="font-semibold text-gray-900 dark:text-white min-w-[60px]">Obra:</span> 
+                                        <span className="font-medium text-gray-800 dark:text-gray-200">{event.site.title}</span>
+                                      </p>
+                                  )}
+                                  {event.site?.address && (
+                                      <p className="flex items-start gap-2 text-xs">
+                                        <span className="font-semibold text-gray-900 dark:text-white min-w-[60px]">Endereço:</span> 
+                                        <span className="text-gray-500 dark:text-gray-400 italic">{event.site.address}</span>
+                                      </p>
+                                  )}
                                   {event.downtime_reason && (
                                       <p className="flex items-start gap-2">
                                         <span className="font-semibold text-gray-900 dark:text-white min-w-[60px]">Motivo:</span> 

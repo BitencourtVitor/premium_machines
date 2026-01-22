@@ -23,6 +23,7 @@ export interface AllocationEvent {
   correction_description?: string
   rejection_reason?: string
   notas?: string
+  sharepoint_links?: { label: string; url: string }[]
 }
 
 export interface ActiveAllocation {
@@ -70,4 +71,6 @@ export interface NewEventState {
   supplier_id: string
   machine_type_id: string
   notas: string
+  sharepoint_links: { label: string; url: string }[]
+  from_request_id?: string
 }

@@ -7,7 +7,7 @@ interface MetricsCardsProps {
 
 export default function MetricsCards({ metrics, loadingMetrics }: MetricsCardsProps) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 flex-shrink-0 min-w-0">
+    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 flex-shrink-0 min-w-0">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden min-w-0">
         <div className="p-3 md:p-4">
           <div className="flex items-center justify-between gap-2 min-w-0">
@@ -49,7 +49,25 @@ export default function MetricsCards({ metrics, loadingMetrics }: MetricsCardsPr
         <div className="p-3 md:p-4">
           <div className="flex items-center justify-between gap-2 min-w-0">
             <div className="min-w-0 flex-1">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">Alocações Pendentes</p>
+              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">Extensões Alocadas</p>
+              <p className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                {loadingMetrics ? '...' : metrics.totalExtensionsAllocated}
+              </p>
+            </div>
+            <div className="bg-purple-100 dark:bg-purple-900 rounded-full p-1.5 md:p-2 flex-shrink-0">
+              <svg className="w-4 h-4 md:w-5 md:h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 011-1h1a2 2 0 100-4H7a1 1 0 01-1-1V7a1 1 0 011-1h3a1 1 0 011-1V4z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden min-w-0">
+        <div className="p-3 md:p-4">
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">Eventos Pendentes</p>
               <p className={`text-xl md:text-2xl font-bold mt-1 ${metrics.pendingAllocations > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-900 dark:text-white'}`}>
                 {loadingMetrics ? '...' : metrics.pendingAllocations}
               </p>
@@ -67,7 +85,7 @@ export default function MetricsCards({ metrics, loadingMetrics }: MetricsCardsPr
         <div className="p-3 md:p-4">
           <div className="flex items-center justify-between gap-2 min-w-0">
             <div className="min-w-0 flex-1">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">Máquinas com Problemas</p>
+              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 truncate">Máquinas em Manutenção</p>
               <p className={`text-xl md:text-2xl font-bold mt-1 ${metrics.machinesWithIssues > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
                 {loadingMetrics ? '...' : metrics.machinesWithIssues}
               </p>

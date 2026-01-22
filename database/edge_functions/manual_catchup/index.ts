@@ -10,52 +10,13 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 })
 
-type RefuelingTemplate = {
-  id: string
-  site_id: string
-  machine_id: string
-  fuel_supplier_id: string | null
-  day_of_week: number
-  time_of_day: string
-  is_active: boolean
-  created_by: string | null
-  machines: { unit_number: string }
-  sites: { title: string }
-}
-
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
-
-// Standard project timezone offset (Brazil/Sao Paulo = UTC-3)
-// We add 3 hours to the wall-clock time to get the correct UTC representation
-// that will be displayed back as the intended local time in the browser.
 const BR_OFFSET = 3
 
-function getCurrentWeekRange() {
-  const now = new Date()
-  const day = now.getUTCDay() // 0 = Sunday, 1 = Monday, ...
-
-  // Regra Permanente:
-  // Domingo (0) ou Segunda (1) -> Segunda desta semana (ciclo atual)
-  // Terça (2) a Sábado (6) -> Próxima Segunda (próximo ciclo)
-  let diffToMonday
-  if (day === 0) {
-    diffToMonday = 1 // Próxima segunda (amanhã)
-  } else if (day === 1) {
-    diffToMonday = 0 // Hoje
-  } else {
-    diffToMonday = 8 - day // Próxima segunda
-  }
-
-  const monday = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMonday),
-  )
-  const sunday = new Date(monday.getTime() + 6 * ONE_DAY_MS)
-  const start = new Date(
-    Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate(), 0, 0, 0),
-  )
-  const end = new Date(
-    Date.UTC(sunday.getUTCFullYear(), sunday.getUTCMonth(), sunday.getUTCDate(), 23, 59, 59),
-  )
+// Configuração fixa para a semana atual (19/01/2026 a 23/01/2026)
+function getCatchupWeekRange() {
+  const start = new Date(Date.UTC(2026, 0, 19, 0, 0, 0)) // Segunda
+  const end = new Date(Date.UTC(2026, 0, 23, 23, 59, 59)) // Sexta
   return { start, end }
 }
 
@@ -87,26 +48,25 @@ serve(async (req: Request) => {
     return new Response("Method not allowed", { status: 405 })
   }
 
+  console.log("[Catchup] Iniciando processamento manual para a semana de 19/01 a 23/01...")
+
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
     return new Response("Missing Supabase environment variables", { status: 500 })
   }
 
-  // 1. Get a fallback user ID (admin or dev) in case template.created_by is null
-  const { data: fallbackUser, error: fallbackError } = await supabase
+  // 1. Get a fallback user ID
+  const { data: fallbackUser } = await supabase
     .from("users")
     .select("id")
     .in("role", ["admin", "dev"])
     .limit(1)
     .maybeSingle()
 
-
-
-  const { start, end } = getCurrentWeekRange()
+  const { start, end } = getCatchupWeekRange()
 
   const { data: templates, error: templatesError } = await supabase
     .from("refueling_templates")
-    .select(
-      `
+    .select(`
       id,
       site_id,
       machine_id,
@@ -117,19 +77,22 @@ serve(async (req: Request) => {
       created_by,
       machines (unit_number),
       sites (title)
-    `,
-    )
+    `)
     .eq("is_active", true)
 
-
+  if (templatesError) {
+    console.error("[Catchup] Erro ao buscar templates:", templatesError)
+    return new Response(JSON.stringify(templatesError), { status: 500 })
+  }
 
   if (!templates || templates.length === 0) {
     return new Response("No active refueling templates", { status: 200 })
   }
 
   const notificationsToCreate: NotificationInput[] = []
+  let eventsCreated = 0
 
-  for (const template of templates as RefuelingTemplate[]) {
+  for (const template of templates) {
     const dates = getScheduledDatesForTemplate(
       start,
       end,
@@ -137,19 +100,13 @@ serve(async (req: Request) => {
       template.time_of_day,
     )
 
-    // Ensure we have a created_by ID
     const createdBy = template.created_by || fallbackUser?.id
-
-
 
     for (const scheduledAt of dates) {
       const scheduledIso = scheduledAt.toISOString()
       
-      // A data de referência para o trigger deve ser o dia local planejado,
-      // não o timestamp UTC que pode ter virado o dia devido ao fuso horário.
-      const eventDay = new Date(scheduledAt.getTime() - (BR_OFFSET * 60 * 60 * 1000))
-
-      const { data: existing, error: existingError } = await supabase
+      // Check if event already exists
+      const { data: existing } = await supabase
         .from("allocation_events")
         .select("id")
         .eq("event_type", "refueling")
@@ -159,9 +116,8 @@ serve(async (req: Request) => {
         .limit(1)
         .maybeSingle()
 
-
-
       if (existing) {
+        console.log(`[Catchup] Evento já existe para ${template.machines?.unit_number} em ${scheduledIso}`)
         continue
       }
 
@@ -180,34 +136,48 @@ serve(async (req: Request) => {
         .select("id")
         .single()
 
-
-
-        // 3. Prepare notification for the new event
-        const machineUnit = template.machines?.unit_number || "Desconhecida"
-        const siteTitle = template.sites?.title || "Desconhecido"
-        const formattedDate = new Date(scheduledIso).toLocaleDateString("pt-BR")
-
-        // A notificação deve disparar no início do dia do evento (00:00 AM BR / 03:00 UTC)
-        // para que o gestor veja as tarefas do dia assim que acessar o sistema.
-        const triggerDate = new Date(
-          Date.UTC(eventDay.getUTCFullYear(), eventDay.getUTCMonth(), eventDay.getUTCDate(), 3, 0, 0, 0)
-        )
-
-        notificationsToCreate.push({
-          event_id: newEvent.id,
-          root_type: "refueling",
-          titulo: `Abastecimento da ${machineUnit}`,
-          mensagem: `Este evento precisa acontecer hoje para a máquina ${machineUnit} no site ${siteTitle} para o dia ${formattedDate}. Aguardamos a confirmação.`,
-          trigger_date: triggerDate.toISOString(),
-        })
+      if (insertError) {
+        console.error("[Catchup] Erro ao criar evento:", insertError)
+        continue
       }
+
+      eventsCreated++
+
+      // Prepare notification
+      const machineUnit = template.machines?.unit_number || "Desconhecida"
+      const siteTitle = template.sites?.title || "Desconhecido"
+      const formattedDate = new Date(scheduledIso).toLocaleDateString("pt-BR")
+
+      // Event day local
+      const eventDay = new Date(scheduledAt.getTime() - (BR_OFFSET * 60 * 60 * 1000))
+      const triggerDate = new Date(
+        Date.UTC(eventDay.getUTCFullYear(), eventDay.getUTCMonth(), eventDay.getUTCDate(), 3, 0, 0, 0)
+      )
+
+      notificationsToCreate.push({
+        event_id: newEvent.id,
+        root_type: "refueling",
+        titulo: `Abastecimento da ${machineUnit}`,
+        mensagem: `Este evento precisa acontecer hoje para a máquina ${machineUnit} no site ${siteTitle} para o dia ${formattedDate}. Aguardamos a confirmação.`,
+        trigger_date: triggerDate.toISOString(),
+      })
     }
   }
 
-  // 4. Chamar a função de processamento de notificações (agora como módulo interno)
+  console.log(`[Catchup] Total de eventos criados: ${eventsCreated}`)
+
+  // 4. Chamar a função de processamento de notificações
   if (notificationsToCreate.length > 0) {
+    console.log(`[Catchup] Processando ${notificationsToCreate.length} notificações...`)
     await processNotifications(supabase, notificationsToCreate)
   }
 
-  return new Response("Refueling events generated and notifications processed", { status: 200 })
+  return new Response(JSON.stringify({
+    message: "Processamento concluído",
+    events_created: eventsCreated,
+    notifications_created: notificationsToCreate.length
+  }), { 
+    status: 200,
+    headers: { "Content-Type": "application/json" }
+  })
 })

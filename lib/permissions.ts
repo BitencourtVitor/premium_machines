@@ -71,27 +71,20 @@ export function getDefaultPermissions(role: string): RolePermissions {
 // Event types labels
 export const EVENT_TYPE_LABELS: Record<string, string> = {
   request_allocation: 'Solicitação de Alocação',
-  confirm_allocation: 'Confirmação de Alocação',
   start_allocation: 'Alocação de Máquina',
   end_allocation: 'Fim de Alocação',
   downtime_start: 'Início de Manutenção',
   downtime_end: 'Fim de Manutenção',
-  extension_attach: 'Alocação de Extensão para Obra',
-  extension_detach: 'Extensão Desconectada',
-  refueling: 'Abastecimento de Combustível',
+  extension_attach: 'Alocação de Extensão',
+  refueling: 'Abastecimento',
   transport_start: 'Início de Transporte',
   transport_arrival: 'Chegada em Obra',
 }
 
 // Downtime reason labels
 export const DOWNTIME_REASON_LABELS: Record<string, string> = {
-  defect: 'Defeito',
-  lack_of_supplies: 'Falta de Insumos',
-  weather: 'Condições Climáticas',
-  lack_of_operator: 'Falta de Operador',
-  holiday: 'Feriado',
-  maintenance: 'Manutenção',
-  other: 'Outro',
+  preventive: 'Manutenção Preventiva',
+  corrective: 'Manutenção Corretiva',
 }
 
 // Machine status labels
@@ -101,6 +94,11 @@ export const MACHINE_STATUS_LABELS: Record<string, string> = {
   maintenance: 'Em Manutenção',
   inactive: 'Inativa',
   in_transit: 'Em Trânsito',
+  exceeded: 'Ativa Excedida',
+  moved: 'Movida',
+  scheduled: 'Agendada',
+  finished: 'Encerrada',
+  active: 'Ativa',
 }
 
 // Event status labels

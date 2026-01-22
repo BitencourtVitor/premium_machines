@@ -25,7 +25,7 @@ interface CreateEventModalProps {
   editingEventId?: string | null
 }
 
-const MANDATORY_DOC_TYPES = ['start_allocation', 'end_allocation', 'extension_attach', 'downtime_end', 'transport_arrival']
+const MANDATORY_DOC_TYPES = ['start_allocation', 'end_allocation', 'extension_attach', 'downtime_start', 'downtime_end', 'transport_arrival']
 
 export default function CreateEventModal({
   showCreateModal,
@@ -82,8 +82,21 @@ export default function CreateEventModal({
     } else if (newEvent.machine_id && newEvent.event_type === 'downtime_start') {
       // Direct open for downtime start
       setStep('form')
+    } else if (newEvent.from_request_id) {
+      // Abrir formulário diretamente se vier de uma solicitação
+      setStep('form')
     }
-  }, [showCreateModal, editingEventId, newEvent.machine_id, newEvent.event_type])
+  }, [showCreateModal, editingEventId, newEvent.machine_id, newEvent.event_type, newEvent.from_request_id])
+
+  // Auto-preencher fornecedor quando a máquina é selecionada
+  useEffect(() => {
+    if (newEvent.event_type === 'start_allocation' && newEvent.machine_id && !newEvent.supplier_id && !editingEventId) {
+      const machine = machines.find(m => m.id === newEvent.machine_id)
+      if (machine?.supplier_id) {
+        setNewEvent({ ...newEvent, supplier_id: machine.supplier_id })
+      }
+    }
+  }, [newEvent.machine_id, newEvent.event_type, machines, editingEventId])
 
   // Auto-preencher site_id para fim de alocação baseado no histórico
   useEffect(() => {
@@ -129,7 +142,9 @@ export default function CreateEventModal({
       if (!newEvent.machine_id) {
         return newEvent.event_type === 'extension_attach' 
           ? 'A seleção de extensão é obrigatória.' 
-          : 'A seleção de máquina é obrigatória.'
+          : ['transport_start', 'transport_arrival'].includes(newEvent.event_type)
+            ? 'A seleção de máquina ou extensão é obrigatória.'
+            : 'A seleção de máquina é obrigatória.'
       }
     }
 
@@ -149,9 +164,14 @@ export default function CreateEventModal({
       if (!newEvent.downtime_reason) return 'O motivo da manutenção é obrigatório.'
     }
 
-    // Bloqueia se o tipo exige documento e não há arquivos selecionados (apenas na criação)
-    if (MANDATORY_DOC_TYPES.includes(newEvent.event_type) && files.length === 0 && !editingEventId) {
-      return 'Este tipo de evento exige obrigatoriamente o anexo de documentos (Imagem ou PDF).'
+    // Bloqueia se o tipo exige documento e não há arquivos selecionados nem links do SharePoint (apenas na criação)
+    if (MANDATORY_DOC_TYPES.includes(newEvent.event_type) && !editingEventId) {
+      const hasFiles = files.length > 0;
+      const hasLinks = (newEvent.sharepoint_links || []).some(link => link.url.trim() !== '');
+      
+      if (!hasFiles && !hasLinks) {
+        return 'Este tipo de evento exige obrigatoriamente o anexo de documentos (Imagem ou PDF) ou pelo menos um link do SharePoint.';
+      }
     }
 
     return null
@@ -208,6 +228,11 @@ export default function CreateEventModal({
     // Para todos os outros eventos, usar a lista filtrada pelo utils.ts
     // que já separa máquinas e extensões corretamente
     machinesToDisplay = [...filteredMachines]
+
+    // Se estiver vindo de uma solicitação, filtrar apenas máquinas do tipo solicitado
+    if (newEvent.from_request_id && newEvent.machine_type_id) {
+      machinesToDisplay = machinesToDisplay.filter(m => m.machine_type_id === newEvent.machine_type_id)
+    }
     
     if (editingEventId && newEvent.machine_id) {
       // Garantir que o item selecionado apareça na lista mesmo que não passasse no filtro (ex: já alocado)
@@ -269,7 +294,6 @@ export default function CreateEventModal({
       downtime_start: getAvailableCount('downtime_start'),
       downtime_end: getAvailableCount('downtime_end'),
       extension_attach: getAvailableCount('extension_attach'),
-      extension_detach: getAvailableCount('extension_detach'),
       transport_start: getAvailableCount('transport_start'),
       transport_arrival: getAvailableCount('transport_arrival')
     }
@@ -288,10 +312,6 @@ export default function CreateEventModal({
         extension_attach: {
           button: "hover:bg-[#F39C12]/10 dark:hover:bg-[#F39C12]/20 hover:border-[#F39C12]/30",
           iconBox: "bg-[#F39C12]/10 dark:bg-[#F39C12]/20 text-[#F39C12] group-hover:bg-[#F39C12]/20"
-        },
-        extension_detach: {
-          button: "hover:bg-[#E67E22]/10 dark:hover:bg-[#E67E22]/20 hover:border-[#E67E22]/30",
-          iconBox: "bg-[#E67E22]/10 dark:bg-[#E67E22]/20 text-[#E67E22] group-hover:bg-[#E67E22]/20"
         },
         end_allocation: {
           button: "hover:bg-[#E74C3C]/10 dark:hover:bg-[#E74C3C]/20 hover:border-[#E74C3C]/30",
@@ -395,7 +415,7 @@ export default function CreateEventModal({
             <Button 
               type="transport_start" 
               label="Início de Transporte" 
-              desc="Máquina saiu para outra obra" 
+              desc="Máquina/Extensão saiu para outra obra" 
               color="teal" 
               count={counts.transport_start}
               icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>}
@@ -403,7 +423,7 @@ export default function CreateEventModal({
             <Button 
               type="transport_arrival" 
               label="Chegada em Obra" 
-              desc="Máquina chegou no destino" 
+              desc="Máquina/Extensão chegou no destino" 
               color="cyan" 
               count={counts.transport_arrival}
               icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
@@ -448,7 +468,6 @@ export default function CreateEventModal({
       case 'downtime_start': return `${prefix}Início de Manutenção`
       case 'downtime_end': return `${prefix}Fim de Manutenção`
       case 'extension_attach': return `${prefix}Alocação de Extensão`
-      case 'extension_detach': return `${prefix}Fim de Alocação de Extensão`
       case 'transport_start': return `${prefix}Início de Transporte`
       case 'transport_arrival': return `${prefix}Chegada em Obra`
       default: return `${prefix}Evento`
@@ -499,7 +518,8 @@ export default function CreateEventModal({
                 <CustomDropdown
                   label={
                     newEvent.event_type === 'request_allocation' ? "Tipo de Máquina *" : 
-                    ['extension_attach', 'extension_detach'].includes(newEvent.event_type) ? "Extensão *" : "Máquina *"
+                    newEvent.event_type === 'extension_attach' ? "Extensão *" : 
+                    ['transport_start', 'transport_arrival'].includes(newEvent.event_type) ? "Máquina ou Extensão *" : "Máquina *"
                   }
                   value={newEvent.event_type === 'request_allocation' ? newEvent.machine_type_id : newEvent.machine_id}
                   onChange={(value) => {
@@ -520,12 +540,13 @@ export default function CreateEventModal({
                   ]}
                   placeholder={
                     newEvent.event_type === 'request_allocation' ? "Selecione o tipo" :
-                    ['extension_attach', 'extension_detach'].includes(newEvent.event_type) ? "Selecione uma extensão" : "Selecione uma máquina"
+                    newEvent.event_type === 'extension_attach' ? "Selecione uma extensão" : 
+                    ['transport_start', 'transport_arrival'].includes(newEvent.event_type) ? "Selecione máquina ou extensão" : "Selecione uma máquina"
                   }
                   required
                 />
 
-                {['start_allocation', 'request_allocation', 'extension_attach', 'transport_arrival'].includes(newEvent.event_type) && (
+                {['start_allocation', 'request_allocation', 'transport_arrival'].includes(newEvent.event_type) && (
                   <CustomDropdown
                     label="Jobsite *"
                     value={newEvent.site_id}
@@ -541,6 +562,45 @@ export default function CreateEventModal({
                     placeholder="Selecione um jobsite"
                     required
                   />
+                )}
+
+                {newEvent.event_type === 'extension_attach' && (
+                  <>
+                    <CustomDropdown
+                      label="Jobsite *"
+                      value={newEvent.site_id}
+                      onChange={(value) => setNewEvent({ ...newEvent, site_id: value })}
+                      options={[
+                        { value: '', label: 'Selecione...' },
+                        ...sites.map((site) => ({
+                          value: site.id,
+                          label: site.title,
+                          description: site.address
+                        }))
+                      ]}
+                      placeholder="Selecione um jobsite"
+                      required
+                    />
+                    
+                    {newEvent.site_id && (
+                      <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg">
+                        <p className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">
+                          Máquinas alocadas neste site:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {machinesAtSite.length > 0 ? (
+                            machinesAtSite.map((unit, idx) => (
+                              <span key={idx} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100 rounded text-[10px] font-bold">
+                                {unit}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[10px] text-blue-500 italic">Nenhuma máquina encontrada</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -622,7 +682,7 @@ export default function CreateEventModal({
                 )}
               </div>
 
-              {newEvent.event_type === 'request_allocation' && (
+              {['request_allocation', 'start_allocation'].includes(newEvent.event_type) && (
                 <CustomDropdown
                   label="Fornecedor *"
                   value={newEvent.supplier_id}
@@ -739,182 +799,245 @@ export default function CreateEventModal({
                 />
               )}
 
-              {MANDATORY_DOC_TYPES.includes(newEvent.event_type) && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Documentos (Imagens ou PDF) *
-                  </label>
-                  {/* Documentos existentes (apenas em edição) */}
-                  {editingEventId && (existingFiles.length > 0 || loadingExisting) && (
-                    <div className="mb-4">
-                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">
-                        Documentos já anexados
-                      </span>
-                      {loadingExisting ? (
-                        <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
-                          <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin" />
-                          Carregando arquivos...
-                        </div>
-                      ) : (
-                        <ul className="divide-y divide-gray-100 dark:divide-gray-800 border border-gray-100 dark:border-gray-800 rounded-lg overflow-hidden bg-gray-50/50 dark:bg-gray-900/20">
-                          {existingFiles.map((file, index) => (
-                            <li key={index} className="flex items-center justify-between py-2 px-3">
-                              <div className="flex items-center gap-2 overflow-hidden">
-                                <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                <span className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                                  {file.name.split('_').slice(1).join('_') || file.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-gray-400">Existente</span>
-                                <button 
-                                  onClick={async () => {
-                                    if (confirm('Deseja realmente excluir este documento permanentemente?')) {
-                                      try {
-                                        const { supabase } = await import('@/lib/supabase')
-                                        const { error } = await supabase.storage
-                                          .from('Allocation Documents')
-                                          .remove([`${editingEventId}/${file.name}`])
-                                        
-                                        if (!error) {
-                                          setExistingFiles(prev => prev.filter((_, i) => i !== index))
-                                        } else {
-                                          alert('Erro ao excluir arquivo')
-                                        }
-                                      } catch (err) {
-                                        console.error('Error deleting file:', err)
-                                      }
-                                    }
-                                  }}
-                                  className="text-gray-400 hover:text-red-500 p-1 transition-colors"
-                                  title="Excluir permanentemente"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              {newEvent.event_type && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Documentos (Imagens ou PDF) {MANDATORY_DOC_TYPES.includes(newEvent.event_type) ? '*' : ''}
+                    </label>
+                    {/* Documentos existentes (apenas em edição) */}
+                    {editingEventId && (existingFiles.length > 0 || loadingExisting) && (
+                      <div className="mb-4">
+                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">
+                          Documentos já anexados
+                        </span>
+                        {loadingExisting ? (
+                          <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
+                            <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin" />
+                            Carregando arquivos...
+                          </div>
+                        ) : (
+                          <ul className="divide-y divide-gray-100 dark:divide-gray-800 border border-gray-100 dark:border-gray-800 rounded-lg overflow-hidden bg-gray-50/50 dark:bg-gray-900/20">
+                            {existingFiles.map((file, index) => (
+                              <li key={index} className="flex items-center justify-between py-2 px-3">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                  <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                   </svg>
-                                </button>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-
-                  <div 
-                    className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-lg transition-colors ${
-                      isDragging 
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
-                        : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500'
-                    }`}
-                    onDragOver={(e) => {
-                      e.preventDefault()
-                      setIsDragging(true)
-                    }}
-                    onDragLeave={(e) => {
-                      e.preventDefault()
-                      setIsDragging(false)
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      setIsDragging(false)
-                      const droppedFiles = Array.from(e.dataTransfer.files)
-                      const validFiles = droppedFiles.filter(file => {
-                        if (file.size > 10 * 1024 * 1024) {
-                          alert(`Arquivo ${file.name} excede o limite de 10MB e não será adicionado.`)
-                          return false
-                        }
-                        const isValidType = file.type.startsWith('image/') || file.type === 'application/pdf'
-                        if (!isValidType) {
-                          alert(`Arquivo ${file.name} não é uma imagem ou PDF.`)
-                          return false
-                        }
-                        return true
-                      })
-                      setFiles(prev => [...prev, ...validFiles])
-                      if (validationError && validationError.includes('documento')) {
-                        setValidationError(null)
-                      }
-                    }}
-                  >
-                    <div className="space-y-1 text-center">
-                      <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      <div className="flex text-sm text-gray-600 dark:text-gray-400">
-                        <label htmlFor="file-upload" className="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-                          <span>Fazer upload de arquivos</span>
-                          <input 
-                            id="file-upload" 
-                            name="file-upload" 
-                            type="file" 
-                            className="sr-only" 
-                            multiple 
-                            accept="image/*,application/pdf"
-                            onChange={(e) => {
-                              const selectedFiles = Array.from(e.target.files || [])
-                              const validFiles = selectedFiles.filter(file => {
-                                if (file.size > 10 * 1024 * 1024) {
-                                  alert(`Arquivo ${file.name} excede o limite de 10MB e não será adicionado.`)
-                                  return false
-                                }
-                                return true
-                              })
-                              setFiles(prev => [...prev, ...validFiles])
-                              if (validationError && validationError.includes('documento')) {
-                                setValidationError(null)
-                              }
-                            }}
-                          />
-                        </label>
-                        <p className="pl-1">ou arraste e solte</p>
+                                  <span className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                                    {file.name.split('_').slice(1).join('_') || file.name}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-gray-400">Existente</span>
+                                  <button 
+                                    onClick={async () => {
+                                      if (confirm('Deseja realmente excluir este documento permanentemente?')) {
+                                        try {
+                                          const { supabase } = await import('@/lib/supabase')
+                                          const { error } = await supabase.storage
+                                            .from('Allocation Documents')
+                                            .remove([`${editingEventId}/${file.name}`])
+                                          
+                                          if (!error) {
+                                            setExistingFiles(prev => prev.filter((_, i) => i !== index))
+                                          } else {
+                                            alert('Erro ao excluir arquivo')
+                                          }
+                                        } catch (err) {
+                                          console.error('Error deleting file:', err)
+                                        }
+                                      }
+                                    }}
+                                    className="text-gray-400 hover:text-red-500 p-1 transition-colors"
+                                    title="Excluir permanentemente"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        PNG, JPG, PDF até 10MB
-                      </p>
+                    )}
+
+                    <div 
+                      className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-lg transition-colors ${
+                        isDragging 
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+                          : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500'
+                      }`}
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        setIsDragging(true)
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault()
+                        setIsDragging(false)
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        setIsDragging(false)
+                        const droppedFiles = Array.from(e.dataTransfer.files)
+                        const validFiles = droppedFiles.filter(file => {
+                          if (file.size > 10 * 1024 * 1024) {
+                            alert(`Arquivo ${file.name} excede o limite de 10MB e não será adicionado.`)
+                            return false
+                          }
+                          const isValidType = file.type.startsWith('image/') || file.type === 'application/pdf'
+                          if (!isValidType) {
+                            alert(`Arquivo ${file.name} não é uma imagem ou PDF.`)
+                            return false
+                          }
+                          return true
+                        })
+                        setFiles(prev => [...prev, ...validFiles])
+                        if (validationError && validationError.includes('documento')) {
+                          setValidationError(null)
+                        }
+                      }}
+                    >
+                      <div className="space-y-1 text-center">
+                        <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                          <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <div className="flex text-sm text-gray-600 dark:text-gray-400">
+                          <label htmlFor="file-upload" className="relative cursor-pointer bg-white dark:bg-gray-800 rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                            <span>Fazer upload de arquivos</span>
+                            <input 
+                              id="file-upload" 
+                              name="file-upload" 
+                              type="file" 
+                              className="sr-only" 
+                              multiple 
+                              accept="image/*,application/pdf"
+                              onChange={(e) => {
+                                const selectedFiles = Array.from(e.target.files || [])
+                                const validFiles = selectedFiles.filter(file => {
+                                  if (file.size > 10 * 1024 * 1024) {
+                                    alert(`Arquivo ${file.name} excede o limite de 10MB e não será adicionado.`)
+                                    return false
+                                  }
+                                  return true
+                                })
+                                setFiles(prev => [...prev, ...validFiles])
+                                if (validationError && validationError.includes('documento')) {
+                                  setValidationError(null)
+                                }
+                              }}
+                            />
+                          </label>
+                          <p className="pl-1">ou arraste e solte</p>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          PNG, JPG, PDF até 10MB
+                        </p>
+                      </div>
+                    </div>
+
+                    {files.length > 0 && (
+                      <ul className="mt-3 divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                        {files.map((file, index) => (
+                          <li key={index} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-900/30">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                              </svg>
+                              <span className="text-xs text-gray-700 dark:text-gray-300 truncate">{file.name}</span>
+                              <span className="text-[10px] text-gray-500 flex-shrink-0">({(file.size / 1024).toFixed(0)} KB)</span>
+                            </div>
+                            <button 
+                              onClick={() => setFiles(prev => prev.filter((_, i) => i !== index))}
+                              className="text-red-500 hover:text-red-700 p-1"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Links do SharePoint {MANDATORY_DOC_TYPES.includes(newEvent.event_type) ? '*' : ''}
+                    </label>
+                    <div className="space-y-2">
+                      {(newEvent.sharepoint_links || []).map((linkObj, index) => (
+                        <div key={index} className="space-y-2 p-3 bg-gray-50 dark:bg-gray-900/30 rounded-lg border border-gray-100 dark:border-gray-700">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={linkObj.label}
+                              onChange={(e) => {
+                                const newLinks = [...(newEvent.sharepoint_links || [])]
+                                newLinks[index] = { ...newLinks[index], label: e.target.value }
+                                setNewEvent({ ...newEvent, sharepoint_links: newLinks })
+                              }}
+                              className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                              placeholder="Título do link (ex: Relatório, Foto...)"
+                            />
+                            <button
+                              onClick={() => {
+                                const newLinks = (newEvent.sharepoint_links || []).filter((_, i) => i !== index)
+                                setNewEvent({ ...newEvent, sharepoint_links: newLinks })
+                              }}
+                              className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                          <input
+                            type="url"
+                            value={linkObj.url}
+                            onChange={(e) => {
+                              const newLinks = [...(newEvent.sharepoint_links || [])]
+                              newLinks[index] = { ...newLinks[index], url: e.target.value }
+                              setNewEvent({ ...newEvent, sharepoint_links: newLinks })
+                            }}
+                            className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                            placeholder="https://sharepoint.com/..."
+                          />
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => {
+                          setNewEvent({ 
+                            ...newEvent, 
+                            sharepoint_links: [...(newEvent.sharepoint_links || []), { label: '', url: '' }] 
+                          })
+                        }}
+                        className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Adicionar Link
+                      </button>
                     </div>
                   </div>
 
-                  {files.length > 0 && (
-                    <ul className="mt-3 divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                      {files.map((file, index) => (
-                        <li key={index} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-900/30">
-                          <div className="flex items-center gap-2 overflow-hidden">
-                            <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                            </svg>
-                            <span className="text-xs text-gray-700 dark:text-gray-300 truncate">{file.name}</span>
-                            <span className="text-[10px] text-gray-500 flex-shrink-0">({(file.size / 1024).toFixed(0)} KB)</span>
-                          </div>
-                          <button 
-                            onClick={() => setFiles(prev => prev.filter((_, i) => i !== index))}
-                            className="text-red-500 hover:text-red-700 p-1"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Notas/Observações
+                    </label>
+                    <textarea
+                      value={newEvent.notas}
+                      onChange={(e) => setNewEvent({ ...newEvent, notas: e.target.value })}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="Observações adicionais..."
+                    />
+                  </div>
+                </>
               )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Notas/Observações
-                </label>
-                <textarea
-                  value={newEvent.notas}
-                  onChange={(e) => setNewEvent({ ...newEvent, notas: e.target.value })}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="Observações adicionais..."
-                />
-              </div>
             </>
           )}
         </div>

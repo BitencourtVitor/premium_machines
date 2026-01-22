@@ -13,7 +13,8 @@ export default function MapLegend({ isDark }: MapLegendProps) {
     { color: isDark ? '#4ADE80' : '#16A34A', label: 'ATIVA' },
     { color: isDark ? '#60A5FA' : '#2563EB', label: 'AGENDADA' },
     { color: isDark ? '#F472B6' : '#DB2777', label: 'MOVIDA' },
-    { color: isDark ? '#A78BFA' : '#9333EA', label: 'ENCERRADA' },
+    { color: isDark ? '#A78BFA' : '#9333EA', label: 'EM TRÂNSITO' },
+    { color: isDark ? '#818CF8' : '#4F46E5', label: 'ENCERRADA' },
     { color: isDark ? '#9CA3AF' : '#6B7280', label: 'SEM ALOCAÇÃO' },
   ]
 

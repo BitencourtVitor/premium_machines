@@ -3,7 +3,7 @@ import { Site } from './types'
 import { MACHINE_STATUS_LABELS } from '@/lib/permissions'
 
 // Função para obter cores adaptadas ao tema
-export const getThemeColors = (colorType: 'neutral' | 'blue' | 'red' | 'green' | 'yellow' | 'orange' | 'purple' | 'pink', isDark: boolean) => {
+export const getThemeColors = (colorType: 'neutral' | 'blue' | 'red' | 'green' | 'yellow' | 'orange' | 'purple' | 'pink' | 'indigo', isDark: boolean) => {
   const colors: Record<string, { bg: string; text: string }> = {
     neutral: {
       bg: isDark ? '#374151' : '#6B7280', // gray-700 : gray-500
@@ -36,6 +36,10 @@ export const getThemeColors = (colorType: 'neutral' | 'blue' | 'red' | 'green' |
     pink: {
       bg: isDark ? '#F472B6' : '#DB2777', // pink-400 : pink-600
       text: '#FFFFFF'
+    },
+    indigo: {
+      bg: isDark ? '#818CF8' : '#4F46E5', // indigo-400 : indigo-600
+      text: '#FFFFFF'
     }
   }
   return colors[colorType] || colors.neutral
@@ -46,6 +50,7 @@ export const getClusterStatusColor = (sites: Site[], isDark: boolean) => {
   let hasMaintenance = false
   let hasExceeded = false
   let hasActive = false
+  let hasInTransit = false
   let hasScheduled = false
   let hasMoved = false
   let hasHistory = false
@@ -72,41 +77,41 @@ export const getClusterStatusColor = (sites: Site[], isDark: boolean) => {
         status = 'exceeded'
       }
       
-      const isMoved = (status === 'inactive' || status === 'available') && 
-                      machine.current_site_id && 
-                      machine.current_site_id !== site.id;
-
       if (status === 'maintenance') {
         hasMaintenance = true
       } else if (status === 'exceeded') {
         hasExceeded = true
       } else if (status === 'allocated' || status === 'active') {
         hasActive = true
+      } else if (status === 'in_transit') {
+        hasInTransit = true
+      } else if (status === 'moved') {
+        hasMoved = true
       } else if (status === 'scheduled') {
         hasScheduled = true
-      } else if (isMoved) {
-        hasMoved = true
-      } else if (status === 'inactive') {
+      } else if (status === 'inactive' || status === 'available') {
         hasHistory = true
       }
     }
   }
 
-  // Definir cor baseada na prioridade: Manutenção > Excedida > Ativa > Agendada > Movida > Histórico > Nunca
+  // Definir cor baseada na prioridade: Manutenção > Excedida > Ativa > Trânsito > Agendada > Movida > Histórico > Nunca
   if (hasMaintenance) {
-    return getThemeColors('orange', isDark) // Crítico: Manutenção
+    return getThemeColors('orange', isDark)
   } else if (hasExceeded) {
-    return getThemeColors('red', isDark) // Crítico: Excedida
+    return getThemeColors('red', isDark)
   } else if (hasActive) {
-    return getThemeColors('green', isDark) // Ativa: Em operação
+    return getThemeColors('green', isDark)
+  } else if (hasInTransit) {
+    return getThemeColors('purple', isDark)
   } else if (hasScheduled) {
-    return getThemeColors('blue', isDark) // Agendada: Futura
+    return getThemeColors('blue', isDark)
   } else if (hasMoved) {
-    return getThemeColors('pink', isDark) // Movida: Saiu da obra
+    return getThemeColors('pink', isDark)
   } else if (hasHistory) {
-    return getThemeColors('purple', isDark) // Histórico: Já teve algo
+    return getThemeColors('indigo', isDark)
   } else {
-    return getThemeColors('neutral', isDark) // Nunca houve: Vazio
+    return getThemeColors('neutral', isDark)
   }
 }
 
@@ -209,12 +214,13 @@ export const groupNearbySites = (sites: Site[], mapInstance: mapboxgl.Map, thres
 export const createLocationMarker = (site: Site, currentIsDark: boolean, onClick: (e?: Event) => void, isSelected: boolean = false) => {
   const machines = site.all_machines || site.machines || []
   // Determine status flags
-  let hasActive = false
-  let hasExceeded = false
-  let hasMaintenance = false
-  let hasScheduled = false
-  let hasMoved = false
-  let hasHistory = false
+  let hasActive = false;
+  let hasExceeded = false;
+  let hasMaintenance = false;
+  let hasScheduled = false;
+  let hasInTransit = false;
+  let hasMoved = false;
+  let hasHistory = false;
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -233,33 +239,32 @@ export const createLocationMarker = (site: Site, currentIsDark: boolean, onClick
       status = 'exceeded'
     }
 
-    const isMoved = (status === 'inactive' || status === 'available') && 
-                    machine.current_site_id && 
-                    machine.current_site_id !== site.id;
-
     if (status === 'maintenance') hasMaintenance = true
     else if (status === 'exceeded') hasExceeded = true
     else if (status === 'allocated' || status === 'active') hasActive = true
+    else if (status === 'in_transit') hasInTransit = true
+    else if (status === 'moved') hasMoved = true
     else if (status === 'scheduled') hasScheduled = true
-    else if (isMoved) hasMoved = true
-    else if (status === 'inactive') hasHistory = true
+    else if (status === 'inactive' || status === 'available') hasHistory = true
   })
 
-  let baseColorType: 'neutral' | 'blue' | 'red' | 'green' | 'yellow' | 'orange' | 'purple' | 'pink' = 'neutral'
+  let baseColorType: 'neutral' | 'blue' | 'red' | 'green' | 'yellow' | 'orange' | 'purple' | 'pink' | 'indigo' = 'neutral'
   
-  // Prioridade: Manutenção > Excedida > Ativa > Agendada > Movida > Histórico > Nunca
+  // Prioridade: Manutenção > Excedida > Ativa > Trânsito > Agendada > Movida > Histórico > Nunca
   if (hasMaintenance) {
     baseColorType = 'orange'
   } else if (hasExceeded) {
     baseColorType = 'red'
   } else if (hasActive) {
     baseColorType = 'green'
+  } else if (hasInTransit) {
+    baseColorType = 'purple'
   } else if (hasScheduled) {
     baseColorType = 'blue'
   } else if (hasMoved) {
     baseColorType = 'pink'
   } else if (hasHistory) {
-    baseColorType = 'purple'
+    baseColorType = 'indigo'
   } else {
     baseColorType = 'neutral'
   }
@@ -333,7 +338,7 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
                 finalStatus = 'exceeded';
               }
               
-              return finalStatus === 'allocated' || finalStatus === 'active' || finalStatus === 'exceeded';
+              return finalStatus === 'allocated' || finalStatus === 'active' || finalStatus === 'exceeded' || finalStatus === 'in_transit';
             }).length;
             
             return `Equipamentos (${workingCount} ativos de ${machines.length})`;
@@ -360,37 +365,31 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
                   finalStatus = 'exceeded';
                 }
 
-                let label = 'Encerrada';
+                let label = MACHINE_STATUS_LABELS[finalStatus] || finalStatus;
                 let statusColor = '';
 
-                const isMoved = (finalStatus === 'inactive' || finalStatus === 'available') && 
-                                machine.current_site_id && 
-                                machine.current_site_id !== site.id;
-
-                if (isMoved) {
-                  label = 'MOVIDA';
+                if (finalStatus === 'in_transit') {
+                  statusColor = `background: ${currentIsDark ? '#4c1d95' : '#f3e8ff'}; color: ${currentIsDark ? '#a78bfa' : '#6b21a8'}; border: 1px solid ${currentIsDark ? '#9333ea' : '#e9d5ff'};`;
+                } else if (finalStatus === 'moved') {
                   statusColor = `background: ${currentIsDark ? '#831843' : '#fce7f3'}; color: ${currentIsDark ? '#f9a8d4' : '#9d174d'}; border: 1px solid ${currentIsDark ? '#db2777' : '#fbcfe8'}; font-weight: 700;`;
-                } else if (finalStatus === 'allocated' || finalStatus === 'active') {
-                  label = 'Ativa';
-                  statusColor = `background: ${currentIsDark ? '#064e3b' : '#dcfce7'}; color: ${currentIsDark ? '#6ee7b7' : '#166534'};`;
                 } else if (finalStatus === 'exceeded') {
-                  label = 'Ativa (Excedida)';
                   statusColor = `background: ${currentIsDark ? '#7f1d1d' : '#fee2e2'}; color: ${currentIsDark ? '#fca5a5' : '#991b1b'}; font-weight: 700; border: 1px solid ${currentIsDark ? '#f87171' : '#fecaca'};`;
+                } else if (finalStatus === 'allocated' || finalStatus === 'active') {
+                  label = MACHINE_STATUS_LABELS.active;
+                  statusColor = `background: ${currentIsDark ? '#064e3b' : '#dcfce7'}; color: ${currentIsDark ? '#6ee7b7' : '#166534'};`;
                 } else if (finalStatus === 'maintenance') {
-                  label = 'Manutenção';
                   statusColor = `background: ${currentIsDark ? '#7f1d1d' : '#fee2e2'}; color: ${currentIsDark ? '#fca5a5' : '#991b1b'};`;
                 } else if (finalStatus === 'scheduled') {
-                  label = 'Agendada';
                   statusColor = `background: ${currentIsDark ? '#1e3a8a' : '#dbeafe'}; color: ${currentIsDark ? '#93c5fd' : '#1e40af'};`;
                 } else if (finalStatus === 'available' || finalStatus === 'inactive') {
                   // Se for na sede, é "Disponível", se for em obra é "Encerrada"
-                  label = site.is_headquarters ? 'Disponível' : 'Encerrada';
+                  label = site.is_headquarters ? MACHINE_STATUS_LABELS.available : MACHINE_STATUS_LABELS.finished;
                   statusColor = site.is_headquarters 
                     ? `background: ${currentIsDark ? '#1e3a8a' : '#dbeafe'}; color: ${currentIsDark ? '#93c5fd' : '#1e40af'};`
-                    : `background: ${currentIsDark ? '#4c1d95' : '#f3e8ff'}; color: ${currentIsDark ? '#c4b5fd' : '#6d28d9'};`;
+                    : `background: ${currentIsDark ? '#312e81' : '#e0e7ff'}; color: ${currentIsDark ? '#a5b4fc' : '#3730a3'}; border: 1px solid ${currentIsDark ? '#4338ca' : '#c7d2fe'};`;
                 } else {
-                  label = 'Encerrada';
-                  statusColor = `background: ${currentIsDark ? '#4c1d95' : '#f3e8ff'}; color: ${currentIsDark ? '#c4b5fd' : '#6d28d9'};`;
+                  label = MACHINE_STATUS_LABELS.finished;
+                  statusColor = `background: ${currentIsDark ? '#312e81' : '#e0e7ff'}; color: ${currentIsDark ? '#a5b4fc' : '#3730a3'}; border: 1px solid ${currentIsDark ? '#4338ca' : '#c7d2fe'};`;
                 }
 
                 return `

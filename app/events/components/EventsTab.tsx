@@ -23,10 +23,10 @@ import BaseList from '@/app/components/BaseList'
 import ListActionButton from '@/app/components/ListActionButton'
 
 interface EventsTabProps {
-  filterStatus: string[]
-  setFilterStatus: (status: string[]) => void
   filterType: string[]
   setFilterType: (type: string[]) => void
+  searchTerm: string
+  setSearchTerm: (term: string) => void
   filteredEvents: AllocationEvent[]
   loadingEvents: boolean
   loadEvents: () => void
@@ -34,6 +34,7 @@ interface EventsTabProps {
   setShowCreateModal: (show: boolean) => void
   handleNewEvent: () => void
   handleEditEvent: (event: AllocationEvent) => void
+  handleStartFromRequest: (event: AllocationEvent) => void
   handleDeleteEvent: (event: AllocationEvent) => void
   machineTypes: any[]
   startDate: string
@@ -43,10 +44,10 @@ interface EventsTabProps {
 }
 
 export default function EventsTab({
-  filterStatus,
-  setFilterStatus,
   filterType,
   setFilterType,
+  searchTerm,
+  setSearchTerm,
   filteredEvents,
   loadingEvents,
   loadEvents,
@@ -54,6 +55,7 @@ export default function EventsTab({
   setShowCreateModal,
   handleNewEvent,
   handleEditEvent,
+  handleStartFromRequest,
   handleDeleteEvent,
   machineTypes,
   startDate,
@@ -81,31 +83,24 @@ export default function EventsTab({
       loading={loadingEvents}
       onRefresh={loadEvents}
       showRefresh={true}
+      showSearch={true}
+      searchTerm={searchTerm}
+      onSearchChange={setSearchTerm}
+      searchPlaceholder="Buscar por máquina, obra ou solicitante..."
       showFilter={true}
-      isFiltering={filterStatus.length > 0 || filterType.length > 0 || startDate !== '' || endDate !== ''}
+      isFiltering={filterType.length > 0 || startDate !== '' || endDate !== '' || searchTerm !== ''}
       filterConfig={{
         title: 'Filtrar Eventos',
         popoverWidth: 'w-80'
       }}
       onClearFilters={() => {
-        setFilterStatus([])
         setFilterType([])
         setStartDate('')
         setEndDate('')
+        setSearchTerm('')
       }}
       filterPanelContent={
         <>
-          <MultiSelectDropdown
-            label="Status"
-            value={filterStatus}
-            onChange={setFilterStatus}
-            options={Object.entries(EVENT_STATUS_LABELS).map(([value, label]) => ({
-              value,
-              label: label as string
-            }))}
-            placeholder="Todos os status"
-          />
-
           <MultiSelectDropdown
             label="Tipo de Evento"
             value={filterType}
@@ -239,9 +234,18 @@ export default function EventsTab({
             {/* Actions */}
             {(user?.can_register_events || user?.role === 'admin' || user?.role === 'dev') && (
               <div className="flex items-center gap-2 self-start md:self-center border-t md:border-t-0 border-gray-100 dark:border-gray-700 pt-3 md:pt-0 w-full md:w-auto mt-2 md:mt-0 justify-end md:justify-start">
+                {event.event_type === 'request_allocation' && (
+                  <ListActionButton
+                    icon={<FiCheckCircle className="w-5 h-5" />}
+                    onClick={() => handleStartFromRequest(event)}
+                    variant="green"
+                    title="Iniciar Alocação"
+                  />
+                )}
                 <EventDocumentPopover 
                   eventId={event.id} 
                   unitNumber={event.machine?.unit_number || 'S/N'} 
+                  sharepointLinks={event.sharepoint_links}
                 />
                 <ListActionButton
                   icon="edit"

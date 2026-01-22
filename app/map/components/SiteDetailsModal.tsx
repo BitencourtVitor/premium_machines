@@ -22,6 +22,8 @@ export default function SiteDetailsModal({
   allocations,
   events
 }: SiteDetailsModalProps) {
+
+
   const [calendarMonth, setCalendarMonth] = useState(new Date())
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null)
   const [selectedAllocationId, setSelectedAllocationId] = useState<string | null>(null)
@@ -129,13 +131,50 @@ export default function SiteDetailsModal({
     return getSystemDateStr(dateToUse)
   }, [allocations, getSystemDateStr, selectedAllocationId])
 
+  const getDaySite = useCallback((date: Date, entityId: string | null, allEvents: any[]) => {
+    if (!entityId) return null
+    const dateStr = getSystemDateStr(date)
+    const entityEvents = getEntityEvents(allEvents, entityId)
+    const sortedEvents = [...entityEvents].sort((a, b) => 
+      new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
+    )
+    
+    let currentSite = null
+    for (const event of sortedEvents) {
+      const eventDateStr = getSystemDateStr(event.event_date)
+      if (eventDateStr > dateStr) break
+      
+      // Consideramos apenas eventos aprovados ou de abastecimento
+      if (event.status !== 'approved' && event.event_type !== 'refueling') continue
+
+      switch (event.event_type) {
+        case 'start_allocation':
+        case 'extension_attach':
+        case 'transport_arrival':
+          currentSite = event.site
+          break
+        
+        case 'transport_start':
+          // Ao iniciar transporte, ela tecnicamente saiu da obra anterior mas ainda não chegou na nova
+          // No entanto, para fins de feedback visual de "em outra obra", mantemos o site anterior
+          // até que ela chegue no novo. Se o usuário quiser ser mais rigoroso, pode setar null aqui.
+          break
+
+        case 'end_allocation':
+        case 'extension_detach':
+          if (eventDateStr < dateStr) {
+            currentSite = null
+          }
+          break
+      }
+    }
+    return currentSite
+  }, [getSystemDateStr, getEntityEvents])
+
   const getDayStatus = useCallback((date: Date, entityId: string | null, allEvents: any[]) => {
-    if (!entityId) return 'not-allocated'
+    if (!entityId) return { status: 'not-allocated', isOtherSite: false }
 
     const dateStr = getSystemDateStr(date)
-    const todayStr = getSystemDateStr(new Date())
-    
-    // IMPORTANTE: Usamos todos os eventos da máquina, não apenas desta obra
     const entityEvents = getEntityEvents(allEvents, entityId)
     const sortedEvents = [...entityEvents].sort((a, b) => 
       new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
@@ -144,12 +183,12 @@ export default function SiteDetailsModal({
     let isAllocated = false
     let isInDowntime = false
     let isInTransit = false
+    let currentSiteId = null
 
     for (const event of sortedEvents) {
       const eventDateStr = getSystemDateStr(event.event_date)
       if (eventDateStr > dateStr) break
       
-      // Consideramos eventos aprovados ou de abastecimento (que indicam atividade)
       if (event.status !== 'approved' && event.event_type !== 'refueling') continue
 
       switch (event.event_type) {
@@ -158,7 +197,7 @@ export default function SiteDetailsModal({
         case 'transport_arrival':
           isAllocated = true
           isInDowntime = false
-          // No dia da chegada, o transporte ainda é a prioridade visual (roxo)
+          currentSiteId = event.site?.id
           if (event.event_type === 'transport_arrival' && eventDateStr === dateStr) {
             isInTransit = true
           } else {
@@ -168,18 +207,15 @@ export default function SiteDetailsModal({
         
         case 'transport_start':
           isInTransit = true
-          // O usuário ressaltou que alocação e presença física são coisas distintas.
-          // Mesmo em trânsito, a máquina continua "alocada" comercialmente.
-          // isAllocated = true // Mantemos como true se já estava alocada
           break
 
         case 'end_allocation':
         case 'extension_detach':
-          // A máquina só deixa de estar alocada no dia SEGUINTE ao fim real
           if (eventDateStr < dateStr) {
             isAllocated = false
             isInTransit = false
             isInDowntime = false
+            currentSiteId = null
           }
           break
 
@@ -190,7 +226,6 @@ export default function SiteDetailsModal({
 
         case 'downtime_end':
         case 'end_downtime':
-          // Fica em manutenção até o fim do dia do evento
           if (eventDateStr < dateStr) {
             isInDowntime = false
           }
@@ -198,38 +233,45 @@ export default function SiteDetailsModal({
       }
     }
 
+    const isOtherSite = currentSiteId && site?.id && String(currentSiteId) !== String(site.id)
+    let status: 'not-allocated' | 'working' | 'working-exceeded' | 'maintenance' | 'in-transit' = 'not-allocated'
+
     if (isAllocated) {
       const expirationDate = getExpirationDate(entityId)
-      // Se a data do calendário for POSTERIOR ao vencimento planejado
       if (expirationDate && dateStr > expirationDate) {
-        // Se estiver em manutenção ou transporte no dia excedido, 
-        // priorizamos a visualização do estado físico, mas garantimos que 
-        // o 'working-exceeded' seja o fallback se não houver outro estado especial.
-        if (isInTransit) return 'in-transit'
-        if (isInDowntime) return 'maintenance'
-        return 'working-exceeded'
+        if (isInTransit) status = 'in-transit'
+        else if (isInDowntime) status = 'maintenance'
+        else status = 'working-exceeded'
+      } else {
+        if (isInTransit) status = 'in-transit'
+        else if (isInDowntime) status = 'maintenance'
+        else status = 'working'
       }
-      
-      if (isInTransit) return 'in-transit'
-      if (isInDowntime) return 'maintenance'
-      return 'working'
     }
 
-    return 'not-allocated'
-  }, [getExpirationDate, getSystemDateStr, getEntityEvents])
+    return { status, isOtherSite }
+  }, [getExpirationDate, getSystemDateStr, getEntityEvents, site?.id])
 
   const getAllocationStatusToday = (allocation: any) => {
     const machineId = allocation.machine_id
-    const status = getDayStatus(new Date(), machineId, filteredEvents)
-    const isMaintenance = status === 'maintenance'
-    const isExceeded = status === 'working-exceeded'
+    const { status: dayStatus } = getDayStatus(new Date(), machineId, filteredEvents)
     
-    // Uma alocação é considerada ativa se o seu status no ciclo for 'allocated'
-    // E se não houver um evento de fim real (end_allocation)
-    const isStillAllocated = allocation.status === 'allocated'
-    const today = getSystemDateStr(new Date())
-    const dateToUse = allocation.start_date || allocation.allocation_start
-    const startDate = dateToUse ? getSystemDateStr(dateToUse) : null
+    // Busca se existe manutenção ativa para esta máquina em QUALQUER lugar
+    const allMachineEvents = getEntityEvents(filteredEvents, machineId)
+    const hasActiveDowntime = allMachineEvents.some(e => 
+      (e.event_type === 'downtime_start' || e.event_type === 'start_downtime') && 
+      e.status === 'approved' &&
+      !allMachineEvents.some(end => 
+        (end.event_type === 'downtime_end' || end.event_type === 'end_downtime') && 
+        new Date(end.event_date) > new Date(e.event_date)
+      )
+    )
+
+    const isMaintenance = dayStatus === 'maintenance' || hasActiveDowntime
+    const isExceeded = dayStatus === 'working-exceeded'
+    const isInTransit = dayStatus === 'in-transit' || allocation.status === 'in_transit'
+    
+
 
     if (isMaintenance) {
       return {
@@ -239,13 +281,45 @@ export default function SiteDetailsModal({
       }
     }
 
+    if (isInTransit) {
+      // Prioridade absoluta para a presença física:
+      // Se is_currently_at_site for true, ela está CHEGANDO nesta obra (Em trânsito)
+      // Se is_currently_at_site for false, ela SAIU desta obra (Movida)
+      const isCurrentlyHere = allocation.is_currently_at_site === true
+      
+      // Se for o registro da obra de destino, é 'Em trânsito'
+      // Se for o registro da obra de origem, é 'Movida'
+      return {
+        isActive: true,
+        label: isCurrentlyHere ? 'Em trânsito' : 'Movida',
+        className: isCurrentlyHere 
+          ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+          : 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400 font-bold border border-pink-200'
+      }
+    }
+
     if (isExceeded) {
       return {
         isActive: true,
-        label: 'Ativa (Excedida)',
-        className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-semibold'
+        label: 'Ativa Excedida',
+        className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-semibold border border-red-200'
       }
     }
+    
+    // Se não estiver fisicamente aqui e não for sede, é 'Movida'
+    if (allocation.is_currently_at_site === false && !site?.is_headquarters) {
+      return {
+        isActive: true,
+        label: 'Movida',
+        className: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400 font-bold border border-pink-200'
+      }
+    }
+    
+    // Uma alocação é considerada ativa se o seu status no ciclo for 'allocated'
+    const isStillAllocated = allocation.status === 'allocated' || allocation.status === 'active' || allocation.status === 'exceeded'
+    const today = getSystemDateStr(new Date())
+    const dateToUse = allocation.start_date || allocation.allocation_start
+    const startDate = dateToUse ? getSystemDateStr(dateToUse) : null
 
     if (isStillAllocated) {
       const expirationDateStr = allocation.end_date ? getSystemDateStr(allocation.end_date) : null
@@ -254,7 +328,7 @@ export default function SiteDetailsModal({
       if (expirationDateStr && todayStr > expirationDateStr) {
         return {
           isActive: true,
-          label: 'Ativa (Excedida)',
+          label: 'Ativa Excedida',
           className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-semibold border border-red-200'
         }
       }
@@ -283,7 +357,8 @@ export default function SiteDetailsModal({
 
   const todayStatus = useMemo(() => {
     if (!selectedMachineId) return null
-    return getDayStatus(new Date(), selectedMachineId, filteredEvents)
+    const { status } = getDayStatus(new Date(), selectedMachineId, filteredEvents)
+    return status
   }, [selectedMachineId, filteredEvents, getDayStatus])
 
   // Filtrar eventos para o histórico - Mostrar o ciclo completo da alocação selecionada
@@ -313,12 +388,17 @@ export default function SiteDetailsModal({
         
         // Se este evento NÃO é o de início, verificamos se ele encerra a LOCAÇÃO globalmente
         if (event.id !== selectedAllocationId) {
-          // 1. Fim de alocação ou desengate de extensão (Fim absoluto)
-          const isAbsoluteEnd = event.event_type === 'end_allocation' || event.event_type === 'extension_detach'
+          // 1. Fim de alocação ou desengate de extensão (Fim absoluto do ciclo de alocação)
+          // transport_start e transport_arrival NÃO encerram a alocação comercial, são eventos de movimentação
+          const isAbsoluteEnd = event.event_type === 'end_allocation' || 
+                               event.event_type === 'extension_detach'
           
-          // 2. Um NOVO início de alocação (significa que o ciclo anterior terminou, mesmo que sem evento de fim)
-          const isNewAllocationStart = (event.event_type === 'start_allocation' || event.event_type === 'extension_attach') && 
-                                       event.id !== selectedAllocationId
+          // 2. Um NOVO início de alocação (apenas start_allocation ou extension_attach)
+          // Se encontrarmos um novo início que seja diferente do atual e posterior a ele, o ciclo anterior acabou
+          const isNewAllocationStart = (event.event_type === 'start_allocation' || 
+                                       event.event_type === 'extension_attach') && 
+                                       event.id !== selectedAllocationId &&
+                                       new Date(event.event_date).getTime() > new Date(allMachineEvents.find(e => e.id === selectedAllocationId)?.event_date || 0).getTime()
 
           if (isAbsoluteEnd || isNewAllocationStart) {
             isTrackingThisAllocation = false
@@ -661,14 +741,20 @@ export default function SiteDetailsModal({
                                 }).sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
 
                                 if (dayEvents.length === 0) {
-                                  const status = getDayStatus(selectedDate, selectedMachineId, filteredEvents)
+                                  const { status, isOtherSite } = getDayStatus(selectedDate, selectedMachineId, filteredEvents)
                                   return (
                                     <div className="space-y-2">
-                                      <div className="p-2.5 bg-gray-50/80 dark:bg-gray-700/30 rounded-lg border border-gray-100 dark:border-gray-700/50">
-                                        <p className="text-[11px] text-gray-500 dark:text-gray-400 text-center font-medium">
-                                          {status === 'working' ? 'Máquina em operação.' : 
-                                           status === 'working-exceeded' ? 'Máquina em operação (Uso Excedido).' :
-                                           status === 'maintenance' ? 'Máquina em manutenção.' :
+                                      <div className={`p-2.5 rounded-lg border transition-all ${
+                                        isOtherSite 
+                                          ? 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-200/50 dark:border-amber-800/30' 
+                                          : 'bg-gray-50/80 dark:bg-gray-700/30 border-gray-100 dark:border-gray-700/50'
+                                      }`}>
+                                        <p className={`text-[11px] text-center font-medium ${
+                                          isOtherSite ? 'text-amber-700 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'
+                                        }`}>
+                                          {status === 'working' ? (isOtherSite ? 'Máquina em operação (Em outra obra).' : 'Máquina em operação.') : 
+                                           status === 'working-exceeded' ? (isOtherSite ? 'Máquina em operação (Uso Excedido em outra obra).' : 'Máquina em operação (Uso Excedido).') :
+                                           status === 'maintenance' ? (isOtherSite ? 'Máquina em manutenção (Em outra obra).' : 'Máquina em manutenção.') :
                                            status === 'in-transit' ? 'Máquina em transporte.' :
                                            'Nenhum evento registrado.'}
                                         </p>
@@ -730,19 +816,37 @@ export default function SiteDetailsModal({
                                     {dayEvents.map(event => {
                                       const config = getEventConfig(event.event_type)
                                       const Icon = config.icon
+                                      const isOtherSiteEvent = event.site?.id && site?.id && String(event.site.id) !== String(site.id)
+                                      
                                       return (
-                                        <div key={event.id} className="bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm">
+                                        <div key={event.id} className={`p-2 rounded-lg border shadow-sm transition-all ${
+                                          isOtherSiteEvent 
+                                            ? 'bg-amber-50/30 dark:bg-amber-900/5 border-amber-100 dark:border-amber-800/50' 
+                                            : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700'
+                                        }`}>
                                           <div className="flex items-center gap-2.5">
                                             <div className={`p-1.5 rounded ${config.bgColor} ${config.textColor}`}>
                                               <Icon size={12} />
                                             </div>
                                             <div className="min-w-0 flex-1">
-                                              <p className="text-[10px] font-bold text-gray-900 dark:text-white truncate">
-                                                {config.label}
-                                              </p>
+                                              <div className="flex items-center justify-between gap-2">
+                                                <p className="text-[10px] font-bold text-gray-900 dark:text-white truncate">
+                                                  {config.label}
+                                                </p>
+                                                {isOtherSiteEvent && (
+                                                  <span className="flex-shrink-0 px-1 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-[8px] font-bold uppercase rounded leading-none">
+                                                    Em outra obra
+                                                  </span>
+                                                )}
+                                              </div>
                                               <p className="text-[9px] text-gray-500">
                                                 {formatWithSystemTimezone(event.event_date, { hour: '2-digit', minute: '2-digit' })}
                                               </p>
+                                              {(event.event_type === 'transport_arrival' || event.event_type === 'start_allocation' || isOtherSiteEvent) && event.site?.address && (
+                                                <p className="text-[9px] text-gray-500 mt-0.5 italic">
+                                                  {event.site.address}
+                                                </p>
+                                              )}
                                             </div>
                                           </div>
                                         </div>
@@ -798,7 +902,7 @@ export default function SiteDetailsModal({
                                 const dayDate = new Date(currentDate)
                                 const dateStr = getSystemDateStr(dayDate)
                                 // Passamos 'filteredEvents' para consistência visual com o restante da modal
-                                const dayStatus = getDayStatus(dayDate, selectedMachineId, filteredEvents)
+                                const { status: dayStatus, isOtherSite } = getDayStatus(dayDate, selectedMachineId, filteredEvents)
                                 const isCurrentMonth = dayDate.getMonth() === month
                                 const isToday = dateStr === getSystemDateStr(new Date())
                                 const isExpirationDay = dateStr === expirationDateStr
@@ -821,6 +925,7 @@ export default function SiteDetailsModal({
                                       relative aspect-square flex items-center justify-center transition-all duration-200 cursor-pointer group
                                       ${!isCurrentMonth ? 'bg-gray-100/50 dark:bg-gray-900/30 opacity-40' : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50'}
                                       ${selectedDate && getSystemDateStr(selectedDate) === dateStr ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}
+                                      ${isCurrentMonth && isOtherSite ? 'bg-amber-50/10 dark:bg-amber-900/5' : ''}
                                     `}
                                   >
                                     {/* Indicador de Seleção (Borda Externa) */}
@@ -847,6 +952,7 @@ export default function SiteDetailsModal({
                                       w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center rounded-full text-xs sm:text-sm font-semibold transition-all relative border-2 z-10
                                       ${isCurrentMonth ? statusConfig[dayStatus] : 'text-gray-300 dark:text-gray-600 border-transparent'}
                                       ${isCurrentMonth && dayStatus === 'not-allocated' ? 'border-transparent group-hover:bg-gray-100 dark:group-hover:bg-gray-700' : ''}
+                                      ${isCurrentMonth && isOtherSite ? 'opacity-40 ring-2 ring-amber-500/50 ring-offset-1 dark:ring-offset-gray-900 shadow-inner' : ''}
                                     `}>
                                       {dayDate.getDate()}
                                     </div>
@@ -878,6 +984,7 @@ export default function SiteDetailsModal({
                           const isLast = index === machineHistoryEvents.length - 1
                           const config = getEventConfig(event.event_type)
                           const Icon = config.icon
+                          const isOtherSiteEvent = event.site?.id && site?.id && String(event.site.id) !== String(site.id)
                           
                           return (
                             <div key={event.id} className="relative flex gap-4">
@@ -894,13 +1001,26 @@ export default function SiteDetailsModal({
                               {/* Conteúdo */}
                               <div className="flex-1 pt-1 pb-6">
                                 <div className="flex items-center justify-between mb-1">
-                                  <h4 className="text-base font-semibold text-gray-900 dark:text-white">
-                                    {config.label}
-                                  </h4>
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-base font-semibold text-gray-900 dark:text-white">
+                                      {config.label}
+                                    </h4>
+                                    {isOtherSiteEvent && (
+                                      <span className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-[10px] font-bold uppercase rounded">
+                                        Em outra obra
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full">
                                     {formatDate(event.event_date)}
                                   </span>
                                 </div>
+                                {/* NOVO: Endereço para Alocação de Máquina e Chegada em Obra */}
+                                {(event.event_type === 'start_allocation' || event.event_type === 'transport_arrival' || isOtherSiteEvent) && event.site && (
+                                  <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 mb-2 italic">
+                                    <span className="font-medium not-italic">Local:</span> {event.site.address || event.site.title}
+                                  </div>
+                                )}
                                 
                                 <div className="text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/30 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
                                   {event.end_date && (
@@ -909,17 +1029,6 @@ export default function SiteDetailsModal({
                                       <span className="font-semibold">
                                         {formatDateOnly(event.end_date)}
                                       </span>
-                                    </div>
-                                  )}
-
-                                  {(event.event_type === 'transport_arrival' || event.event_type === 'start_allocation') && 
-                                   event.site?.id && event.site.id !== site?.id && (
-                                    <div className="mb-2 flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                                      </svg>
-                                      <span className="font-medium">Chegou em:</span> 
-                                      <span className="font-semibold text-gray-700 dark:text-gray-200">{event.site.title}</span>
                                     </div>
                                   )}
 

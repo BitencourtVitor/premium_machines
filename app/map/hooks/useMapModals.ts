@@ -144,8 +144,8 @@ export function useMapModals({ selectedSite, setSelectedSite }: UseMapModalsProp
         
         // Se houver máquinas, buscamos os últimos eventos delas para complementar
         if (machinesAtSite.length > 0) {
-          const machineEventsPromises = machinesAtSite.slice(0, 10).map((mId: string) => 
-            fetch(`/api/events?machine_id=${mId}&limit=100`).then(r => r.json())
+          const machineEventsPromises = machinesAtSite.slice(0, 15).map((mId: string) => 
+            fetch(`/api/events?machine_id=${mId}&limit=500`).then(r => r.json())
           )
           
           const machinesEventsResults = await Promise.all(machineEventsPromises)

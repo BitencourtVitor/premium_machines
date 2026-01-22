@@ -56,6 +56,11 @@ export interface ActiveAllocation {
   current_downtime_start: string | null
   attached_extensions: AttachedExtension[]
   status: 'available' | 'allocated' | 'maintenance' | 'inactive' | 'in_transit' | 'exceeded'
+  is_currently_at_site: boolean
+  previous_site_id?: string | null
+  origin_site_id?: string | null
+  destination_site_id?: string | null
+  physical_site_id?: string | null
 }
 
 export interface ActiveDowntime {
@@ -83,6 +88,8 @@ export interface MachineAllocationState {
   end_date?: string | null
   downtime_start: string | null
   attached_extensions: AttachedExtension[]
+  previous_site_id?: string | null
+  destination_site_id?: string | null
 }
 
 export interface ExtensionState {

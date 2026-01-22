@@ -21,6 +21,8 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
     end_date: null,
     downtime_start: null,
     attached_extensions: [],
+    previous_site_id: null,
+    destination_site_id: null,
   }
 
   if (!events || events.length === 0) {
@@ -50,6 +52,10 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
 
       case 'start_allocation':
         if (event.site_id) {
+          // Se ela já estava em outro lugar, esse lugar vira o anterior
+          if (state.current_site_id && state.current_site_id !== event.site_id) {
+            state.previous_site_id = state.current_site_id
+          }
           state.current_site_id = event.site_id
           state.current_site_title = event.site?.title || null
           state.current_allocation_event_id = event.id
@@ -64,9 +70,13 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
       case 'end_allocation':
         // Só encerra se o site corresponder
         if (state.current_site_id && (!event.site_id || state.current_site_id === event.site_id)) {
+          // Se a máquina já está em trânsito, o fim da alocação apenas limpa os dados do contrato,
+          // mas não muda o status físico de 'in_transit'
+          const wasInTransit = state.status === 'in_transit'
+
           // A máquina só deixa de estar alocada no dia SEGUINTE ao fim real (conforme SiteDetailsModal)
           if (eventDateStr < refDateStr) {
-            state.status = 'available'
+            if (!wasInTransit) state.status = 'available'
             state.current_allocation_event_id = null
             state.construction_type = null
             state.lot_building_number = null
@@ -74,7 +84,8 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
             state.end_date = null
           } else {
             // No dia do evento de fim, ela ainda é considerada 'allocated' (ou 'exceeded' se passar da data)
-            state.status = 'allocated'
+            // A menos que já tenha iniciado um transporte
+            if (!wasInTransit) state.status = 'allocated'
           }
         }
         break
@@ -133,38 +144,47 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
         break
 
       case 'transport_start':
-        // A máquina inicia o deslocamento. Ela continua vinculada à obra de origem, 
-        // mas o status muda para indicar que não está operando.
+        // A máquina inicia o deslocamento.
+        // MANTEMOS o current_site_id como a obra de origem.
+        // O site de destino está no event.site_id, mas a máquina fisicamente ainda não chegou lá.
+        
+        // Status físico muda para em trânsito
         state.status = 'in_transit'
-        // Registrar o evento de início de transporte como o evento ativo
+        state.destination_site_id = event.site_id
+        
+        // Se o destino não estiver no evento de início, buscamos no próximo evento de chegada (mesmo que futuro)
+        if (!state.destination_site_id) {
+          const nextArrival = events.find(e => 
+            e.event_type === 'transport_arrival' && 
+            new Date(e.event_date) >= new Date(event.event_date) &&
+            e.site_id
+          )
+          if (nextArrival) {
+            state.destination_site_id = nextArrival.site_id
+          }
+        }
+        
+        // Registrar o evento de início de transporte como o evento ativo para sabermos o destino
         state.current_allocation_event_id = event.id
         break
 
       case 'transport_arrival':
-        // A máquina chega em um novo local.
+        // A máquina chega no local de destino.
         if (event.site_id) {
+          // Se ela já estava em outro lugar, esse lugar vira o anterior
+          if (state.current_site_id && state.current_site_id !== event.site_id) {
+            state.previous_site_id = state.current_site_id
+          }
+          
           state.current_site_id = event.site_id
           state.current_site_title = event.site?.title || null
+          state.destination_site_id = null
           
-          // Se a máquina já estava alocada (vinda de um start_allocation anterior), 
-          // mantemos o status como alocado e preservamos as datas e contrato.
-          // O usuário ressaltou que alocação e presença física são datas distintas.
-          if (state.allocation_start) {
-            state.status = state.is_in_downtime ? 'maintenance' : 'allocated'
-            // Preservamos construction_type e lot_building_number se vierem no transporte, 
-            // caso contrário mantemos os atuais da alocação.
-            if (event.construction_type) state.construction_type = event.construction_type
-            if (event.lot_building_number) state.lot_building_number = event.lot_building_number
-            // IMPORTANTE: Não atualizamos a data de vencimento (end_date) na chegada do transporte.
-            // O usuário declarou que o evento de início de alocação é a fonte da verdade para o vencimento.
-          } else {
-            // Se não havia alocação anterior, ela chega como disponível no novo local
-            state.status = state.is_in_downtime ? 'maintenance' : 'available'
-            state.construction_type = event.construction_type || null
-            state.lot_building_number = event.lot_building_number || null
-            state.allocation_start = event.event_date || null
-            state.end_date = event.end_date || null
-          }
+          // Na chegada, se não houver downtime, o status é 'allocated' (Ativa)
+          state.status = state.is_in_downtime ? 'maintenance' : 'allocated'
+          
+          if (event.construction_type) state.construction_type = event.construction_type
+          if (event.lot_building_number) state.lot_building_number = event.lot_building_number
           
           // O evento de chegada passa a ser o evento atual da máquina no local
           state.current_allocation_event_id = event.id
@@ -173,11 +193,17 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
     }
   }
 
-  // Verificar se a alocação está excedida (apenas se estiver 'allocated')
-  if (state.status === 'allocated' && state.end_date) {
+  // Verificar se a alocação está excedida (se estiver alocada ou em manutenção no site)
+  if (state.current_site_id && state.end_date) {
     const endDateStr = state.end_date.split('T')[0]
     if (refDateStr > endDateStr) {
-      state.status = 'exceeded'
+      // Se estiver 'allocated', vira 'exceeded' (Ativa Excedida)
+      // Se estiver em 'maintenance', mantemos 'maintenance' para fins técnicos, 
+      // mas a UI saberá lidar com o rótulo prioritário se necessário.
+      // No entanto, para o status de mapa, 'exceeded' é mais crítico que 'allocated'.
+      if (state.status === 'allocated') {
+        state.status = 'exceeded'
+      }
     }
   }
 
@@ -188,7 +214,7 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
  * Calcula o estado atual de uma máquina a partir dos eventos aprovados
  * Esta é a função fundamental que deriva o estado dos eventos
  */
-export async function calculateMachineAllocationState(machineId: string): Promise<MachineAllocationState> {
+export async function calculateMachineAllocationState(machineId: string, referenceDate?: Date): Promise<MachineAllocationState> {
   // Buscar todos os eventos para esta máquina, ordenados cronologicamente
   const { data: events, error } = await supabaseServer
     .from('allocation_events')
@@ -206,7 +232,7 @@ export async function calculateMachineAllocationState(machineId: string): Promis
     throw new Error(`Erro ao buscar eventos: ${error.message}`)
   }
 
-  return calculateStateFromEvents(machineId, events || [])
+  return calculateStateFromEvents(machineId, events || [], referenceDate)
 }
 
 /**

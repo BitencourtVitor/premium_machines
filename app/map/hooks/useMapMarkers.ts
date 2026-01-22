@@ -42,7 +42,9 @@ export function useMapMarkers({
     const validSites = sites.filter(site => {
       const lat = Number(site.latitude)
       const lng = Number(site.longitude)
-      return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0
+      const hasCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0
+      
+      return hasCoords
     })
     const headquarters = validSites.find(site => 
       site.is_headquarters || 

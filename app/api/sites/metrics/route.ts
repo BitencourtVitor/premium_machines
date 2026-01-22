@@ -25,6 +25,18 @@ export async function GET() {
     ) || []
     const totalMachinesAllocated = machinesInSites.length
 
+    // Total de extensões alocadas (conectadas a máquinas que estão em obras)
+    const { data: allocatedExtensions } = await supabaseServer
+      .from('machine_extensions')
+      .select('id, current_machine_id, machines!machine_extensions_current_machine_id_fkey(current_site_id, sites!machines_current_site_id_fkey(is_headquarters))')
+      .eq('ativo', true)
+      .not('current_machine_id', 'is', null)
+
+    const extensionsInSites = allocatedExtensions?.filter(
+      (ext: any) => ext.machines?.sites && !ext.machines.sites.is_headquarters
+    ) || []
+    const totalExtensionsAllocated = extensionsInSites.length
+
     // Alocações/Eventos pendentes de aprovação
     const { count: pendingAllocations } = await supabaseServer
       .from('allocation_events')
@@ -50,6 +62,7 @@ export async function GET() {
       metrics: {
         totalActiveSites: totalActiveSites || 0,
         totalMachinesAllocated: totalMachinesAllocated || 0,
+        totalExtensionsAllocated: totalExtensionsAllocated || 0,
         pendingAllocations: pendingAllocations || 0,
         machinesWithIssues: machinesWithIssues || 0,
         archivedSites: archivedSites || 0,

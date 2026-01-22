@@ -20,8 +20,14 @@ export async function validateEvent(event: Partial<AllocationEvent>): Promise<{
     return { valid: false, reason: 'Tipo de máquina é obrigatório para solicitações' }
   }
 
+  // Para transporte, olhamos o estado final da linha do tempo (ignorando a data de hoje)
+  // Isso permite vincular chegadas a transportes agendados para o futuro.
+  const isTransportEvent = ['transport_start', 'transport_arrival'].includes(event.event_type || '')
   const state = event.machine_id
-    ? await calculateMachineAllocationState(event.machine_id)
+    ? await calculateMachineAllocationState(
+        event.machine_id, 
+        isTransportEvent ? new Date('9999-12-31') : undefined
+      )
     : null
 
   switch (event.event_type) {

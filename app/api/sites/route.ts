@@ -22,211 +22,139 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Error fetching jobsites' }, { status: 500 })
     }
 
-    // Filtrar no código para garantir que a sede sempre apareça
     let sites = allSites || []
 
+    // Filtragem simplificada conforme solicitação do usuário:
+    // "toda obra que não estiver arquivada precisa ser listada no dropdown de jobsite"
     if (archived === 'true') {
-      // Arquivados: sites inativos (EXCLUINDO sede se estiver ativa, mas sede geralmente não é arquivada)
-      // Se o usuário quer APENAS arquivados, mostramos apenas inativos.
       sites = sites.filter(s => s.ativo === false)
-    } else if (archived === 'false') {
-      // Ativos: sites ativos
-      sites = sites.filter(s => s.ativo === true)
-    }
-    // Se archived não for especificado, retornar todos
-
-    // Ordenar: sede primeiro, depois por título
-    if (sites) {
-      sites.sort((a, b) => {
-        if (a.is_headquarters && !b.is_headquarters) return -1
-        if (!a.is_headquarters && b.is_headquarters) return 1
-        return a.title.localeCompare(b.title)
-      })
+    } else {
+      // Mostra tudo que não está explicitamente arquivado (ativo !== false inclui true e null)
+      sites = sites.filter(s => s.ativo !== false)
     }
 
-    // If machines are requested, fetch them for each site
-    if (withMachines && sites) {
-      // Fetch all active allocations (calculated from events) to ensure real-time accuracy
+    // Ordenação robusta
+    sites.sort((a, b) => {
+      if (a.is_headquarters && !b.is_headquarters) return -1
+      if (!a.is_headquarters && b.is_headquarters) return 1
+      const titleA = a.title || ''
+      const titleB = b.title || ''
+      return titleA.localeCompare(titleB)
+    })
+
+    if (withMachines) {
+      // AÇÃO 1: Fonte única da verdade - Motor de cálculo
       const activeAllocations = await getActiveAllocations()
       
-      // Get all machines in the system to identify available ones
       const { data: allSystemMachines } = await supabaseServer
         .from('machines')
         .select('id, unit_number, machine_type:machine_types(nome, icon)')
         .eq('ativo', true)
 
-      // Fetch all historical and future associations (all events with site_id)
-      const { data: allEvents, error: eventsError } = await supabaseServer
-        .from('allocation_events')
-        .select(`
-          site_id,
-          machine_id,
-          event_date,
-          end_date,
-          event_type,
-          machine:machines(
-            unit_number,
-            machine_type:machine_types(nome, icon)
-          )
-        `)
-        .in('event_type', ['start_allocation', 'extension_attach'])
-        .or('status.eq.approved,event_type.neq.refueling')
-        .not('site_id', 'is', null)
-        .order('event_date', { ascending: false })
-
-      // Map site_id to all machines ever/scheduled to be there
-      const historicalMachinesMap = new Map<string, Map<string, any>>()
-      
-      // Map machine_id to its current site_id for "moved" status detection
-      const globalActiveMap = new Map(activeAllocations.map(a => [a.machine_id, a.site_id]));
-      
-      const now = new Date().toISOString().split('T')[0]
-
-      if (!eventsError && allEvents) {
-        allEvents.forEach(event => {
-          if (!event.site_id || !event.machine_id || !event.machine) return
-          
-          if (!historicalMachinesMap.has(event.site_id)) {
-            historicalMachinesMap.set(event.site_id, new Map())
-          }
-          
-          const siteMap = historicalMachinesMap.get(event.site_id)!
-          if (!siteMap.has(event.machine_id)) {
-            const machine = event.machine as any
-            const isFuture = event.event_date > now
-            const currentSiteId = globalActiveMap.get(event.machine_id);
-            
-            siteMap.set(event.machine_id, {
-              id: event.machine_id,
-              unit_number: machine.unit_number,
-              machine_type: machine.machine_type?.nome || '',
-              machine_type_icon: machine.machine_type?.icon || null,
-              start_date: event.event_date,
-              end_date: event.end_date,
-              status: isFuture ? 'scheduled' : 'inactive',
-              current_site_id: currentSiteId || null
-            })
-          }
-        })
-      }
-      
       const sitesWithMachines = sites.map((site) => {
-        // Filter active allocations for this site
-        const siteAllocations = activeAllocations.filter(a => a.site_id === site.id)
-        
-        // Map to active machine objects
-        const activeMachinesMap = new Map()
-        
-        siteAllocations.forEach(alloc => {
-            // Add the main machine
-            activeMachinesMap.set(alloc.machine_id, {
+        // AÇÃO: Filtrar máquinas que pertencem a este site (origem ou destino de transporte, ou local físico)
+        const activeMachinesForSite = activeAllocations.flatMap(alloc => {
+          const machines: any[] = []
+          
+          // Se status for in_transit, projetar nos dois sites
+          if (alloc.status === 'in_transit') {
+            if (alloc.origin_site_id === site.id) {
+              machines.push({
                 id: alloc.machine_id,
                 unit_number: alloc.machine_unit_number,
-                status: alloc.status,
+                status: 'moved', // Projetado como Movida na origem
                 ownership_type: alloc.machine_ownership,
                 machine_type: alloc.machine_type,
                 machine_type_icon: alloc.machine_type_icon,
                 start_date: alloc.allocation_start,
                 end_date: alloc.end_date,
-                current_site_id: alloc.site_id
+                current_site_id: site.id,
+                is_currently_at_site: false,
+                previous_site_id: alloc.previous_site_id,
+                origin_site_id: alloc.origin_site_id,
+                destination_site_id: alloc.destination_site_id,
+                physical_site_id: alloc.physical_site_id
+              })
+            }
+            if (alloc.destination_site_id === site.id) {
+              machines.push({
+                id: alloc.machine_id,
+                unit_number: alloc.machine_unit_number,
+                status: 'in_transit', // Projetado como Em Trânsito no destino
+                ownership_type: alloc.machine_ownership,
+                machine_type: alloc.machine_type,
+                machine_type_icon: alloc.machine_type_icon,
+                start_date: alloc.allocation_start,
+                end_date: alloc.end_date,
+                current_site_id: site.id,
+                is_currently_at_site: true,
+                previous_site_id: alloc.previous_site_id,
+                origin_site_id: alloc.origin_site_id,
+                destination_site_id: alloc.destination_site_id,
+                physical_site_id: alloc.physical_site_id
+              })
+            }
+          } 
+          // Caso contrário, projetar apenas no physical_site_id
+          else if (alloc.physical_site_id === site.id) {
+            machines.push({
+              id: alloc.machine_id,
+              unit_number: alloc.machine_unit_number,
+              status: alloc.status,
+              ownership_type: alloc.machine_ownership,
+              machine_type: alloc.machine_type,
+              machine_type_icon: alloc.machine_type_icon,
+              start_date: alloc.allocation_start,
+              end_date: alloc.end_date,
+              current_site_id: site.id,
+              is_currently_at_site: true,
+              previous_site_id: alloc.previous_site_id,
+              origin_site_id: alloc.origin_site_id,
+              destination_site_id: alloc.destination_site_id,
+              physical_site_id: alloc.physical_site_id
             })
-
-            // Add attached extensions
-                alloc.attached_extensions.forEach(ext => {
-                    if (!activeMachinesMap.has(ext.extension_id)) {
-                        activeMachinesMap.set(ext.extension_id, {
-                            id: ext.extension_id,
-                            unit_number: ext.extension_unit_number,
-                            status: alloc.status, // Extensão herda o status da máquina (ex: exceeded)
-                            ownership_type: 'owned',
-                            machine_type: ext.extension_type,
-                            machine_type_icon: ext.extension_type_icon,
-                            start_date: alloc.allocation_start, // Extension follows machine start
-                            end_date: alloc.end_date,
-                            current_site_id: alloc.site_id
-                        })
-                    }
-                })
+          }
+          
+          return machines
         })
 
-        // If this is headquarters, also add all machines that are NOT currently allocated anywhere
+        // Se for a sede, adicionar máquinas disponíveis
         if (site.is_headquarters && allSystemMachines) {
-          const currentlyAllocatedMachineIds = new Set(activeAllocations.map(a => a.machine_id))
-          
+          const busyMachineIds = new Set(activeAllocations.filter(a => a.status !== 'in_transit' && a.physical_site_id).map(a => a.machine_id))
+          // Adicionar também máquinas em trânsito (elas não estão disponíveis na sede se estiverem em trânsito)
+          activeAllocations.forEach(a => {
+            if (a.status === 'in_transit') busyMachineIds.add(a.machine_id)
+          })
+
           allSystemMachines.forEach(m => {
-            if (!currentlyAllocatedMachineIds.has(m.id)) {
-              activeMachinesMap.set(m.id, {
+            if (!busyMachineIds.has(m.id)) {
+              activeMachinesForSite.push({
                 id: m.id,
                 unit_number: m.unit_number,
                 status: 'available',
-                ownership_type: 'owned', // Default
+                ownership_type: 'owned',
                 machine_type: (m.machine_type as any)?.nome || '',
                 machine_type_icon: (m.machine_type as any)?.icon || null,
                 start_date: null,
-                current_site_id: site.id // At HQ
-              })
+                current_site_id: site.id,
+                is_currently_at_site: true
+              } as any)
             }
           })
         }
 
-        const activeMachines = Array.from(activeMachinesMap.values())
-        
-        // Get all machines for search (including historical/future)
-        const siteHistoricalMachines = historicalMachinesMap.get(site.id)
-        const allMachinesForSearchMap = new Map()
-        
-        // Start with historical/future ones
-        if (siteHistoricalMachines) {
-          siteHistoricalMachines.forEach((m, id) => {
-            allMachinesForSearchMap.set(id, {
-              ...m
-            })
-          })
-        }
-        
-        // Add current ones (includes available if HQ) to ensure they have the correct current status
-        activeMachines.forEach(m => {
-          allMachinesForSearchMap.set(m.id, {
-            id: m.id,
-            unit_number: m.unit_number,
-            machine_type: m.machine_type,
-            status: m.status,
-            start_date: m.start_date,
-            end_date: m.end_date,
-            current_site_id: m.current_site_id
-          })
-        })
-
-        const allMachinesForSearch = Array.from(allMachinesForSearchMap.values())
-
         return {
           ...site,
-          machines_count: allMachinesForSearch.length,
-          machines: activeMachines,
-          all_machines: allMachinesForSearch
+          machines_count: activeMachinesForSite.length,
+          machines: activeMachinesForSite,
+          all_machines: activeMachinesForSite // No mapa, all_machines é o que importa
         }
       })
 
       return NextResponse.json({ success: true, sites: sitesWithMachines })
     }
 
-    // Get machines count for each site
-    const sitesWithCount = await Promise.all(
-      (sites || []).map(async (site) => {
-        const { count } = await supabaseServer
-          .from('machines')
-          .select('id', { count: 'exact', head: true })
-          .eq('current_site_id', site.id)
-          .eq('ativo', true)
-
-        return {
-          ...site,
-          machines_count: count || 0,
-        }
-      })
-    )
-
-    return NextResponse.json({ success: true, sites: sitesWithCount })
+    return NextResponse.json({ success: true, sites: sites })
   } catch (error) {
     console.error('Error:', error)
     return NextResponse.json({ success: false, message: 'Erro interno' }, { status: 500 })
@@ -237,7 +165,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // Validar campos obrigatórios
     if (!body.title) {
       return NextResponse.json({ success: false, message: 'Jobsite title is required' }, { status: 400 })
     }
@@ -246,7 +173,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Endereço é obrigatório' }, { status: 400 })
     }
 
-    // Validar que latitude e longitude são obrigatórios
     if (body.latitude === null || body.latitude === undefined ||
         body.longitude === null || body.longitude === undefined) {
       return NextResponse.json({
@@ -255,7 +181,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Validar que são números válidos
     const latitude = Number(body.latitude)
     const longitude = Number(body.longitude)
 
@@ -266,7 +191,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Validar range de coordenadas
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
       return NextResponse.json({
         success: false,
@@ -301,7 +225,6 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // Log action
     await createAuditLog({
       entidade: 'sites',
       entidade_id: site.id,

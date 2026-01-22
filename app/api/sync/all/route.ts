@@ -11,12 +11,9 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST() {
   try {
-    console.log('🔄 Iniciando sincronização completa de todas as máquinas')
-
     const result = await syncAllMachineStates()
 
     if (result.success) {
-      console.log(`✅ Sincronização completa: ${result.synced} máquinas sincronizadas`)
       return NextResponse.json({
         success: true,
         message: `Sincronização completa: ${result.synced} máquinas sincronizadas`,
@@ -24,7 +21,6 @@ export async function POST() {
         errors: result.errors.length > 0 ? result.errors : undefined
       })
     } else {
-      console.error('❌ Erro na sincronização:', result.errors)
       return NextResponse.json({
         success: false,
         message: 'Erro na sincronização',
@@ -32,7 +28,7 @@ export async function POST() {
       }, { status: 500 })
     }
   } catch (error: any) {
-    console.error('Erro ao sincronizar:', error)
+
     return NextResponse.json(
       { success: false, message: error.message || 'Erro interno' },
       { status: 500 }

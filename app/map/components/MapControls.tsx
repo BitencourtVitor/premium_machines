@@ -148,11 +148,12 @@ export default function MapControls({
                   <div className="space-y-1 animate-in slide-in-from-top-1 duration-200">
                     {[
                       { id: 'maintenance', label: 'Manutenção', color: 'bg-orange-500' },
-                      { id: 'exceeded', label: 'Excedida', color: 'bg-red-500' },
-                      { id: 'active', label: 'Ativa', color: 'bg-green-500' },
-                      { id: 'scheduled', label: 'Agendada', color: 'bg-blue-500' },
+          { id: 'exceeded', label: 'Excedida', color: 'bg-red-500' },
+          { id: 'active', label: 'Ativa', color: 'bg-green-500' },
+          { id: 'in_transit', label: 'Em Trânsito', color: 'bg-purple-500' },
+          { id: 'scheduled', label: 'Agendada', color: 'bg-blue-500' },
                       { id: 'moved', label: 'Movida', color: 'bg-pink-500' },
-                      { id: 'finished', label: 'Encerrada', color: 'bg-purple-500' },
+                      { id: 'finished', label: 'Encerrada', color: 'bg-indigo-500' },
                       { id: 'none', label: 'Sem Alocação', color: 'bg-gray-400' },
                     ].map((status) => (
                       <label key={status.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors">

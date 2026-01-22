@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET() {
   try {
-    console.log('🔍 Debug: Iniciando teste de alocações ativas')
+
 
     // 1. Buscar todas as máquinas ativas
     const { data: machines, error: machinesError } = await supabaseServer
@@ -19,7 +19,7 @@ export async function GET() {
       .select('id, unit_number, status, current_site_id')
       .eq('ativo', true)
 
-    console.log('🔍 Debug: Máquinas encontradas:', machines?.length || 0)
+
 
     if (machinesError) {
       return NextResponse.json({
@@ -33,7 +33,7 @@ export async function GET() {
     const machineStates = []
     for (const machine of machines || []) {
       try {
-        console.log(`🔍 Debug: Calculando estado da máquina ${machine.unit_number}`)
+
         const state = await calculateMachineAllocationState(machine.id)
         machineStates.push({
           machine_id: machine.id,
@@ -42,7 +42,7 @@ export async function GET() {
           calculated_state: state
         })
       } catch (error: any) {
-        console.error(`Erro ao calcular estado da máquina ${machine.id}:`, error)
+
         machineStates.push({
           machine_id: machine.id,
           unit_number: machine.unit_number,
@@ -52,10 +52,10 @@ export async function GET() {
     }
 
     // 3. Buscar alocações ativas usando a função completa
-    console.log('🔍 Debug: Buscando alocações ativas')
+
     const activeAllocations = await getActiveAllocations()
 
-    console.log('🔍 Debug: Alocações ativas encontradas:', activeAllocations.length)
+
 
     return NextResponse.json({
       success: true,
@@ -68,7 +68,7 @@ export async function GET() {
       active_allocations: activeAllocations
     })
   } catch (error: any) {
-    console.error('Erro no debug de alocações:', error)
+
     return NextResponse.json(
       { success: false, message: error.message || 'Erro interno' },
       { status: 500 }

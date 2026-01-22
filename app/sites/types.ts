@@ -17,6 +17,7 @@ export interface Site {
 export interface SiteMetrics {
   totalActiveSites: number
   totalMachinesAllocated: number
+  totalExtensionsAllocated: number
   pendingAllocations: number
   machinesWithIssues: number
   archivedSites: number

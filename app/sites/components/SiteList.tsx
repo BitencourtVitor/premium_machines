@@ -125,14 +125,22 @@ function MachineCount({ site }: MachineCountProps) {
                               </span>
                             )}
                           </div>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                             machine.status === 'maintenance' 
                               ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' 
-                              : isActive
+                            : machine.status === 'exceeded'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800'
+                            : machine.status === 'moved'
+                              ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400 border border-pink-200 dark:border-pink-800'
+                            : machine.status === 'scheduled'
                               ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                              : 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300'
+                            : machine.status === 'in_transit'
+                              ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                            : isActive
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
                           }`}>
-                            {isActive ? (MACHINE_STATUS_LABELS[machine.status] || machine.status) : 'Inativo'}
+                            {MACHINE_STATUS_LABELS[machine.status] || machine.status}
                           </span>
                         </div>
                       )
@@ -169,6 +177,8 @@ export default function SiteList({
   handleOpenModal,
   handleArchiveSite,
 }: SiteListProps) {
+
+
   return (
     <BaseList
       title="Jobsites"

@@ -1,5 +1,6 @@
 import { supabaseServer } from '../supabase-server'
 import { validateEvent, syncMachineState, syncExtensionState } from '../allocationService'
+import { updateAllocationNotification } from '../notificationService'
 
 /**
  * Processa a aprovação de um evento e atualiza o estado das máquinas/extensões
@@ -67,6 +68,23 @@ export async function processEventApproval(
       }
     }
 
+    // Agendar notificações para o evento aprovado
+    // Buscamos o evento completo com relações para ter os dados necessários (unit_number, site title)
+    const { data: fullEvent } = await supabaseServer
+      .from('allocation_events')
+      .select(`
+        *,
+        machine:machines(id, unit_number),
+        site:sites(id, title),
+        extension:machines(id, unit_number)
+      `)
+      .eq('id', eventId)
+      .single()
+
+    if (fullEvent) {
+      await updateAllocationNotification(fullEvent)
+    }
+
     return {
       success: true,
       message: 'Evento aprovado com sucesso'
@@ -104,6 +122,17 @@ export async function processEventRejection(
         message: 'Erro ao rejeitar evento',
         error
       }
+    }
+
+    // Remover notificações se existirem (evento não está mais aprovado)
+    const { data: rejectedEvent } = await supabaseServer
+      .from('allocation_events')
+      .select('*')
+      .eq('id', eventId)
+      .single()
+    
+    if (rejectedEvent) {
+      await updateAllocationNotification(rejectedEvent)
     }
 
     return {

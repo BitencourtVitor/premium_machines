@@ -48,7 +48,7 @@ export default function MapPage() {
   const [mapFilters, setMapFilters] = useState({
     showHeadquarters: true,
     showJobsites: true,
-    statuses: ['maintenance', 'exceeded', 'active', 'scheduled', 'moved', 'finished', 'none']
+    statuses: ['maintenance', 'exceeded', 'active', 'scheduled', 'moved', 'finished', 'in_transit', 'none']
   })
 
   // Filter sites based on search query and map filters
@@ -83,11 +83,6 @@ export default function MapPage() {
       }
     }
 
-    // Get current date for status logic
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const todayStr = today.toISOString().split('T')[0]
-
     // Apply Map Filters
     result = result.filter(site => {
       const isHQ = site.is_headquarters || site.title === 'Premium Group Inc.'
@@ -98,41 +93,21 @@ export default function MapPage() {
       // Jobsites filter (non-headquarters)
       if (!isHQ && !mapFilters.showJobsites) return false
       
-      // Status filter
+      // REGRA DE OURO: Se o site tem máquinas, ele DEVE aparecer no mapa.
+      // Filtros de status (MapControls) não podem remover o site do mapa, apenas afetar o popup interno.
       const machines = site.all_machines || site.machines || []
+      
+      // LOG DE AUDITORIA: Garantir que sabemos por que o site está sendo mantido
+      if (machines.length > 0) {
+
+      }
       
       if (machines.length === 0) {
         return mapFilters.statuses.includes('none')
       }
 
-      const hasMatchingStatus = machines.some((machine: any) => {
-        const startDateStr = machine.start_date ? machine.start_date.split('T')[0] : null
-        const endDateStr = machine.end_date ? machine.end_date.split('T')[0] : null
-        let status = machine.status
-
-        if (status === 'allocated' && startDateStr && startDateStr > todayStr) {
-          status = 'scheduled'
-        }
-
-        if ((status === 'allocated' || status === 'active') && endDateStr && todayStr > endDateStr) {
-          status = 'exceeded'
-        }
-        
-        const isMoved = (status === 'inactive' || status === 'available') && 
-                        machine.current_site_id && 
-                        machine.current_site_id !== site.id;
-
-        if (status === 'maintenance' && mapFilters.statuses.includes('maintenance')) return true
-        if (status === 'exceeded' && mapFilters.statuses.includes('exceeded')) return true
-        if ((status === 'allocated' || status === 'active') && mapFilters.statuses.includes('active')) return true
-        if (status === 'scheduled' && mapFilters.statuses.includes('scheduled')) return true
-        if (isMoved && mapFilters.statuses.includes('moved')) return true
-        if (status === 'inactive' && !isMoved && mapFilters.statuses.includes('finished')) return true
-        
-        return false
-      })
-
-      return hasMatchingStatus
+      // Se tem máquinas, o site sobrevive ao filtro.
+      return true
     })
 
     return result
@@ -181,11 +156,20 @@ export default function MapPage() {
   // Load Sites
   const loadSites = useCallback(async () => {
     try {
-      const response = await fetch('/api/sites?with_machines=true')
-      const data = await response.json()
+      const now = new Date();
+      // INSTRUMENTAÇÃO: Buscar eventos e sites em paralelo para auditoria total
+      const [sitesRes, eventsRes] = await Promise.all([
+        fetch(`/api/sites?with_machines=true&t=${Date.now()}`, { cache: 'no-store' }),
+        fetch(`/api/events?limit=2000&t=${Date.now()}`, { cache: 'no-store' })
+      ])
+      
+      const sitesData = await sitesRes.json()
+      const eventsData = await eventsRes.json()
 
-      if (data.success && data.sites) {
-        const activeSites = data.sites.filter((s: any) => 
+      if (sitesData.success && sitesData.sites) {
+
+
+        const activeSites = sitesData.sites.filter((s: any) => 
           s.ativo === true || s.is_headquarters === true
         )
         setSites(activeSites)
