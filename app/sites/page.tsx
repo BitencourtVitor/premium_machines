@@ -25,6 +25,7 @@ export default function SitesPage() {
   const [metrics, setMetrics] = useState<SiteMetrics>({
     totalActiveSites: 0,
     totalMachinesAllocated: 0,
+    totalExtensionsAllocated: 0,
     pendingAllocations: 0,
     machinesWithIssues: 0,
     archivedSites: 0,
