@@ -908,7 +908,7 @@ export default function SiteDetailsModal({
                                 const isExpirationDay = dateStr === expirationDateStr
                                 const isStartDay = dateStr === startDateStr
 
-                                const statusConfig = {
+                                const statusConfig: Record<string, string> = {
                                   'working': 'bg-emerald-500 dark:bg-emerald-500 text-white dark:text-white font-semibold border-emerald-600 dark:border-emerald-400',
                                   'working-exceeded': 'bg-red-600 dark:bg-red-500 text-white dark:text-white font-semibold border-red-700 dark:border-red-400 shadow-md',
                                   'maintenance': 'bg-orange-600 dark:bg-orange-500 text-white dark:text-white font-semibold border-orange-700 dark:border-orange-400',
