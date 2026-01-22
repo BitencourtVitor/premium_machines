@@ -362,7 +362,10 @@ export async function getHistoricalSiteAllocations(siteId: string): Promise<Acti
               is_in_downtime: cycleState.is_in_downtime,
               attached_extensions: [],
               is_currently_at_site: isCurrentlyAtSite,
-              destination_site_id: currentState.destination_site_id || undefined
+              destination_site_id: currentState.destination_site_id || undefined,
+              current_downtime_event_id: cycleState.current_downtime_event_id || null,
+              current_downtime_reason: cycleState.current_downtime_reason || null,
+              current_downtime_start: cycleState.current_downtime_start || null,
             })
           }
         }
