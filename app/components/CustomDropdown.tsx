@@ -18,6 +18,7 @@ interface CustomDropdownProps {
   className?: string
   label?: string
   searchable?: boolean
+  descriptionLayout?: 'below' | 'beside'
 }
 
 export default function CustomDropdown({
@@ -30,9 +31,11 @@ export default function CustomDropdown({
   className = '',
   label,
   searchable,
+  descriptionLayout = 'below',
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [highlightedIndex, setHighlightedIndex] = useState(0)
   const [dropdownPosition, setDropdownPosition] = useState<'bottom' | 'top'>('bottom')
   const dropdownRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -43,12 +46,12 @@ export default function CustomDropdown({
 
   const selectedOption = options.find(opt => opt.value === value)
 
-  const filteredOptions = isSearchable && searchTerm
-    ? options.filter(opt => 
-        opt.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (opt.description && opt.description.toLowerCase().includes(searchTerm.toLowerCase()))
-      )
-    : options
+  const filteredOptions = options.filter(opt => {
+    if (!isSearchable || !searchTerm) return true
+    const search = searchTerm.toLowerCase()
+    return opt.label.toLowerCase().includes(search) || 
+           (opt.description && opt.description.toLowerCase().includes(search))
+  })
 
   useEffect(() => {
     if (isOpen && buttonRef.current) {
@@ -82,9 +85,8 @@ export default function CustomDropdown({
 
   useEffect(() => {
     if (isOpen && isSearchable && searchInputRef.current) {
-      setTimeout(() => {
-        searchInputRef.current?.focus()
-      }, 100)
+      searchInputRef.current.focus()
+      setHighlightedIndex(0)
     } else if (!isOpen) {
       setSearchTerm('')
     }
@@ -110,6 +112,30 @@ export default function CustomDropdown({
     setIsOpen(false)
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) return
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setHighlightedIndex(prev => (prev + 1) % filteredOptions.length)
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setHighlightedIndex(prev => (prev - 1 + filteredOptions.length) % filteredOptions.length)
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (filteredOptions[highlightedIndex]) {
+          handleSelect(filteredOptions[highlightedIndex].value)
+        }
+        break
+      case 'Escape':
+        setIsOpen(false)
+        break
+    }
+  }
+
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       {label && (
@@ -121,14 +147,30 @@ export default function CustomDropdown({
         ref={buttonRef}
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
+        onKeyDown={(e) => {
+          if (!isOpen && !disabled && /^[a-zA-Z0-9]$/.test(e.key)) {
+            setIsOpen(true)
+            setSearchTerm(e.key)
+          } else if (isOpen) {
+            handleKeyDown(e)
+          }
+        }}
         disabled={disabled}
         className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between ${
           disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
         }`}
       >
-        <span className="text-sm">
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
+        <div className={`flex ${descriptionLayout === 'beside' ? 'flex-row items-center gap-1.5' : 'flex-col items-start'} overflow-hidden`}>
+          <span className="text-sm truncate">
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+          {selectedOption?.description && (
+            <span className={`${descriptionLayout === 'beside' ? 'text-[10px]' : 'text-[10px] mt-0.5'} text-gray-500 dark:text-gray-400 leading-none uppercase tracking-wider font-semibold whitespace-nowrap`}>
+              {descriptionLayout === 'beside' && <span className="mr-1.5 text-gray-300 dark:text-gray-600">|</span>}
+              {selectedOption.description}
+            </span>
+          )}
+        </div>
         <svg
           className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
@@ -157,8 +199,13 @@ export default function CustomDropdown({
                   ref={searchInputRef}
                   type="text"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search..."
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value)
+                    setHighlightedIndex(0)
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Pesquisar..."
+                  autoComplete="off"
                   className="w-full pl-8 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                   onClick={(e) => e.stopPropagation()}
                 />
@@ -187,29 +234,33 @@ export default function CustomDropdown({
           <div className="overflow-y-auto max-h-48">
             {filteredOptions.length === 0 ? (
               <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
-                {isSearchable && searchTerm ? 'No options found' : 'No options available'}
+                {isSearchable && searchTerm ? 'Nenhum resultado encontrado' : 'Nenhuma opção disponível'}
               </div>
             ) : (
               <div className="p-2 space-y-1">
-                {filteredOptions.map((option) => (
+                {filteredOptions.map((option, index) => (
                   <button
-                    key={option.value}
+                    key={`${option.value}-${index}`}
                     type="button"
                     onClick={() => handleSelect(option.value)}
-                    className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors ${
+                    onMouseEnter={() => setHighlightedIndex(index)}
+                    className={`w-full text-left px-3 py-2 text-sm rounded transition-colors ${
                       value === option.value
                         ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                        : index === highlightedIndex
+                        ? 'bg-gray-100 dark:bg-gray-600 text-gray-900 dark:text-white'
                         : 'text-gray-900 dark:text-white'
                     }`}
                   >
-                    <div className="flex flex-col">
+                    <div className={`flex ${descriptionLayout === 'beside' ? 'flex-row items-center gap-1.5' : 'flex-col'}`}>
                       <span className="font-medium">{option.label}</span>
                       {option.description && (
-                        <span className={`text-xs mt-0.5 ${
+                        <span className={`${descriptionLayout === 'beside' ? 'text-[10px]' : 'text-xs mt-0.5'} uppercase tracking-wider font-semibold ${
                           value === option.value 
                             ? 'text-blue-600 dark:text-blue-400' 
                             : 'text-gray-500 dark:text-gray-400'
                         }`}>
+                          {descriptionLayout === 'beside' && <span className="mr-1.5 text-gray-300 dark:text-gray-600">|</span>}
                           {option.description}
                         </span>
                       )}

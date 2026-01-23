@@ -166,9 +166,10 @@ export const filterMachinesForEvent = (
   // - Se for evento de transporte, manter ambos (máquina e extensão)
   // - Se for evento de extensão, manter só extensões. 
   // - Se for evento de máquina, manter só máquinas.
+  // - Se for fim de alocação, manter ambos (máquina e extensão)
   const baseFiltered = machines.filter(m => {
     const isExtension = m.extension_type || m.machine_type?.is_attachment;
-    if (isTransportEvent) return true;
+    if (isTransportEvent || eventType === 'end_allocation') return true;
     return isExtensionEvent ? isExtension : !isExtension;
   });
 

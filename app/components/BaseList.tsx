@@ -44,6 +44,7 @@ interface BaseListProps<T> {
   }
   
   // Actions
+  headerActions?: React.ReactNode
   showRefresh?: boolean
   onRefresh?: () => void
   
@@ -81,6 +82,7 @@ interface BaseListProps<T> {
   
   // State
   isArchivedView?: boolean
+  fullHeight?: boolean
 }
 
 export default function BaseList<T>({
@@ -110,6 +112,8 @@ export default function BaseList<T>({
   showRefresh = false,
   onRefresh,
   
+  headerActions,
+  
   showAdd = false,
   onAdd,
   
@@ -125,7 +129,8 @@ export default function BaseList<T>({
   showSuperButton = false,
   superButtonConfig,
   
-  isArchivedView = false
+  isArchivedView = false,
+  fullHeight = true
 }: BaseListProps<T>) {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
   const [internalSearchTerm, setInternalSearchTerm] = useState('')
@@ -185,7 +190,7 @@ export default function BaseList<T>({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow flex flex-col flex-1 min-h-0 overflow-hidden">
+    <div className={`bg-white dark:bg-gray-800 rounded-lg shadow flex flex-col min-h-0 overflow-hidden ${fullHeight ? 'flex-1' : ''}`}>
       {/* Header */}
       <div className="relative border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-20 min-h-[73px] flex items-center px-4">
         <div className="w-full flex items-center justify-between gap-4">
@@ -218,6 +223,11 @@ export default function BaseList<T>({
           
           {/* Actions (Right Side) */}
           <div className="flex items-center gap-2 ml-auto" ref={searchContainerRef}>
+            {headerActions && (
+              <div className="flex items-center gap-4 mr-2">
+                {headerActions}
+              </div>
+            )}
             {/* Search Input */}
             {showSearch && (
               <div 

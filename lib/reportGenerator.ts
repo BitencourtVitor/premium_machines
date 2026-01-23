@@ -1,0 +1,258 @@
+import jsPDF from 'jspdf'
+import 'jspdf-autotable'
+import { adjustDateToSystemTimezone, formatDateOnly } from './timezone'
+
+interface AllocationData {
+  machine_unit_number: string
+  machine_description: string
+  machine_type: string
+  site_title: string
+  construction_type: 'lot' | 'building' | null
+  lot_building_number: string | null
+  status: string
+  is_in_downtime: boolean
+  attached_extensions: any[]
+}
+
+interface RentExpirationData {
+  machine_unit_number: string
+  machine_description: string
+  machine_type: string
+  site_title: string
+  site_address: string
+  construction_type: 'lot' | 'building' | null
+  lot_building_number: string | null
+  allocation_start: string
+  expiration_date: string | null
+  billing_type: string
+  status: string
+}
+
+const getBase64ImageFromURL = (url: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.setAttribute('crossOrigin', 'anonymous')
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')
+      ctx?.drawImage(img, 0, 0)
+      const dataURL = canvas.toDataURL('image/png')
+      resolve(dataURL)
+    }
+    img.onerror = (error) => reject(error)
+    img.src = url
+  })
+}
+
+const drawHeader = async (doc: any, margin: number) => {
+  try {
+    const logoBase64 = await getBase64ImageFromURL('/premium_logo_vetorizado.png')
+    doc.addImage(logoBase64, 'PNG', margin, 12, 10, 10)
+    
+    // Vertical separator line
+    doc.setDrawColor(200, 200, 200)
+    doc.line(margin + 13, 12, margin + 13, 22)
+    
+    // "Machines" text
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(16)
+    doc.setTextColor(60, 60, 60)
+    doc.text('Machines', margin + 16, 19)
+  } catch (error) {
+    console.error('Error loading logo:', error)
+    doc.setFontSize(18)
+    doc.setTextColor(40)
+    doc.text('Premium Machines', margin, 20)
+  }
+}
+
+export const generateAllocationsPDF = async (data: AllocationData[], periodLabel: string) => {
+  const doc = new jsPDF() as any
+  const pageWidth = doc.internal.pageSize.width
+  const margin = 15
+
+  await drawHeader(doc, margin)
+
+  // Report Title
+  doc.setFontSize(12)
+  doc.setTextColor(40)
+  doc.text('Relatório de Alocações', margin, 35)
+  
+  doc.setFontSize(10)
+  doc.setTextColor(100, 100, 100)
+  doc.text(`Período: ${periodLabel}`, margin, 42)
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 47)
+
+  let currentY = 60
+
+  const getStatusInfo = (status: string, is_in_downtime: boolean) => {
+    if (is_in_downtime) {
+      return { label: 'Em Manutenção', color: [234, 88, 12] } // Orange
+    }
+    
+    switch (status) {
+      case 'allocated': 
+        return { label: 'Ativa', color: [22, 163, 74] } // Green
+      case 'in_transit': 
+        return { label: 'Em Transporte', color: [147, 51, 234] } // Purple
+      case 'maintenance': 
+        return { label: 'Em Manutenção', color: [234, 88, 12] } // Orange
+      case 'exceeded': 
+        return { label: 'Ativa - Prazo Excedido', color: [220, 38, 38] } // Red
+      case 'available': 
+        return { label: 'Disponível', color: [22, 163, 74] } // Green
+      case 'inactive': 
+        return { label: 'Inativa', color: [100, 100, 100] } // Gray
+      default: 
+        return { label: status, color: [100, 100, 100] }
+    }
+  }
+
+  data.forEach((item, index) => {
+    if (currentY > 270) {
+      doc.addPage()
+      currentY = 20
+    }
+
+    // Title: Machine
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(30)
+    const machineTitle = `${item.machine_unit_number} - ${item.machine_description || item.machine_type}`
+    doc.text(machineTitle, margin, currentY)
+
+    // Status (Opposite side)
+    const statusInfo = getStatusInfo(item.status, item.is_in_downtime)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(statusInfo.color[0], statusInfo.color[1], statusInfo.color[2])
+    
+    const statusWidth = doc.getTextWidth(statusInfo.label)
+    doc.text(statusInfo.label, pageWidth - margin - statusWidth, currentY)
+
+    currentY += 6
+
+    // Subtitle: Address
+    doc.setFontSize(9)
+    doc.setTextColor(100, 100, 100)
+    const address = `${item.site_title}${item.lot_building_number ? ` - ${item.construction_type === 'lot' ? 'Lote' : 'Prédio'} ${item.lot_building_number}` : ''}`
+    doc.text(address, margin, currentY)
+
+    currentY += 5
+
+    // Extensions if any
+    if (item.attached_extensions && item.attached_extensions.length > 0) {
+      item.attached_extensions.forEach((ext: any) => {
+        doc.setFontSize(8)
+        doc.setTextColor(120, 120, 120)
+        doc.text(`   + Extensão: ${ext.extension_unit_number} (${ext.extension_type})`, margin, currentY)
+        currentY += 4
+      })
+    }
+
+    // Separator line
+    currentY += 2
+    doc.setDrawColor(230)
+    doc.line(margin, currentY, pageWidth - margin, currentY)
+    currentY += 8
+  })
+
+  doc.save(`relatorio_alocacoes_${new Date().getTime()}.pdf`)
+}
+
+export const generateRentExpirationPDF = async (data: RentExpirationData[], periodLabel: string) => {
+  const doc = new jsPDF() as any
+  const pageWidth = doc.internal.pageSize.width
+  const margin = 15
+
+  await drawHeader(doc, margin)
+
+  // Report Title
+  doc.setFontSize(12)
+  doc.setTextColor(40)
+  doc.text('Relatório de Vencimento de Aluguéis', margin, 35)
+  
+  doc.setFontSize(10)
+  doc.setTextColor(100, 100, 100)
+  doc.text(`Período: ${periodLabel}`, margin, 42)
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 47)
+
+  let currentY = 60
+
+  data.forEach((item, index) => {
+    if (currentY > 260) {
+      doc.addPage()
+      currentY = 20
+    }
+
+    // Title: Machine
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(30)
+    const machineTitle = `${item.machine_unit_number} - ${item.machine_description || item.machine_type}`
+    doc.text(machineTitle, margin, currentY)
+
+    // Expiration Date (Opposite side)
+    if (item.expiration_date) {
+      const expDate = adjustDateToSystemTimezone(item.expiration_date)
+      const today = new Date()
+      const isExpired = expDate < today
+      
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      if (isExpired) {
+        doc.setTextColor(220, 38, 38) // Red
+      } else {
+        doc.setTextColor(22, 163, 74) // Green
+      }
+      
+      const expLabel = `Vence em: ${formatDateOnly(item.expiration_date)}`
+      const expWidth = doc.getTextWidth(expLabel)
+      doc.text(expLabel, pageWidth - margin - expWidth, currentY)
+    }
+
+    currentY += 6
+
+    // Subtitle: Site Address
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(100, 100, 100)
+    const location = `${item.site_title}${item.site_address ? ` - ${item.site_address}` : ''}`
+    const splitAddress = doc.splitTextToSize(location, pageWidth - margin * 2)
+    doc.text(splitAddress, margin, currentY)
+    currentY += (splitAddress.length * 5)
+
+    // Details: Job Site / Lot
+    doc.setFontSize(9)
+    doc.setTextColor(120, 120, 120)
+    let details = ''
+    if (item.construction_type && item.lot_building_number) {
+      const typeLabel = item.construction_type === 'lot' ? 'Lote' : 'Prédio/Torre'
+      details = `${typeLabel}: ${item.lot_building_number}`
+    }
+    
+    if (item.allocation_start) {
+      const startDate = formatDateOnly(item.allocation_start)
+      details += details ? ` | Início: ${startDate}` : `Início: ${startDate}`
+    }
+
+    if (item.billing_type) {
+      const billingLabel = item.billing_type === 'monthly' ? 'Mensal' : item.billing_type === 'weekly' ? 'Semanal' : 'Diário'
+      details += details ? ` | Cobrança: ${billingLabel}` : `Cobrança: ${billingLabel}`
+    }
+
+    if (details) {
+      doc.text(details, margin, currentY)
+      currentY += 6
+    }
+
+    // Divider line
+    doc.setDrawColor(240, 240, 240)
+    doc.line(margin, currentY, pageWidth - margin, currentY)
+    currentY += 10
+  })
+
+  doc.save(`relatorio_vencimentos_${new Date().toISOString().split('T')[0]}.pdf`)
+}
