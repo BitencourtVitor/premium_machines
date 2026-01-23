@@ -67,29 +67,35 @@ export async function GET(request: NextRequest) {
     }
 
     // 4. Calculate state and expiration for each machine
+    const referenceDate = !allPeriod && dateTo ? new Date(dateTo) : new Date()
+    if (!allPeriod && dateTo) {
+      referenceDate.setUTCHours(23, 59, 59, 999)
+    }
+
     const expirations: any[] = []
     for (const machine of machines) {
       const machineEvents = eventsByMachine.get(machine.id) || []
-      const state = calculateStateFromEvents(machine.id, machineEvents)
+      const state = calculateStateFromEvents(machine.id, machineEvents, referenceDate)
 
       // Only active allocations
       if (state.status === 'allocated' || state.status === 'maintenance' || state.status === 'exceeded') {
-        const startDate = state.allocation_start ? new Date(state.allocation_start) : null
-        let expirationDate: Date | null = null
+        let expirationDate = state.end_date || null
 
-        if (startDate && machine.billing_type) {
-          expirationDate = new Date(startDate)
+        if (!expirationDate && state.allocation_start && machine.billing_type) {
+          const startDate = new Date(state.allocation_start)
+          const calcDate = new Date(startDate.getTime())
           switch (machine.billing_type) {
             case 'monthly':
-              expirationDate.setDate(expirationDate.getDate() + 30)
+              calcDate.setUTCDate(calcDate.getUTCDate() + 30)
               break
             case 'weekly':
-              expirationDate.setDate(expirationDate.getDate() + 7)
+              calcDate.setUTCDate(calcDate.getUTCDate() + 7)
               break
             case 'daily':
-              expirationDate.setDate(expirationDate.getDate() + 1)
+              calcDate.setUTCDate(calcDate.getUTCDate() + 1)
               break
           }
+          expirationDate = calcDate.toISOString()
         }
 
         const site = state.current_site_id ? siteInfo.get(state.current_site_id) : null
@@ -104,7 +110,7 @@ export async function GET(request: NextRequest) {
           construction_type: state.construction_type,
           lot_building_number: state.lot_building_number,
           allocation_start: state.allocation_start,
-          expiration_date: expirationDate?.toISOString() || null,
+          expiration_date: expirationDate,
           billing_type: machine.billing_type,
           status: state.status
         })

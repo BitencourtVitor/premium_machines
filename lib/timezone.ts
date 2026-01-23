@@ -88,6 +88,20 @@ export const formatDateOnly = (dateString: string): string => {
 }
 
 /**
+ * Formats a date string without shifting for timezone.
+ * Useful for "whole-day" fields like allocation dates.
+ * @param dateString - ISO date string
+ * @returns Formatted string (DD/MM/YYYY)
+ */
+export const formatDateNoTimezone = (dateString: string | null | undefined): string => {
+  if (!dateString) return ''
+  const datePart = dateString.split('T')[0]
+  const [year, month, day] = datePart.split('-')
+  if (!year || !month || !day) return dateString
+  return `${day}/${month}/${year}`
+}
+
+/**
  * Converts a local datetime-local input value (YYYY-MM-DDTHH:mm) 
  * to a UTC ISO string based on the current system timezone.
  * @param localValue - The value from datetime-local input

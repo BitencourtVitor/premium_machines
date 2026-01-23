@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
-import { adjustDateToSystemTimezone, formatDateOnly } from './timezone'
+import { adjustDateToSystemTimezone, formatDateOnly, formatDateNoTimezone } from '@/lib/timezone'
 
 interface AllocationData {
   machine_unit_number: string
@@ -78,7 +78,7 @@ export const generateAllocationsPDF = async (data: AllocationData[], periodLabel
   // Report Title
   doc.setFontSize(12)
   doc.setTextColor(40)
-  doc.text('Relatório de Alocações', margin, 35)
+  doc.text('Status das Alocações', margin, 35)
   
   doc.setFontSize(10)
   doc.setTextColor(100, 100, 100)
@@ -110,53 +110,80 @@ export const generateAllocationsPDF = async (data: AllocationData[], periodLabel
     }
   }
 
-  data.forEach((item, index) => {
-    if (currentY > 270) {
+  // Group data by site
+  const groupedBySite = new Map<string, AllocationData[]>()
+  data.forEach(item => {
+    const site = item.site_title || 'Sem Localização'
+    if (!groupedBySite.has(site)) groupedBySite.set(site, [])
+    groupedBySite.get(site)?.push(item)
+  })
+
+  // Iterate over groups
+  groupedBySite.forEach((machines, siteTitle) => {
+    if (currentY > 250) {
       doc.addPage()
       currentY = 20
     }
 
-    // Title: Machine
+    // Site Header
+    doc.setFillColor(245, 245, 245)
+    doc.rect(margin, currentY - 5, pageWidth - margin * 2, 8, 'F')
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
-    doc.setTextColor(30)
-    const machineTitle = `${item.machine_unit_number} - ${item.machine_description || item.machine_type}`
-    doc.text(machineTitle, margin, currentY)
+    doc.setTextColor(40)
+    doc.text(siteTitle.toUpperCase(), margin + 2, currentY)
+    currentY += 10
 
-    // Status (Opposite side)
-    const statusInfo = getStatusInfo(item.status, item.is_in_downtime)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
-    doc.setTextColor(statusInfo.color[0], statusInfo.color[1], statusInfo.color[2])
-    
-    const statusWidth = doc.getTextWidth(statusInfo.label)
-    doc.text(statusInfo.label, pageWidth - margin - statusWidth, currentY)
+    machines.forEach((item) => {
+      if (currentY > 270) {
+        doc.addPage()
+        currentY = 20
+      }
 
-    currentY += 6
+      // Machine Info
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.setTextColor(30)
+      const machineTitle = `${item.machine_unit_number} - ${item.machine_description || item.machine_type}`
+      doc.text(machineTitle, margin + 5, currentY)
 
-    // Subtitle: Address
-    doc.setFontSize(9)
-    doc.setTextColor(100, 100, 100)
-    const address = `${item.site_title}${item.lot_building_number ? ` - ${item.construction_type === 'lot' ? 'Lote' : 'Prédio'} ${item.lot_building_number}` : ''}`
-    doc.text(address, margin, currentY)
+      // Status
+      const statusInfo = getStatusInfo(item.status, item.is_in_downtime)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(statusInfo.color[0], statusInfo.color[1], statusInfo.color[2])
+      const statusWidth = doc.getTextWidth(statusInfo.label)
+      doc.text(statusInfo.label, pageWidth - margin - statusWidth, currentY)
 
-    currentY += 5
+      currentY += 5
 
-    // Extensions if any
-    if (item.attached_extensions && item.attached_extensions.length > 0) {
-      item.attached_extensions.forEach((ext: any) => {
+      // Sub-location (Lot/Building)
+      if (item.lot_building_number) {
         doc.setFontSize(8)
         doc.setTextColor(120, 120, 120)
-        doc.text(`   + Extensão: ${ext.extension_unit_number} (${ext.extension_type})`, margin, currentY)
+        const subLocation = `${item.construction_type === 'lot' ? 'Lote' : 'Prédio/Torre'}: ${item.lot_building_number}`
+        doc.text(subLocation, margin + 5, currentY)
         currentY += 4
-      })
-    }
+      }
 
-    // Separator line
-    currentY += 2
-    doc.setDrawColor(230)
-    doc.line(margin, currentY, pageWidth - margin, currentY)
-    currentY += 8
+      // Extensions
+      if (item.attached_extensions && item.attached_extensions.length > 0) {
+        item.attached_extensions.forEach((ext: any) => {
+          doc.setFontSize(8)
+          doc.setTextColor(140, 140, 140)
+          doc.text(`   + Extensão: ${ext.extension_unit_number} (${ext.extension_type})`, margin + 5, currentY)
+          currentY += 4
+        })
+      }
+
+      currentY += 4
+      // Thin separator between machines in the same site
+      doc.setDrawColor(240)
+      doc.line(margin + 5, currentY - 2, pageWidth - margin, currentY - 2)
+      currentY += 4
+    })
+
+    currentY += 5 // Space after each site group
   })
 
   doc.save(`relatorio_alocacoes_${new Date().getTime()}.pdf`)
@@ -196,9 +223,9 @@ export const generateRentExpirationPDF = async (data: RentExpirationData[], peri
 
     // Expiration Date (Opposite side)
     if (item.expiration_date) {
-      const expDate = adjustDateToSystemTimezone(item.expiration_date)
-      const today = new Date()
-      const isExpired = expDate < today
+      const expDateStr = item.expiration_date?.split('T')[0]
+      const todayStr = new Date().toISOString().split('T')[0]
+      const isExpired = expDateStr && todayStr > expDateStr
       
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(10)
@@ -208,7 +235,7 @@ export const generateRentExpirationPDF = async (data: RentExpirationData[], peri
         doc.setTextColor(22, 163, 74) // Green
       }
       
-      const expLabel = `Vence em: ${formatDateOnly(item.expiration_date)}`
+      const expLabel = `Vence em: ${formatDateNoTimezone(item.expiration_date)}`
       const expWidth = doc.getTextWidth(expLabel)
       doc.text(expLabel, pageWidth - margin - expWidth, currentY)
     }
@@ -234,7 +261,7 @@ export const generateRentExpirationPDF = async (data: RentExpirationData[], peri
     }
     
     if (item.allocation_start) {
-      const startDate = formatDateOnly(item.allocation_start)
+      const startDate = formatDateNoTimezone(item.allocation_start)
       details += details ? ` | Início: ${startDate}` : `Início: ${startDate}`
     }
 

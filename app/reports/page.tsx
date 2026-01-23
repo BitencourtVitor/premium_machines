@@ -145,7 +145,7 @@ export default function ReportsPage() {
   const reports: ReportItem[] = [
     {
       id: 'alocacoes',
-      title: 'Relatório de Alocações',
+      title: 'Status das Alocações',
       subtitle: 'Quais máquinas estão alocadas, aonde estão e qual a condição de cada uma',
     },
     {
@@ -160,7 +160,7 @@ export default function ReportsPage() {
     },
     {
       id: 'abastecimento',
-      title: 'Relatório de Abastecimento',
+      title: 'Controle de Abastecimento',
       subtitle: 'Para o intervalo selecionado, o que estava planejado, o que foi executado, onde, quando e com qual máquina',
     },
   ]
