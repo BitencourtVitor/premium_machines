@@ -426,10 +426,10 @@ export const generateMachineHistoryPDF = async (machine: any, events: any[], per
       doc.setTextColor(80, 80, 80)
       let detailText = ''
       if (event.site) detailText += `Local: ${event.site.title}`
-      if (event.extension) detailText += `${detailText ? ' | ' : ''}Extensão: ${event.extension.unit_number}`
+      
       if (event.construction_type) {
         const type = event.construction_type === 'lot' ? 'Lote' : 'Prédio'
-        detailText += ` (${type}: ${event.lot_building_number})`
+        detailText += `${detailText ? ' | ' : ''}${type} ${event.lot_building_number}`
       }
       
       if (detailText) {

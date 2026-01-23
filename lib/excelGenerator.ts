@@ -101,8 +101,7 @@ export const generateMachineHistoryExcel = (machine: any, events: any[]) => {
       'Data': formatDateOnly(event.event_date),
       'Evento': config.label,
       'Local': event.site?.title || '-',
-      'Lote/Prédio': event.lot_building_number || '-',
-      'Extensão': event.extension?.unit_number || '-',
+      'Lote/Prédio': event.lot_building_number ? `${event.construction_type === 'lot' ? 'Lote' : 'Prédio'} ${event.lot_building_number}` : '-',
       'Operador': event.user?.nome || '-',
       'Status': event.status === 'approved' ? 'Aprovado' : event.status === 'pending' ? 'Pendente' : 'Rejeitado',
       'Observações': event.notas || ''
