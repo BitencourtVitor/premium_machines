@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
-import { adjustDateToSystemTimezone, formatDateOnly, formatDateNoTimezone } from '@/lib/timezone'
+import { adjustDateToSystemTimezone, formatDateOnly, formatDateNoTimezone, formatWithSystemTimezone } from '@/lib/timezone'
+import { getEventConfig } from '@/app/events/utils'
 
 interface AllocationData {
   machine_unit_number: string
@@ -28,6 +29,12 @@ interface RentExpirationData {
   expiration_date: string | null
   billing_type: string
   status: string
+}
+
+interface RefuelingControlData {
+  events: any[]
+  templates: any[]
+  period: { start: string, end: string }
 }
 
 const getBase64ImageFromURL = (url: string): Promise<string> => {
@@ -70,7 +77,7 @@ const drawHeader = async (doc: any, margin: number) => {
   }
 }
 
-export const generateAllocationsPDF = async (data: AllocationData[], periodLabel: string) => {
+export const generateAllocationStatusPDF = async (data: AllocationData[], periodLabel: string) => {
   const doc = new jsPDF() as any
   const pageWidth = doc.internal.pageSize.width
   const margin = 15
@@ -323,3 +330,191 @@ export const generateRentExpirationPDF = async (data: RentExpirationData[], peri
 
   doc.save(`relatorio_vencimentos_${new Date().toISOString().split('T')[0]}.pdf`)
 }
+
+export const generateMachineHistoryPDF = async (machine: any, events: any[], periodLabel: string) => {
+  const doc = new jsPDF() as any
+  const pageWidth = doc.internal.pageSize.width
+  const margin = 15
+
+  await drawHeader(doc, margin)
+
+  // Report Title
+  doc.setFontSize(12)
+  doc.setTextColor(40)
+  doc.text('Histórico do Equipamento', margin, 35)
+  
+  doc.setFontSize(10)
+  doc.setTextColor(100, 100, 100)
+  doc.text(`Período: ${periodLabel}`, margin, 42)
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 47)
+
+  // Machine Info Card
+  let currentY = 60
+  doc.setFillColor(248, 250, 252)
+  doc.rect(margin, currentY, pageWidth - margin * 2, 35, 'F')
+  doc.setDrawColor(226, 232, 240)
+  doc.rect(margin, currentY, pageWidth - margin * 2, 35, 'S')
+
+  currentY += 10
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(14)
+  doc.setTextColor(30)
+  doc.text(`${machine.unit_number}`, margin + 5, currentY)
+  
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(100, 100, 100)
+  doc.text(`${machine.machine_type?.nome || 'Equipamento'}`, margin + 5, currentY + 6)
+
+  // Machine Details (Grid)
+  const detailY = currentY + 15
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Propriedade:', margin + 5, detailY)
+  doc.text('Fornecedor:', margin + 65, detailY)
+  doc.text('Status Atual:', margin + 125, detailY)
+
+  doc.setFont('helvetica', 'normal')
+  doc.text(machine.ownership_type === 'own' ? 'Próprio' : 'Alugado', margin + 5, detailY + 5)
+  doc.text(machine.supplier?.nome || 'N/A', margin + 65, detailY + 5)
+  doc.text(machine.ativo ? 'Ativo' : 'Inativo', margin + 125, detailY + 5)
+
+  currentY = 105
+
+  // Timeline
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.setTextColor(40)
+  doc.text('Linha do Tempo de Eventos', margin, currentY)
+  currentY += 10
+
+  if (events.length === 0) {
+    doc.setFont('helvetica', 'italic')
+    doc.setFontSize(10)
+    doc.text('Nenhum evento registrado no período.', margin, currentY)
+  } else {
+    events.forEach((event: any) => {
+      if (currentY > 260) {
+        doc.addPage()
+        currentY = 20
+      }
+
+      const config = getEventConfig(event.event_type)
+      const eventDate = formatDateOnly(event.event_date)
+
+      // Event background
+      doc.setFillColor(252, 252, 252)
+      doc.rect(margin, currentY, pageWidth - margin * 2, 25, 'F')
+      
+      // Vertical line for timeline
+      doc.setDrawColor(230, 230, 230)
+      doc.line(margin + 5, currentY, margin + 5, currentY + 25)
+
+      // Event Title and Date
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.setTextColor(40)
+      doc.text(config.label, margin + 10, currentY + 8)
+      
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(150, 150, 150)
+      doc.text(eventDate, pageWidth - margin - doc.getTextWidth(eventDate) - 2, currentY + 8)
+
+      // Details
+      doc.setFontSize(9)
+      doc.setTextColor(80, 80, 80)
+      let detailText = ''
+      if (event.site) detailText += `Local: ${event.site.title}`
+      if (event.extension) detailText += `${detailText ? ' | ' : ''}Extensão: ${event.extension.unit_number}`
+      if (event.construction_type) {
+        const type = event.construction_type === 'lot' ? 'Lote' : 'Prédio'
+        detailText += ` (${type}: ${event.lot_building_number})`
+      }
+      
+      if (detailText) {
+        doc.text(detailText, margin + 10, currentY + 14)
+      }
+
+      // User and Status
+      doc.setFontSize(8)
+      doc.setTextColor(120, 120, 120)
+      const userText = `Realizado por: ${event.user?.nome || 'N/A'}`
+      doc.text(userText, margin + 10, currentY + 20)
+
+      if (event.status === 'rejected') {
+        doc.setTextColor(220, 38, 38)
+        doc.text('REJEITADO', pageWidth - margin - doc.getTextWidth('REJEITADO') - 2, currentY + 20)
+      } else if (event.status === 'pending') {
+        doc.setTextColor(234, 88, 12)
+        doc.text('PENDENTE', pageWidth - margin - doc.getTextWidth('PENDENTE') - 2, currentY + 20)
+      }
+
+      currentY += 28
+    })
+  }
+
+  doc.save(`historico_${machine.unit_number}_${new Date().getTime()}.pdf`)
+}
+
+export const generateRefuelingControlPDF = async (data: RefuelingControlData, periodLabel: string) => {
+  const doc = new jsPDF() as any
+  const pageWidth = doc.internal.pageSize.width
+  const margin = 15
+
+  await drawHeader(doc, margin)
+
+  // Report Title
+  doc.setFontSize(12)
+  doc.setTextColor(40)
+  doc.text('Controle de Abastecimento', margin, 35)
+  
+  doc.setFontSize(10)
+  doc.setTextColor(100, 100, 100)
+  doc.text(`Período: ${periodLabel}`, margin, 42)
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 47)
+
+  const tableData = data.events.map(event => [
+    formatWithSystemTimezone(event.event_date),
+    event.machine?.unit_number || 'N/A',
+    event.machine?.machine_type?.nome || 'N/A',
+    event.site?.title || 'N/A',
+    event.user?.nome || 'N/A',
+    event.status === 'approved' ? 'Realizado' : event.status === 'pending' ? 'Pendente' : 'Rejeitado'
+  ])
+
+  doc.autoTable({
+    startY: 55,
+    head: [['Data/Hora', 'Unidade', 'Tipo', 'Local', 'Operador', 'Status']],
+    body: tableData,
+    theme: 'striped',
+    headStyles: { fillColor: [46, 134, 193], textColor: 255 },
+    styles: { fontSize: 8 },
+    margin: { left: margin, right: margin }
+  })
+
+  // Add summary of planned vs executed if possible
+  let currentY = (doc as any).lastAutoTable.finalY + 15
+  
+  if (currentY > 260) {
+    doc.addPage()
+    currentY = 20
+  }
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.text('Resumo do Período', margin, currentY)
+  
+  const totalPlanned = data.templates.length // This is simplistic, would need recurring logic
+  const totalExecuted = data.events.filter(e => e.status === 'approved').length
+  
+  currentY += 8
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.text(`Total de Abastecimentos Realizados: ${totalExecuted}`, margin, currentY)
+  currentY += 6
+  doc.text(`Total de Máquinas Atendidas: ${new Set(data.events.map(e => e.machine_id)).size}`, margin, currentY)
+
+  doc.save(`controle_abastecimento_${new Date().getTime()}.pdf`)
+}
+

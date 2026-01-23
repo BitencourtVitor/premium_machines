@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
-import { formatDateNoTimezone } from './timezone'
+import { formatDateNoTimezone, formatWithSystemTimezone, formatDateOnly } from './timezone'
+import { getEventConfig } from '@/app/events/utils'
 
 export const generateAllocationStatusExcel = (data: any[]) => {
   const worksheetData = data.map(item => {
@@ -92,3 +93,64 @@ export const generateRentExpirationExcel = (data: any[]) => {
   XLSX.utils.book_append_sheet(wb, ws, 'Vencimento de Aluguéis')
   XLSX.writeFile(wb, `vencimento_alugueis_${new Date().toISOString().split('T')[0]}.xlsx`)
 }
+
+export const generateMachineHistoryExcel = (machine: any, events: any[]) => {
+  const worksheetData = events.map(event => {
+    const config = getEventConfig(event.event_type)
+    return {
+      'Data': formatDateOnly(event.event_date),
+      'Evento': config.label,
+      'Local': event.site?.title || '-',
+      'Lote/Prédio': event.lot_building_number || '-',
+      'Extensão': event.extension?.unit_number || '-',
+      'Operador': event.user?.nome || '-',
+      'Status': event.status === 'approved' ? 'Aprovado' : event.status === 'pending' ? 'Pendente' : 'Rejeitado',
+      'Observações': event.notas || ''
+    }
+  })
+
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.json_to_sheet(worksheetData)
+
+  // Add machine info at the top if needed, but for now just the list
+  const maxWidths = worksheetData.reduce((acc: any, row: any) => {
+    Object.keys(row).forEach((key, i) => {
+      const value = String(row[key] || '')
+      acc[i] = Math.max(acc[i] || 10, value.length + 2)
+    })
+    return acc
+  }, [])
+  ws['!cols'] = maxWidths.map((w: number) => ({ wch: w }))
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Histórico')
+  XLSX.writeFile(wb, `historico_${machine.unit_number}_${new Date().toISOString().split('T')[0]}.xlsx`)
+}
+
+export const generateRefuelingControlExcel = (events: any[]) => {
+  const worksheetData = events.map(event => ({
+    'Data/Hora': formatWithSystemTimezone(event.event_date),
+    'Unidade': event.machine?.unit_number || '-',
+    'Tipo': event.machine?.machine_type?.nome || '-',
+    'Local': event.site?.title || '-',
+    'Endereço': event.site?.address || '-',
+    'Operador': event.user?.nome || '-',
+    'Status': event.status === 'approved' ? 'Realizado' : event.status === 'pending' ? 'Pendente' : 'Rejeitado',
+    'Observações': event.notas || ''
+  }))
+
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.json_to_sheet(worksheetData)
+
+  const maxWidths = worksheetData.reduce((acc: any, row: any) => {
+    Object.keys(row).forEach((key, i) => {
+      const value = String(row[key] || '')
+      acc[i] = Math.max(acc[i] || 10, value.length + 2)
+    })
+    return acc
+  }, [])
+  ws['!cols'] = maxWidths.map((w: number) => ({ wch: w }))
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Abastecimentos')
+  XLSX.writeFile(wb, `controle_abastecimento_${new Date().toISOString().split('T')[0]}.xlsx`)
+}
+

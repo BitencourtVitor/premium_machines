@@ -10,8 +10,18 @@ import CustomDropdown from '../components/CustomDropdown'
 import { useSidebar } from '@/lib/useSidebar'
 import { HiCheck, HiChevronLeft, HiChevronRight, HiOutlineCalendarDays } from 'react-icons/hi2'
 import { BsFileEarmarkPdf, BsFileEarmarkExcel } from 'react-icons/bs'
-import { generateAllocationsPDF, generateRentExpirationPDF } from '@/lib/reportGenerator'
-import { generateAllocationStatusExcel, generateRentExpirationExcel } from '@/lib/excelGenerator'
+import { 
+  generateAllocationsPDF, 
+  generateRentExpirationPDF,
+  generateMachineHistoryPDF,
+  generateRefuelingControlPDF
+} from '@/lib/reportGenerator'
+import { 
+  generateAllocationStatusExcel, 
+  generateRentExpirationExcel,
+  generateMachineHistoryExcel,
+  generateRefuelingControlExcel
+} from '@/lib/excelGenerator'
 import { adjustDateToSystemTimezone, formatDateOnly } from '@/lib/timezone'
 
 interface ReportItem {
@@ -192,7 +202,7 @@ export default function ReportsPage() {
 
         if (data.success) {
           const periodLabel = allPeriod 
-            ? 'Todo o Período' 
+            ? 'Atualmente' 
             : `Até ${formatDateOnly(dateTo)}`
           await generateAllocationsPDF(data.allocations, periodLabel)
         } else {
@@ -211,9 +221,43 @@ export default function ReportsPage() {
 
         if (data.success) {
           const periodLabel = allPeriod 
-            ? 'Todo o Período' 
+            ? 'Atualmente' 
             : `Até ${formatDateOnly(dateTo)}`
           await generateRentExpirationPDF(data.expirations, periodLabel)
+        } else {
+          alert('Erro ao gerar relatório: ' + data.message)
+        }
+      } else if (reportId === 'historico') {
+        const queryParams = new URLSearchParams({
+          machineId: selectedEquipmentId,
+          allPeriod: allPeriod.toString()
+        })
+        if (!allPeriod) {
+          if (dateFrom) queryParams.append('dateFrom', dateFrom)
+          if (dateTo) queryParams.append('dateTo', dateTo)
+        }
+
+        const res = await fetch(`/api/reports/machine-history?${queryParams.toString()}`)
+        const data = await res.json()
+
+        if (data.success) {
+          const periodLabel = allPeriod ? 'Atualmente' : `${dateFrom ? `De ${formatDateOnly(dateFrom)} ` : ''}Até ${formatDateOnly(dateTo)}`
+          await generateMachineHistoryPDF(data.machine, data.events, periodLabel)
+        } else {
+          alert('Erro ao gerar relatório: ' + data.message)
+        }
+      } else if (reportId === 'abastecimento') {
+        const queryParams = new URLSearchParams({
+          start_date: weekRange.start,
+          end_date: weekRange.end
+        })
+
+        const res = await fetch(`/api/reports/refueling-control?${queryParams.toString()}`)
+        const data = await res.json()
+
+        if (data.success) {
+          const periodLabel = formatWeekRange(weekRange.labelStart, weekRange.labelEnd)
+          await generateRefuelingControlPDF(data, periodLabel)
         } else {
           alert('Erro ao gerar relatório: ' + data.message)
         }
@@ -262,6 +306,38 @@ export default function ReportsPage() {
 
         if (data.success) {
           generateRentExpirationExcel(data.expirations)
+        } else {
+          alert('Erro ao gerar relatório Excel: ' + data.message)
+        }
+      } else if (reportId === 'historico') {
+        const queryParams = new URLSearchParams({
+          machineId: selectedEquipmentId,
+          allPeriod: allPeriod.toString()
+        })
+        if (!allPeriod) {
+          if (dateFrom) queryParams.append('dateFrom', dateFrom)
+          if (dateTo) queryParams.append('dateTo', dateTo)
+        }
+
+        const res = await fetch(`/api/reports/machine-history?${queryParams.toString()}`)
+        const data = await res.json()
+
+        if (data.success) {
+          generateMachineHistoryExcel(data.machine, data.events)
+        } else {
+          alert('Erro ao gerar relatório Excel: ' + data.message)
+        }
+      } else if (reportId === 'abastecimento') {
+        const queryParams = new URLSearchParams({
+          start_date: weekRange.start,
+          end_date: weekRange.end
+        })
+
+        const res = await fetch(`/api/reports/refueling-control?${queryParams.toString()}`)
+        const data = await res.json()
+
+        if (data.success) {
+          generateRefuelingControlExcel(data.events)
         } else {
           alert('Erro ao gerar relatório Excel: ' + data.message)
         }
@@ -322,7 +398,7 @@ export default function ReportsPage() {
           </svg>
         </div>
         <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-          Todo o período
+          Atualmente
         </span>
       </label>
     </div>
