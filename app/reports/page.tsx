@@ -11,6 +11,7 @@ import { useSidebar } from '@/lib/useSidebar'
 import { HiCheck, HiChevronLeft, HiChevronRight, HiOutlineCalendarDays } from 'react-icons/hi2'
 import { BsFileEarmarkPdf, BsFileEarmarkExcel } from 'react-icons/bs'
 import { generateAllocationsPDF, generateRentExpirationPDF } from '@/lib/reportGenerator'
+import { generateAllocationStatusExcel, generateRentExpirationExcel } from '@/lib/excelGenerator'
 import { adjustDateToSystemTimezone, formatDateOnly } from '@/lib/timezone'
 
 interface ReportItem {
@@ -40,6 +41,7 @@ export default function ReportsPage() {
   const [hasFuelData, setHasFuelData] = useState(false)
   const [checkingFuelData, setCheckingFuelData] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState<string | null>(null)
+  const [generatingExcel, setGeneratingExcel] = useState<string | null>(null)
 
   // Persist week offset
   useEffect(() => {
@@ -226,6 +228,54 @@ export default function ReportsPage() {
     }
   }
 
+  const handleGenerateExcel = async (reportId: string) => {
+    if (!isReportReady(reportId)) return
+
+    setGeneratingExcel(reportId)
+    try {
+      if (reportId === 'alocacoes') {
+        const queryParams = new URLSearchParams()
+        if (allPeriod) {
+          queryParams.append('allPeriod', 'true')
+        } else if (dateTo) {
+          queryParams.append('dateTo', dateTo)
+        }
+
+        const res = await fetch(`/api/reports/allocations?${queryParams.toString()}`)
+        const data = await res.json()
+
+        if (data.success) {
+          generateAllocationStatusExcel(data.allocations)
+        } else {
+          alert('Erro ao gerar relatório Excel: ' + data.message)
+        }
+      } else if (reportId === 'vencimento') {
+        const queryParams = new URLSearchParams()
+        if (allPeriod) {
+          queryParams.append('allPeriod', 'true')
+        } else if (dateTo) {
+          queryParams.append('dateTo', dateTo)
+        }
+
+        const res = await fetch(`/api/reports/rent-expiration?${queryParams.toString()}`)
+        const data = await res.json()
+
+        if (data.success) {
+          generateRentExpirationExcel(data.expirations)
+        } else {
+          alert('Erro ao gerar relatório Excel: ' + data.message)
+        }
+      } else {
+        console.log(`Gerando Excel para ${reportId}`, reportId === 'abastecimento' ? weekRange : { dateFrom, dateTo, allPeriod })
+      }
+    } catch (error) {
+      console.error('Error generating Excel:', error)
+      alert('Erro ao gerar relatório Excel. Tente novamente.')
+    } finally {
+      setGeneratingExcel(null)
+    }
+  }
+
   const headerActions = (
     <div className="flex items-center gap-4">
       <div className="flex items-center gap-2">
@@ -385,13 +435,19 @@ export default function ReportsPage() {
             )}
           </button>
           <button
-            onClick={() => console.log(`Gerando Excel para ${report.id}`, report.id === 'abastecimento' ? weekRange : { dateFrom, dateTo, allPeriod })}
-            disabled={!isReportReady(report.id)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => handleGenerateExcel(report.id)}
+            disabled={!isReportReady(report.id) || generatingExcel === report.id}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[70px] justify-center"
             title="Gerar Excel"
           >
-            <BsFileEarmarkExcel className="w-4 h-4" />
-            <span>Excel</span>
+            {generatingExcel === report.id ? (
+              <div className="w-4 h-4 border-2 border-green-600 dark:border-green-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>
+                <BsFileEarmarkExcel className="w-4 h-4" />
+                <span>Excel</span>
+              </>
+            )}
           </button>
         </div>
       </div>

@@ -116,8 +116,8 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
         break
 
       case 'extension_attach':
-        // Lógica antiga: Máquina Pai anexando uma extensão
-        if (event.extension_id) {
+        // Se estamos calculando para a máquina PAI (ela está anexando uma extensão)
+        if (event.extension_id && event.machine_id === machineId) {
           // Verificar se a extensão já está na lista
           const existingIndex = state.attached_extensions.findIndex(e => e.extension_id === event.extension_id)
           if (existingIndex === -1) {
@@ -131,25 +131,42 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
             })
           }
         } 
-        // Lógica nova: Extensão sendo alocada (tratada como máquina independente)
-        else if (event.site_id) {
-          state.current_site_id = event.site_id
-          state.current_site_title = event.site?.title || null
-          state.current_allocation_event_id = event.id
-          state.construction_type = event.construction_type
-          state.lot_building_number = event.lot_building_number
-          state.allocation_start = event.event_date
-          state.end_date = event.end_date
-          state.planned_end_date = event.end_date
-          state.status = 'allocated'
+        // Se estamos calculando para a EXTENSÃO que está sendo anexada (ela herda o local da máquina pai)
+        // OU se é uma alocação independente de extensão (onde machine_id é a extensão e extension_id é null)
+        else if (event.extension_id === machineId || (event.machine_id === machineId && event.site_id)) {
+          if (event.site_id) {
+            state.current_site_id = event.site_id
+            state.current_site_title = event.site?.title || null
+            state.current_allocation_event_id = event.id
+            state.construction_type = event.construction_type
+            state.lot_building_number = event.lot_building_number
+            state.allocation_start = event.event_date
+            state.end_date = event.end_date
+            state.planned_end_date = event.end_date
+            state.status = 'allocated'
+          }
         }
         break
 
       case 'extension_detach':
-        if (event.extension_id) {
+        // Se estamos calculando para a máquina PAI
+        if (event.extension_id && event.machine_id === machineId) {
           state.attached_extensions = state.attached_extensions.filter(
             e => e.extension_id !== event.extension_id
           )
+        }
+        // Se estamos calculando para a EXTENSÃO que está sendo desanexada
+        else if (event.extension_id === machineId) {
+          state.status = 'available'
+          // Ao desanexar, ela perde o vínculo com a obra (a menos que tenha alocação própria, 
+          // mas o evento de detach geralmente significa que ela está saindo de cena)
+          state.current_site_id = null
+          state.current_site_title = null
+          state.construction_type = null
+          state.lot_building_number = null
+          state.allocation_start = null
+          state.end_date = null
+          state.planned_end_date = null
         }
         break
 

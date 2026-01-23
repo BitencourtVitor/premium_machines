@@ -90,6 +90,7 @@ export async function GET(request: NextRequest) {
           status: state.status,
           is_in_downtime: state.is_in_downtime,
           attached_extensions: state.attached_extensions,
+          allocation_start: state.allocation_start,
           end_date: state.end_date
         })
       }

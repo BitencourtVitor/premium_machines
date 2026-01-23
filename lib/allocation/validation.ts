@@ -165,8 +165,8 @@ export async function validateEvent(event: Partial<AllocationEvent>): Promise<{
         return { valid: false, reason: 'A máquina não possui um local de origem definido para iniciar o transporte' }
       }
 
-      // Permitir transporte para máquinas alocadas, disponíveis ou em manutenção
-      const validStatuses = ['allocated', 'available', 'maintenance']
+      // Permitir transporte para máquinas alocadas, disponíveis, em manutenção ou com alocação excedida
+      const validStatuses = ['allocated', 'available', 'maintenance', 'exceeded']
       if (!validStatuses.includes(state.status)) {
         return { valid: false, reason: 'Apenas máquinas alocadas, disponíveis ou em manutenção podem iniciar transporte' }
       }

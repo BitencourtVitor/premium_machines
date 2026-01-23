@@ -13,6 +13,7 @@ interface AllocationData {
   is_in_downtime: boolean
   attached_extensions: any[]
   end_date?: string | null
+  allocation_start?: string | null
 }
 
 interface RentExpirationData {
@@ -180,11 +181,16 @@ export const generateAllocationsPDF = async (data: AllocationData[], periodLabel
         // Status and Exceeded Days
         const statusInfo = getStatusInfo(item.status, item.is_in_downtime)
         let statusLabel = statusInfo.label
+        const today = new Date(new Date().toISOString().split('T')[0])
         
         if (item.status === 'exceeded' && item.end_date) {
           const expDate = new Date(item.end_date.split('T')[0])
-          const today = new Date(new Date().toISOString().split('T')[0])
           const diffTime = Math.abs(today.getTime() - expDate.getTime())
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+          statusLabel += ` (${diffDays} dias)`
+        } else if ((item.status === 'in_transit' || item.status === 'maintenance') && item.allocation_start) {
+          const startDate = new Date(item.allocation_start.split('T')[0])
+          const diffTime = Math.abs(today.getTime() - startDate.getTime())
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
           statusLabel += ` (${diffDays} dias)`
         }
