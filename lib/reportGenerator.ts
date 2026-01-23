@@ -463,15 +463,15 @@ export const generateRefuelingControlPDF = async (data: RefuelingControlData, pe
   await drawHeader(doc, margin)
 
   // Report Title
-  doc.setFontSize(14)
-  doc.setTextColor(40, 40, 40)
+  doc.setFontSize(12)
+  doc.setTextColor(40)
   doc.setFont('helvetica', 'bold')
   doc.text('Controle de Abastecimento', margin, 35)
   
-  doc.setFontSize(9)
+  doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(100, 100, 100)
-  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 41)
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 42)
 
   // Date Interval (Right aligned)
   if (data.period) {
@@ -479,104 +479,57 @@ export const generateRefuelingControlPDF = async (data: RefuelingControlData, pe
     const endDateStr = formatDateOnly(data.period.end)
     const intervalText = `Datas inclusas: de ${startDateStr} até ${endDateStr}`
     const intervalWidth = doc.getTextWidth(intervalText)
-    doc.text(intervalText, pageWidth - margin - intervalWidth, 41)
+    doc.text(intervalText, pageWidth - margin - intervalWidth, 42)
   }
 
-  // Summary Metrics Boxes
-  const totalMachines = new Set(data.events.map(e => e.machine_id)).size
-  const totalConfirmed = data.events.filter(e => e.status === 'approved').length
-  
-  const boxWidth = (pageWidth - (margin * 2) - 10) / 2
-  const boxHeight = 20
-  const boxY = 48
-
-  // Left Box: Máquinas Atendidas
-  doc.setFillColor(248, 250, 252)
-  doc.setDrawColor(226, 232, 240)
-  doc.roundedRect(margin, boxY, boxWidth, boxHeight, 2, 2, 'FD')
-  
-  doc.setFontSize(8)
-  doc.setTextColor(100, 100, 100)
-  doc.text('MÁQUINAS ATENDIDAS', margin + 5, boxY + 7)
-  
-  doc.setFontSize(14)
-  doc.setTextColor(30, 41, 59)
-  doc.setFont('helvetica', 'bold')
-  doc.text(totalMachines.toString(), margin + 5, boxY + 16)
-
-  // Right Box: Abastecimentos Confirmados
-  doc.setFillColor(248, 250, 252)
-  doc.roundedRect(margin + boxWidth + 10, boxY, boxWidth, boxHeight, 2, 2, 'FD')
-  
-  doc.setFontSize(8)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(100, 100, 100)
-  doc.text('ABASTECIMENTOS CONFIRMADOS', margin + boxWidth + 15, boxY + 7)
-  
-  doc.setFontSize(14)
-  doc.setTextColor(22, 163, 74) // Green
-  doc.setFont('helvetica', 'bold')
-  doc.text(totalConfirmed.toString(), margin + boxWidth + 15, boxY + 16)
-
-  let currentY = 75
+  let currentY = 60
 
   data.events.forEach((event, index) => {
-    const cardHeight = 18
-    const cardPadding = 4
-    
     // Check for page break
-    if (currentY + cardHeight > 285) {
+    if (currentY > 260) {
       doc.addPage()
       currentY = 20
     }
 
-    // Card Background
-    doc.setFillColor(255, 255, 255)
-    doc.setDrawColor(241, 245, 249)
-    doc.roundedRect(margin, currentY, pageWidth - margin * 2, cardHeight, 1, 1, 'FD')
-
-    // Unit Number
+    // Title: Unit Number and Machine Type
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
-    doc.setTextColor(30, 41, 59)
-    doc.text(event.machine?.unit_number || 'Sem Unit', margin + cardPadding, currentY + 6.5)
+    doc.setFontSize(11)
+    doc.setTextColor(30)
+    const machineTitle = `${event.machine?.unit_number || 'Sem Unit'} - ${event.machine?.machine_type?.nome || 'Equipamento'}`
+    doc.text(machineTitle, margin, currentY)
 
-    // Location
+    // Status (Opposite side)
+    const statusLabel = event.status === 'approved' ? 'CONFIRMADO' : event.status === 'pending' ? 'PENDENTE' : 'REJEITADO'
+    const statusColor = event.status === 'approved' ? [22, 163, 74] : event.status === 'pending' ? [220, 38, 38] : [100, 100, 100]
+    
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(statusColor[0], statusColor[1], statusColor[2])
+    const statusWidth = doc.getTextWidth(statusLabel)
+    doc.text(statusLabel, pageWidth - margin - statusWidth, currentY)
+
+    currentY += 6
+
+    // Subtitle: Site Address
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7.5)
-    doc.setTextColor(100, 116, 139)
-    doc.text(event.site?.title || 'Sem Jobsite', margin + cardPadding, currentY + 12.5)
+    doc.setFontSize(9)
+    doc.setTextColor(100, 100, 100)
+    const location = `${event.site?.title || 'Sem Jobsite'}${event.site?.address ? ` - ${event.site?.address}` : ''}`
+    const splitAddress = doc.splitTextToSize(location, pageWidth - margin * 2)
+    doc.text(splitAddress, margin, currentY)
+    currentY += (splitAddress.length * 5)
 
-    // Date (Right aligned)
-    const dateText = formatDateOnly(event.event_date)
-    const dateWidth = doc.getTextWidth(dateText)
-    doc.setFontSize(7.5)
-    doc.setTextColor(148, 163, 184)
-    doc.text(dateText, pageWidth - margin - cardPadding - dateWidth, currentY + 6.5)
+    // Details: Date
+    doc.setFontSize(9)
+    doc.setTextColor(120, 120, 120)
+    const dateText = `Data: ${formatDateOnly(event.event_date)}`
+    doc.text(dateText, margin, currentY)
+    currentY += 6
 
-    // Status Badge
-    const status = event.status === 'approved' ? 'CONFIRMADO' : event.status === 'pending' ? 'PENDENTE' : 'REJEITADO'
-    const statusColor = event.status === 'approved' ? [34, 197, 94] : event.status === 'pending' ? [239, 68, 68] : [107, 114, 128]
-    
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(6.5)
-    const badgeText = status
-    const badgeWidth = doc.getTextWidth(badgeText) + 4
-    const badgeHeight = 5
-    const badgeX = pageWidth - margin - cardPadding - badgeWidth
-    const badgeY = currentY + 10
-
-    doc.setFillColor(statusColor[0], statusColor[1], statusColor[2])
-    doc.roundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 1, 1, 'F')
-    
-    doc.setTextColor(255, 255, 255)
-    doc.text(badgeText, badgeX + 2, badgeY + 3.5)
-
-    // Vertical indicator
-    doc.setFillColor(statusColor[0], statusColor[1], statusColor[2])
-    doc.rect(margin, currentY, 1.2, cardHeight, 'F')
-
-    currentY += cardHeight + 2
+    // Divider line
+    doc.setDrawColor(240, 240, 240)
+    doc.line(margin, currentY, pageWidth - margin, currentY)
+    currentY += 10
   })
 
   doc.save(`controle_abastecimento_${new Date().getTime()}.pdf`)
