@@ -19,6 +19,7 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
     current_downtime_event_id: null,
     allocation_start: null,
     end_date: null,
+    planned_end_date: null,
     downtime_start: null,
     current_downtime_reason: null,
     current_downtime_start: null,
@@ -65,6 +66,7 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
           state.lot_building_number = event.lot_building_number
           state.allocation_start = event.event_date
           state.end_date = event.end_date
+          state.planned_end_date = event.end_date
           state.status = 'allocated'
         }
         break
@@ -84,6 +86,7 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
             state.lot_building_number = null
             state.allocation_start = null
             state.end_date = null
+            state.planned_end_date = null
           } else {
             // No dia do evento de fim, ela ainda é considerada 'allocated' (ou 'exceeded' se passar da data)
             // A menos que já tenha iniciado um transporte
@@ -137,6 +140,7 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
           state.lot_building_number = event.lot_building_number
           state.allocation_start = event.event_date
           state.end_date = event.end_date
+          state.planned_end_date = event.end_date
           state.status = 'allocated'
         }
         break

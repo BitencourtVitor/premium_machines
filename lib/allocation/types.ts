@@ -50,6 +50,8 @@ export interface ActiveAllocation {
   allocation_start: string
   start_date?: string
   end_date?: string | null
+  planned_end_date?: string | null
+  actual_end_date?: string | null
   is_in_downtime: boolean
   current_downtime_event_id: string | null
   current_downtime_reason: string | null
@@ -86,6 +88,7 @@ export interface MachineAllocationState {
   current_downtime_event_id: string | null
   allocation_start: string | null
   end_date?: string | null
+  planned_end_date?: string | null
   downtime_start: string | null
   current_downtime_reason: string | null
   current_downtime_start: string | null

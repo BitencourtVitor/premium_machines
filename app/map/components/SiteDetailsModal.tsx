@@ -111,20 +111,46 @@ export default function SiteDetailsModal({
 
   const getExpirationDate = useCallback((machineId: string | null) => {
     if (!machineId) return null
-    // Prioriza a alocação selecionada no histórico lateral
-    const allocation = selectedAllocationId 
-      ? allocations.find(a => String(a.allocation_event_id) === String(selectedAllocationId))
-      : allocations.find(a => a.machine_id === machineId)
+    
+    // Primeiro tenta encontrar a alocação selecionada, mas apenas se ela pertencer a esta máquina
+    let allocation = null
+    if (selectedAllocationId) {
+      allocation = allocations.find(a => 
+        String(a.allocation_event_id) === String(selectedAllocationId) && 
+        a.machine_id === machineId
+      )
+    }
+    
+    // Se não encontrou (ou não tinha selecionada), pega a primeira alocação desta máquina na lista
+    if (!allocation) {
+      allocation = allocations.find(a => a.machine_id === machineId)
+    }
       
-    if (!allocation?.end_date) return null
-    return getSystemDateStr(allocation.end_date)
+    if (!allocation) return null
+
+    // Usar planned_end_date se disponível (vencimento), senão end_date (data final do ciclo)
+    const dateToUse = allocation.planned_end_date || allocation.end_date
+    if (!dateToUse) return null
+    
+    return getSystemDateStr(dateToUse)
   }, [allocations, getSystemDateStr, selectedAllocationId])
 
   const getStartDate = useCallback((machineId: string | null) => {
     if (!machineId) return null
-    const allocation = selectedAllocationId 
-      ? allocations.find(a => String(a.allocation_event_id) === String(selectedAllocationId))
-      : allocations.find(a => a.machine_id === machineId)
+    
+    // Primeiro tenta encontrar a alocação selecionada, mas apenas se ela pertencer a esta máquina
+    let allocation = null
+    if (selectedAllocationId) {
+      allocation = allocations.find(a => 
+        String(a.allocation_event_id) === String(selectedAllocationId) && 
+        a.machine_id === machineId
+      )
+    }
+    
+    // Se não encontrou (ou não tinha selecionada), pega a primeira alocação desta máquina na lista
+    if (!allocation) {
+      allocation = allocations.find(a => a.machine_id === machineId)
+    }
       
     const dateToUse = allocation?.start_date || allocation?.allocation_start
     if (!dateToUse) return null
@@ -322,7 +348,11 @@ export default function SiteDetailsModal({
     const startDate = dateToUse ? getSystemDateStr(dateToUse) : null
 
     if (isStillAllocated) {
-      const expirationDateStr = allocation.end_date ? getSystemDateStr(allocation.end_date) : null
+      // Usar planned_end_date para verificação de excedido, ou end_date como fallback
+      const expirationDateStr = allocation.planned_end_date 
+        ? getSystemDateStr(allocation.planned_end_date) 
+        : (allocation.end_date ? getSystemDateStr(allocation.end_date) : null)
+        
       const todayStr = getSystemDateStr(new Date())
       
       if (expirationDateStr && todayStr > expirationDateStr) {
@@ -490,7 +520,8 @@ export default function SiteDetailsModal({
                       
                       // Formatar as datas do ciclo
                       const cycleStart = formatDateOnly(allocation.start_date || allocation.allocation_start)
-                      const cycleEnd = allocation.end_date ? formatDateOnly(allocation.end_date) : 'Ativa'
+                      const cycleEnd = allocation.actual_end_date ? formatDateOnly(allocation.actual_end_date) : 'Ativa'
+                      const vencimento = allocation.planned_end_date ? formatDateOnly(allocation.planned_end_date) : null
 
                       // Determinar o caminho da imagem baseada no tipo de máquina
                       const getMachineImagePath = () => {
@@ -505,6 +536,8 @@ export default function SiteDetailsModal({
                       }
 
                       const machineImagePath = getMachineImagePath()
+
+                      const isExceeded = allocationStatus.label === 'Ativa Excedida'
 
                       return (
                         <div 
@@ -548,11 +581,27 @@ export default function SiteDetailsModal({
                             <p className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate uppercase tracking-tight">
                               {allocation.machine_type}
                             </p>
-                            <div className="flex items-center gap-1.5 mt-2">
-                              <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600"></span>
-                              <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold whitespace-nowrap uppercase">
-                                {cycleStart} — {cycleEnd}
-                              </p>
+                            <div className="flex flex-col gap-1 mt-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600"></span>
+                                <p className="text-[10px] text-gray-400 dark:text-gray-500 font-semibold whitespace-nowrap uppercase">
+                                  {cycleStart} — {cycleEnd}
+                                </p>
+                              </div>
+                              {vencimento && !allocation.actual_end_date && (
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${
+                                    isExceeded ? 'bg-red-400/50 dark:bg-red-900/50' : 'bg-blue-400/50 dark:bg-blue-900/50'
+                                  }`}></span>
+                                  <p className={`text-[10px] font-bold whitespace-nowrap uppercase tracking-tighter ${
+                                    isExceeded 
+                                      ? 'text-red-500/80 dark:text-red-400/70' 
+                                      : 'text-blue-500/80 dark:text-blue-400/70'
+                                  }`}>
+                                    Vencimento: {vencimento}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </div>
                           
