@@ -91,8 +91,7 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
   
   doc.setFontSize(10)
   doc.setTextColor(100, 100, 100)
-  doc.text(`Período: ${periodLabel}`, margin, 42)
-  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 47)
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 42)
 
   let currentY = 60
 
@@ -250,8 +249,7 @@ export const generateRentExpirationPDF = async (data: RentExpirationData[], peri
   
   doc.setFontSize(10)
   doc.setTextColor(100, 100, 100)
-  doc.text(`Período: ${periodLabel}`, margin, 42)
-  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 47)
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 42)
 
   let currentY = 60
 
@@ -345,8 +343,7 @@ export const generateMachineHistoryPDF = async (machine: any, events: any[], per
   
   doc.setFontSize(10)
   doc.setTextColor(100, 100, 100)
-  doc.text(`Período: ${periodLabel}`, margin, 42)
-  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 47)
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 42)
 
   // Machine Info Card
   let currentY = 60
@@ -471,8 +468,7 @@ export const generateRefuelingControlPDF = async (data: RefuelingControlData, pe
   
   doc.setFontSize(10)
   doc.setTextColor(100, 100, 100)
-  doc.text(`Período: ${periodLabel}`, margin, 42)
-  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 47)
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 42)
 
   const tableData = data.events.map(event => [
     formatWithSystemTimezone(event.event_date),

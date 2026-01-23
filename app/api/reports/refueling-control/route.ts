@@ -35,8 +35,7 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         machine:machines(id, unit_number, machine_type:machine_types(nome)),
-        site:sites(id, title, address),
-        supplier:suppliers(id, nome)
+        site:sites(id, title, address)
       `)
       .eq('is_active', true)
 
