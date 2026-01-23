@@ -11,7 +11,7 @@ import { useSidebar } from '@/lib/useSidebar'
 import { HiCheck, HiChevronLeft, HiChevronRight, HiOutlineCalendarDays } from 'react-icons/hi2'
 import { BsFileEarmarkPdf, BsFileEarmarkExcel } from 'react-icons/bs'
 import { 
-  generateAllocationsPDF, 
+  generateAllocationStatusPDF, 
   generateRentExpirationPDF,
   generateMachineHistoryPDF,
   generateRefuelingControlPDF
@@ -204,7 +204,7 @@ export default function ReportsPage() {
           const periodLabel = allPeriod 
             ? 'Atualmente' 
             : `Até ${formatDateOnly(dateTo)}`
-          await generateAllocationsPDF(data.allocations, periodLabel)
+          await generateAllocationStatusPDF(data.allocations, periodLabel)
         } else {
           alert('Erro ao gerar relatório: ' + data.message)
         }

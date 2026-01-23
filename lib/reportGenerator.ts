@@ -1,5 +1,12 @@
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
+import { UserOptions } from 'jspdf-autotable'
+
+// Extend jsPDF type to include autoTable
+interface jsPDFWithAutoTable extends jsPDF {
+  autoTable: (options: UserOptions) => jsPDF
+}
+
 import { adjustDateToSystemTimezone, formatDateOnly, formatDateNoTimezone, formatWithSystemTimezone } from '@/lib/timezone'
 import { getEventConfig } from '@/app/events/utils'
 
@@ -78,7 +85,7 @@ const drawHeader = async (doc: any, margin: number) => {
 }
 
 export const generateAllocationStatusPDF = async (data: AllocationData[], periodLabel: string) => {
-  const doc = new jsPDF() as any
+  const doc = new jsPDF() as jsPDFWithAutoTable
   const pageWidth = doc.internal.pageSize.width
   const margin = 15
 
@@ -236,7 +243,7 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
 }
 
 export const generateRentExpirationPDF = async (data: RentExpirationData[], periodLabel: string) => {
-  const doc = new jsPDF() as any
+  const doc = new jsPDF() as jsPDFWithAutoTable
   const pageWidth = doc.internal.pageSize.width
   const margin = 15
 
@@ -330,7 +337,7 @@ export const generateRentExpirationPDF = async (data: RentExpirationData[], peri
 }
 
 export const generateMachineHistoryPDF = async (machine: any, events: any[], periodLabel: string) => {
-  const doc = new jsPDF() as any
+  const doc = new jsPDF() as jsPDFWithAutoTable
   const pageWidth = doc.internal.pageSize.width
   const margin = 15
 
@@ -455,7 +462,7 @@ export const generateMachineHistoryPDF = async (machine: any, events: any[], per
 }
 
 export const generateRefuelingControlPDF = async (data: RefuelingControlData, periodLabel: string) => {
-  const doc = new jsPDF() as any
+  const doc = new jsPDF() as jsPDFWithAutoTable
   const pageWidth = doc.internal.pageSize.width
   const margin = 15
 
