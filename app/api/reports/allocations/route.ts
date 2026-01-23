@@ -89,7 +89,8 @@ export async function GET(request: NextRequest) {
           lot_building_number: state.lot_building_number,
           status: state.status,
           is_in_downtime: state.is_in_downtime,
-          attached_extensions: state.attached_extensions
+          attached_extensions: state.attached_extensions,
+          end_date: state.end_date
         })
       }
     }

@@ -12,6 +12,7 @@ interface AllocationData {
   status: string
   is_in_downtime: boolean
   attached_extensions: any[]
+  end_date?: string | null
 }
 
 interface RentExpirationData {
@@ -110,77 +111,110 @@ export const generateAllocationsPDF = async (data: AllocationData[], periodLabel
     }
   }
 
-  // Group data by site
-  const groupedBySite = new Map<string, AllocationData[]>()
+  // Group data by site and then by lot/building
+  const groupedBySite = new Map<string, Map<string, AllocationData[]>>()
+  
   data.forEach(item => {
     const site = item.site_title || 'Sem Localização'
-    if (!groupedBySite.has(site)) groupedBySite.set(site, [])
-    groupedBySite.get(site)?.push(item)
+    const lot = item.lot_building_number 
+      ? `${item.construction_type === 'lot' ? 'Lote' : 'Prédio/Torre'}: ${item.lot_building_number}`
+      : 'Geral / Sem Lote'
+      
+    if (!groupedBySite.has(site)) {
+      groupedBySite.set(site, new Map<string, AllocationData[]>())
+    }
+    
+    const siteMap = groupedBySite.get(site)!
+    if (!siteMap.has(lot)) {
+      siteMap.set(lot, [])
+    }
+    siteMap.get(lot)!.push(item)
   })
 
-  // Iterate over groups
-  groupedBySite.forEach((machines, siteTitle) => {
+  // Iterate over Sites
+  groupedBySite.forEach((lotsMap, siteTitle) => {
     if (currentY > 250) {
       doc.addPage()
       currentY = 20
     }
 
-    // Site Header
-    doc.setFillColor(245, 245, 245)
+    // 1. Site Header (Level 1)
+    doc.setFillColor(240, 240, 240)
     doc.rect(margin, currentY - 5, pageWidth - margin * 2, 8, 'F')
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
-    doc.setTextColor(40)
+    doc.setTextColor(60, 60, 60)
     doc.text(siteTitle.toUpperCase(), margin + 2, currentY)
     currentY += 10
 
-    machines.forEach((item) => {
-      if (currentY > 270) {
+    // Iterate over Lots (Level 2)
+    lotsMap.forEach((machines, lotLabel) => {
+      if (currentY > 260) {
         doc.addPage()
         currentY = 20
       }
 
-      // Machine Info
+      // Lot Header
+      doc.setFillColor(248, 248, 248)
+      doc.rect(margin + 5, currentY - 5, pageWidth - margin * 2 - 5, 7, 'F')
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(10)
-      doc.setTextColor(30)
-      const machineTitle = `${item.machine_unit_number} - ${item.machine_description || item.machine_type}`
-      doc.text(machineTitle, margin + 5, currentY)
+      doc.setTextColor(100, 100, 100)
+      doc.text(lotLabel, margin + 7, currentY)
+      currentY += 8
 
-      // Status
-      const statusInfo = getStatusInfo(item.status, item.is_in_downtime)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      doc.setTextColor(statusInfo.color[0], statusInfo.color[1], statusInfo.color[2])
-      const statusWidth = doc.getTextWidth(statusInfo.label)
-      doc.text(statusInfo.label, pageWidth - margin - statusWidth, currentY)
+      // Iterate over Machines (Level 3)
+      machines.forEach((item) => {
+        if (currentY > 275) {
+          doc.addPage()
+          currentY = 20
+        }
 
-      currentY += 5
+        // Machine Info
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(10)
+        doc.setTextColor(30)
+        const machineTitle = `${item.machine_unit_number} - ${item.machine_description || item.machine_type}`
+        doc.text(machineTitle, margin + 10, currentY)
 
-      // Sub-location (Lot/Building)
-      if (item.lot_building_number) {
-        doc.setFontSize(8)
-        doc.setTextColor(120, 120, 120)
-        const subLocation = `${item.construction_type === 'lot' ? 'Lote' : 'Prédio/Torre'}: ${item.lot_building_number}`
-        doc.text(subLocation, margin + 5, currentY)
+        // Status and Exceeded Days
+        const statusInfo = getStatusInfo(item.status, item.is_in_downtime)
+        let statusLabel = statusInfo.label
+        
+        if (item.status === 'exceeded' && item.end_date) {
+          const expDate = new Date(item.end_date.split('T')[0])
+          const today = new Date(new Date().toISOString().split('T')[0])
+          const diffTime = Math.abs(today.getTime() - expDate.getTime())
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+          statusLabel += ` (${diffDays} dias)`
+        }
+
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(9)
+        doc.setTextColor(statusInfo.color[0], statusInfo.color[1], statusInfo.color[2])
+        const statusWidth = doc.getTextWidth(statusLabel)
+        doc.text(statusLabel, pageWidth - margin - statusWidth, currentY)
+
+        currentY += 5
+
+        // Extensions
+        if (item.attached_extensions && item.attached_extensions.length > 0) {
+          item.attached_extensions.forEach((ext: any) => {
+            doc.setFontSize(8)
+            doc.setTextColor(140, 140, 140)
+            doc.text(`   + Extensão: ${ext.extension_unit_number} (${ext.extension_type})`, margin + 10, currentY)
+            currentY += 4
+          })
+        }
+
         currentY += 4
-      }
+        // Thin separator between machines
+        doc.setDrawColor(245)
+        doc.line(margin + 10, currentY - 2, pageWidth - margin, currentY - 2)
+        currentY += 2
+      })
 
-      // Extensions
-      if (item.attached_extensions && item.attached_extensions.length > 0) {
-        item.attached_extensions.forEach((ext: any) => {
-          doc.setFontSize(8)
-          doc.setTextColor(140, 140, 140)
-          doc.text(`   + Extensão: ${ext.extension_unit_number} (${ext.extension_type})`, margin + 5, currentY)
-          currentY += 4
-        })
-      }
-
-      currentY += 4
-      // Thin separator between machines in the same site
-      doc.setDrawColor(240)
-      doc.line(margin + 5, currentY - 2, pageWidth - margin, currentY - 2)
-      currentY += 4
+      currentY += 4 // Space after each lot group
     })
 
     currentY += 5 // Space after each site group
