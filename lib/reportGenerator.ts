@@ -1,11 +1,5 @@
 import jsPDF from 'jspdf'
-import 'jspdf-autotable'
-import { UserOptions } from 'jspdf-autotable'
-
-// Extend jsPDF type to include autoTable
-interface jsPDFWithAutoTable extends jsPDF {
-  autoTable: (options: UserOptions) => jsPDF
-}
+import autoTable from 'jspdf-autotable'
 
 import { adjustDateToSystemTimezone, formatDateOnly, formatDateNoTimezone, formatWithSystemTimezone } from '@/lib/timezone'
 import { getEventConfig } from '@/app/events/utils'
@@ -85,7 +79,7 @@ const drawHeader = async (doc: any, margin: number) => {
 }
 
 export const generateAllocationStatusPDF = async (data: AllocationData[], periodLabel: string) => {
-  const doc = new jsPDF() as jsPDFWithAutoTable
+  const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.width
   const margin = 15
 
@@ -131,7 +125,7 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
   data.forEach(item => {
     const site = item.site_title || 'Sem Localização'
     const lot = item.lot_building_number 
-      ? `${item.construction_type === 'lot' ? 'Lote' : 'Prédio/Torre'}: ${item.lot_building_number}`
+      ? `${item.construction_type === 'lot' ? 'Lote' : 'Prédio'} ${item.lot_building_number}`
       : 'Geral / Sem Lote'
       
     if (!groupedBySite.has(site)) {
@@ -243,7 +237,7 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
 }
 
 export const generateRentExpirationPDF = async (data: RentExpirationData[], periodLabel: string) => {
-  const doc = new jsPDF() as jsPDFWithAutoTable
+  const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.width
   const margin = 15
 
@@ -308,8 +302,8 @@ export const generateRentExpirationPDF = async (data: RentExpirationData[], peri
     doc.setTextColor(120, 120, 120)
     let details = ''
     if (item.construction_type && item.lot_building_number) {
-      const typeLabel = item.construction_type === 'lot' ? 'Lote' : 'Prédio/Torre'
-      details = `${typeLabel}: ${item.lot_building_number}`
+      const typeLabel = item.construction_type === 'lot' ? 'Lote' : 'Prédio'
+      details = `${typeLabel} ${item.lot_building_number}`
     }
     
     if (item.allocation_start) {
@@ -337,7 +331,7 @@ export const generateRentExpirationPDF = async (data: RentExpirationData[], peri
 }
 
 export const generateMachineHistoryPDF = async (machine: any, events: any[], periodLabel: string) => {
-  const doc = new jsPDF() as jsPDFWithAutoTable
+  const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.width
   const margin = 15
 
@@ -462,61 +456,128 @@ export const generateMachineHistoryPDF = async (machine: any, events: any[], per
 }
 
 export const generateRefuelingControlPDF = async (data: RefuelingControlData, periodLabel: string) => {
-  const doc = new jsPDF() as jsPDFWithAutoTable
+  const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.width
   const margin = 15
 
   await drawHeader(doc, margin)
 
   // Report Title
-  doc.setFontSize(12)
-  doc.setTextColor(40)
+  doc.setFontSize(14)
+  doc.setTextColor(40, 40, 40)
+  doc.setFont('helvetica', 'bold')
   doc.text('Controle de Abastecimento', margin, 35)
   
-  doc.setFontSize(10)
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
   doc.setTextColor(100, 100, 100)
-  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 42)
+  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 41)
 
-  const tableData = data.events.map(event => [
-    formatWithSystemTimezone(event.event_date),
-    event.machine?.unit_number || 'N/A',
-    event.machine?.machine_type?.nome || 'N/A',
-    event.site?.title || 'N/A',
-    event.user?.nome || 'N/A',
-    event.status === 'approved' ? 'Realizado' : event.status === 'pending' ? 'Pendente' : 'Rejeitado'
-  ])
-
-  doc.autoTable({
-    startY: 55,
-    head: [['Data/Hora', 'Unidade', 'Tipo', 'Local', 'Operador', 'Status']],
-    body: tableData,
-    theme: 'striped',
-    headStyles: { fillColor: [46, 134, 193], textColor: 255 },
-    styles: { fontSize: 8 },
-    margin: { left: margin, right: margin }
-  })
-
-  // Add summary of planned vs executed if possible
-  let currentY = (doc as any).lastAutoTable.finalY + 15
-  
-  if (currentY > 260) {
-    doc.addPage()
-    currentY = 20
+  // Date Interval (Right aligned)
+  if (data.period) {
+    const startDateStr = formatDateOnly(data.period.start)
+    const endDateStr = formatDateOnly(data.period.end)
+    const intervalText = `Datas inclusas: de ${startDateStr} até ${endDateStr}`
+    const intervalWidth = doc.getTextWidth(intervalText)
+    doc.text(intervalText, pageWidth - margin - intervalWidth, 41)
   }
 
+  // Summary Metrics Boxes
+  const totalMachines = new Set(data.events.map(e => e.machine_id)).size
+  const totalConfirmed = data.events.filter(e => e.status === 'approved').length
+  
+  const boxWidth = (pageWidth - (margin * 2) - 10) / 2
+  const boxHeight = 20
+  const boxY = 48
+
+  // Left Box: Máquinas Atendidas
+  doc.setFillColor(248, 250, 252)
+  doc.setDrawColor(226, 232, 240)
+  doc.roundedRect(margin, boxY, boxWidth, boxHeight, 2, 2, 'FD')
+  
+  doc.setFontSize(8)
+  doc.setTextColor(100, 100, 100)
+  doc.text('MÁQUINAS ATENDIDAS', margin + 5, boxY + 7)
+  
+  doc.setFontSize(14)
+  doc.setTextColor(30, 41, 59)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  doc.text('Resumo do Período', margin, currentY)
+  doc.text(totalMachines.toString(), margin + 5, boxY + 16)
+
+  // Right Box: Abastecimentos Confirmados
+  doc.setFillColor(248, 250, 252)
+  doc.roundedRect(margin + boxWidth + 10, boxY, boxWidth, boxHeight, 2, 2, 'FD')
   
-  const totalPlanned = data.templates.length // This is simplistic, would need recurring logic
-  const totalExecuted = data.events.filter(e => e.status === 'approved').length
-  
-  currentY += 8
+  doc.setFontSize(8)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.text(`Total de Abastecimentos Realizados: ${totalExecuted}`, margin, currentY)
-  currentY += 6
-  doc.text(`Total de Máquinas Atendidas: ${new Set(data.events.map(e => e.machine_id)).size}`, margin, currentY)
+  doc.setTextColor(100, 100, 100)
+  doc.text('ABASTECIMENTOS CONFIRMADOS', margin + boxWidth + 15, boxY + 7)
+  
+  doc.setFontSize(14)
+  doc.setTextColor(22, 163, 74) // Green
+  doc.setFont('helvetica', 'bold')
+  doc.text(totalConfirmed.toString(), margin + boxWidth + 15, boxY + 16)
+
+  let currentY = 75
+
+  data.events.forEach((event, index) => {
+    const cardHeight = 18
+    const cardPadding = 4
+    
+    // Check for page break
+    if (currentY + cardHeight > 285) {
+      doc.addPage()
+      currentY = 20
+    }
+
+    // Card Background
+    doc.setFillColor(255, 255, 255)
+    doc.setDrawColor(241, 245, 249)
+    doc.roundedRect(margin, currentY, pageWidth - margin * 2, cardHeight, 1, 1, 'FD')
+
+    // Unit Number
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(30, 41, 59)
+    doc.text(event.machine?.unit_number || 'Sem Unit', margin + cardPadding, currentY + 6.5)
+
+    // Location
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(100, 116, 139)
+    doc.text(event.site?.title || 'Sem Jobsite', margin + cardPadding, currentY + 12.5)
+
+    // Date (Right aligned)
+    const dateText = formatDateOnly(event.event_date)
+    const dateWidth = doc.getTextWidth(dateText)
+    doc.setFontSize(7.5)
+    doc.setTextColor(148, 163, 184)
+    doc.text(dateText, pageWidth - margin - cardPadding - dateWidth, currentY + 6.5)
+
+    // Status Badge
+    const status = event.status === 'approved' ? 'CONFIRMADO' : event.status === 'pending' ? 'PENDENTE' : 'REJEITADO'
+    const statusColor = event.status === 'approved' ? [34, 197, 94] : event.status === 'pending' ? [239, 68, 68] : [107, 114, 128]
+    
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(6.5)
+    const badgeText = status
+    const badgeWidth = doc.getTextWidth(badgeText) + 4
+    const badgeHeight = 5
+    const badgeX = pageWidth - margin - cardPadding - badgeWidth
+    const badgeY = currentY + 10
+
+    doc.setFillColor(statusColor[0], statusColor[1], statusColor[2])
+    doc.roundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 1, 1, 'F')
+    
+    doc.setTextColor(255, 255, 255)
+    doc.text(badgeText, badgeX + 2, badgeY + 3.5)
+
+    // Vertical indicator
+    doc.setFillColor(statusColor[0], statusColor[1], statusColor[2])
+    doc.rect(margin, currentY, 1.2, cardHeight, 'F')
+
+    currentY += cardHeight + 2
+  })
 
   doc.save(`controle_abastecimento_${new Date().getTime()}.pdf`)
 }

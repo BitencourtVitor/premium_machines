@@ -44,7 +44,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       events,
-      templates
+      templates,
+      period: { start: start_date, end: end_date }
     })
   } catch (error: any) {
     console.error('Error in refueling control report API:', error)

@@ -34,7 +34,7 @@ export const generateAllocationStatusExcel = (data: any[]) => {
       'Descrição': item.machine_description || '',
       'Tipo': item.machine_type,
       'Obra': item.site_title,
-      'Lote/Prédio': item.lot_building_number || '-',
+      'Lote/Prédio': item.lot_building_number ? `${item.construction_type === 'lot' ? 'Lote' : 'Prédio'} ${item.lot_building_number}` : '-',
       'Status': status,
       'Início': item.allocation_start ? formatDateNoTimezone(item.allocation_start) : '-',
       'Vencimento': item.end_date ? formatDateNoTimezone(item.end_date) : '-'
