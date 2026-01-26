@@ -49,12 +49,21 @@ export default function SiteDetailsModal({
     return new Date(endDate.getFullYear(), endDate.getMonth(), 1)
   }, [selectedAllocation])
 
-  // Resetar o mês do calendário quando mudar de alocação para focar no início dela
+  // Resetar o mês do calendário quando mudar de alocação para focar no mês mais próximo do atual
   useEffect(() => {
-    if (minMonth) {
-      setCalendarMonth(minMonth)
+    if (minMonth && maxMonth) {
+      const now = new Date()
+      const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      
+      if (currentMonth >= minMonth && currentMonth <= maxMonth) {
+        setCalendarMonth(currentMonth)
+      } else if (currentMonth < minMonth) {
+        setCalendarMonth(minMonth)
+      } else {
+        setCalendarMonth(maxMonth)
+      }
     }
-  }, [selectedAllocationId, minMonth])
+  }, [selectedAllocationId, minMonth, maxMonth])
 
   // Helper para obter string YYYY-MM-DD no fuso horário do sistema
   const getSystemDateStr = useCallback((date: Date | string) => {
