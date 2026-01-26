@@ -308,6 +308,20 @@ export default function SiteDetailsModal({
     
 
 
+    // Uma alocação é considerada ativa se o seu status no ciclo for 'allocated'
+    const isStillAllocated = allocation.status === 'allocated' || allocation.status === 'active' || allocation.status === 'exceeded'
+    
+    // Verificamos se houve fim de alocação após o início desta alocação nos eventos aprovados
+    const allocationStartDate = new Date(allocation.start_date || allocation.allocation_start)
+    const hasEndEvent = allMachineEvents.some(e => 
+      e.event_type === 'end_allocation' && 
+      e.status === 'approved' &&
+      new Date(e.event_date) >= allocationStartDate
+    )
+
+    // Se houve evento de fim, ela está encerrada, independente do status no objeto allocation
+    const isActuallyEnded = !isStillAllocated || hasEndEvent
+
     if (isMaintenance) {
       return {
         isActive: true,
@@ -322,18 +336,21 @@ export default function SiteDetailsModal({
       // Se is_currently_at_site for false, ela SAIU desta obra (Movida)
       const isCurrentlyHere = allocation.is_currently_at_site === true
       
-      // Se for o registro da obra de destino, é 'Em trânsito'
-      // Se for o registro da obra de origem, é 'Movida'
-      return {
-        isActive: true,
-        label: isCurrentlyHere ? 'Em trânsito' : 'Movida',
-        className: isCurrentlyHere 
-          ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-          : 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400 font-bold border border-pink-200'
+      // Se houve um evento de fim de alocação, ignoramos o status de trânsito para mostrar Encerrada
+      if (hasEndEvent) {
+        // Segue para o fluxo de Encerrada
+      } else {
+        return {
+          isActive: true,
+          label: isCurrentlyHere ? 'Em trânsito' : 'Movida',
+          className: isCurrentlyHere 
+            ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+            : 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400 font-bold border border-pink-200'
+        }
       }
     }
 
-    if (isExceeded) {
+    if (isExceeded && !isActuallyEnded) {
       return {
         isActive: true,
         label: 'Ativa Excedida',
@@ -341,8 +358,8 @@ export default function SiteDetailsModal({
       }
     }
     
-    // Se não estiver fisicamente aqui e não for sede, é 'Movida'
-    if (allocation.is_currently_at_site === false && !site?.is_headquarters) {
+    // Se não estiver fisicamente aqui e não for sede, e NÃO houver evento de fim, é 'Movida'
+    if (!isActuallyEnded && allocation.is_currently_at_site === false && !site?.is_headquarters) {
       return {
         isActive: true,
         label: 'Movida',
@@ -350,13 +367,11 @@ export default function SiteDetailsModal({
       }
     }
     
-    // Uma alocação é considerada ativa se o seu status no ciclo for 'allocated'
-    const isStillAllocated = allocation.status === 'allocated' || allocation.status === 'active' || allocation.status === 'exceeded'
     const today = getSystemDateStr(new Date())
     const dateToUse = allocation.start_date || allocation.allocation_start
     const startDate = dateToUse ? getSystemDateStr(dateToUse) : null
 
-    if (isStillAllocated) {
+    if (!isActuallyEnded) {
       // Usar planned_end_date para verificação de excedido, ou end_date como fallback
       const expirationDateStr = allocation.planned_end_date 
         ? getSystemDateStr(allocation.planned_end_date) 
