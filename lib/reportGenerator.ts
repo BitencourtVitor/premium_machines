@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable'
 
 import { adjustDateToSystemTimezone, formatDateOnly, formatDateNoTimezone, formatWithSystemTimezone } from '@/lib/timezone'
 import { getEventConfig } from '@/app/events/utils'
+import { getMachineStatusLabel } from '@/lib/permissions'
 
 interface AllocationData {
   machine_unit_number: string
@@ -16,6 +17,7 @@ interface AllocationData {
   attached_extensions: any[]
   end_date?: string | null
   allocation_start?: string | null
+  ownership_type?: string
 }
 
 interface RentExpirationData {
@@ -96,26 +98,32 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
 
   let currentY = 60
 
-  const getStatusInfo = (status: string, is_in_downtime: boolean) => {
+  const getStatusInfo = (status: string, is_in_downtime: boolean, ownership_type?: string) => {
     if (is_in_downtime) {
       return { label: 'Em Manutenção', color: [234, 88, 12] } // Orange
     }
     
+    const label = getMachineStatusLabel(status, ownership_type);
+    
+    if (status === 'available' && ownership_type === 'rented') {
+      return { label: label || 'Devolvida', color: [107, 114, 128] } // Gray
+    }
+
     switch (status) {
       case 'allocated': 
-        return { label: 'Ativa', color: [22, 163, 74] } // Green
+        return { label: label || 'Ativa', color: [22, 163, 74] } // Green
       case 'in_transit': 
-        return { label: 'Em Transporte', color: [147, 51, 234] } // Purple
+        return { label: label || 'Em Transporte', color: [147, 51, 234] } // Purple
       case 'maintenance': 
-        return { label: 'Em Manutenção', color: [234, 88, 12] } // Orange
+        return { label: label || 'Em Manutenção', color: [234, 88, 12] } // Orange
       case 'exceeded': 
-        return { label: 'Ativa - Prazo Excedido', color: [220, 38, 38] } // Red
+        return { label: label || 'Ativa - Prazo Excedido', color: [220, 38, 38] } // Red
       case 'available': 
-        return { label: 'Disponível', color: [22, 163, 74] } // Green
+        return { label: label || 'Disponível', color: [22, 163, 74] } // Green
       case 'inactive': 
-        return { label: 'Inativa', color: [100, 100, 100] } // Gray
+        return { label: label || 'Inativa', color: [100, 100, 100] } // Gray
       default: 
-        return { label: status, color: [100, 100, 100] }
+        return { label: label || status, color: [100, 100, 100] }
     }
   }
 
@@ -186,7 +194,7 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
         doc.text(machineTitle, margin + 10, currentY)
 
         // Status and Exceeded Days
-        const statusInfo = getStatusInfo(item.status, item.is_in_downtime)
+        const statusInfo = getStatusInfo(item.status, item.is_in_downtime, item.ownership_type)
         let statusLabel = statusInfo.label
         const today = new Date(new Date().toISOString().split('T')[0])
         
@@ -373,9 +381,9 @@ export const generateMachineHistoryPDF = async (machine: any, events: any[], per
   doc.text('Status Atual:', margin + 125, detailY)
 
   doc.setFont('helvetica', 'normal')
-  doc.text(machine.ownership_type === 'own' ? 'Próprio' : 'Alugado', margin + 5, detailY + 5)
+  doc.text(machine.ownership_type === 'own' ? 'Própria' : 'Alugada', margin + 5, detailY + 5)
   doc.text(machine.supplier?.nome || 'N/A', margin + 65, detailY + 5)
-  doc.text(machine.ativo ? 'Ativo' : 'Inativo', margin + 125, detailY + 5)
+  doc.text(getMachineStatusLabel(machine.status, machine.ownership_type), margin + 125, detailY + 5)
 
   currentY = 105
 

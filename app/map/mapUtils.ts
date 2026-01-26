@@ -1,6 +1,6 @@
 import mapboxgl from 'mapbox-gl'
 import { Site } from './types'
-import { MACHINE_STATUS_LABELS } from '@/lib/permissions'
+import { MACHINE_STATUS_LABELS, getMachineStatusLabel } from '@/lib/permissions'
 
 // Função para obter cores adaptadas ao tema
 export const getThemeColors = (colorType: 'neutral' | 'blue' | 'red' | 'green' | 'yellow' | 'orange' | 'purple' | 'pink' | 'indigo', isDark: boolean) => {
@@ -365,7 +365,7 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
                   finalStatus = 'exceeded';
                 }
 
-                let label = MACHINE_STATUS_LABELS[finalStatus] || finalStatus;
+                let label = getMachineStatusLabel(finalStatus, machine.ownership_type);
                 let statusColor = '';
 
                 if (finalStatus === 'in_transit') {
@@ -375,20 +375,28 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
                 } else if (finalStatus === 'exceeded') {
                   statusColor = `background: ${currentIsDark ? '#7f1d1d' : '#fee2e2'}; color: ${currentIsDark ? '#fca5a5' : '#991b1b'}; font-weight: 700; border: 1px solid ${currentIsDark ? '#f87171' : '#fecaca'};`;
                 } else if (finalStatus === 'allocated' || finalStatus === 'active') {
-                  label = MACHINE_STATUS_LABELS.active;
+                  label = getMachineStatusLabel('active', machine.ownership_type);
                   statusColor = `background: ${currentIsDark ? '#064e3b' : '#dcfce7'}; color: ${currentIsDark ? '#6ee7b7' : '#166534'};`;
                 } else if (finalStatus === 'maintenance') {
                   statusColor = `background: ${currentIsDark ? '#7f1d1d' : '#fee2e2'}; color: ${currentIsDark ? '#fca5a5' : '#991b1b'};`;
                 } else if (finalStatus === 'scheduled') {
                   statusColor = `background: ${currentIsDark ? '#1e3a8a' : '#dbeafe'}; color: ${currentIsDark ? '#93c5fd' : '#1e40af'};`;
                 } else if (finalStatus === 'available' || finalStatus === 'inactive') {
-                  // Se for na sede, é "Disponível", se for em obra é "Encerrada"
-                  label = site.is_headquarters ? MACHINE_STATUS_LABELS.available : MACHINE_STATUS_LABELS.finished;
-                  statusColor = site.is_headquarters 
-                    ? `background: ${currentIsDark ? '#1e3a8a' : '#dbeafe'}; color: ${currentIsDark ? '#93c5fd' : '#1e40af'};`
-                    : `background: ${currentIsDark ? '#312e81' : '#e0e7ff'}; color: ${currentIsDark ? '#a5b4fc' : '#3730a3'}; border: 1px solid ${currentIsDark ? '#4338ca' : '#c7d2fe'};`;
+                  // Se for na sede, é "Disponível" (ou "Devolvida" se alugada), se for em obra é "Encerrada"
+                  label = site.is_headquarters 
+                    ? getMachineStatusLabel('available', machine.ownership_type)
+                    : getMachineStatusLabel('finished', machine.ownership_type);
+                  
+                  if (site.is_headquarters && finalStatus === 'available' && machine.ownership_type === 'rented') {
+                    // Estilo cinza para "Devolvida"
+                    statusColor = `background: ${currentIsDark ? '#374151' : '#f3f4f6'}; color: ${currentIsDark ? '#9ca3af' : '#6b7280'}; border: 1px solid ${currentIsDark ? '#4b5563' : '#d1d5db'};`;
+                  } else {
+                    statusColor = site.is_headquarters 
+                      ? `background: ${currentIsDark ? '#1e3a8a' : '#dbeafe'}; color: ${currentIsDark ? '#93c5fd' : '#1e40af'};`
+                      : `background: ${currentIsDark ? '#312e81' : '#e0e7ff'}; color: ${currentIsDark ? '#a5b4fc' : '#3730a3'}; border: 1px solid ${currentIsDark ? '#4338ca' : '#c7d2fe'};`;
+                  }
                 } else {
-                  label = MACHINE_STATUS_LABELS.finished;
+                  label = getMachineStatusLabel('finished', machine.ownership_type);
                   statusColor = `background: ${currentIsDark ? '#312e81' : '#e0e7ff'}; color: ${currentIsDark ? '#a5b4fc' : '#3730a3'}; border: 1px solid ${currentIsDark ? '#4338ca' : '#c7d2fe'};`;
                 }
 

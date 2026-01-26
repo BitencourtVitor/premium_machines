@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import MachineImage from '@/app/components/MachineImage'
-import { MACHINE_STATUS_LABELS, OWNERSHIP_TYPE_LABELS, EVENT_TYPE_LABELS } from '@/lib/permissions'
+import { MACHINE_STATUS_LABELS, OWNERSHIP_TYPE_LABELS, EVENT_TYPE_LABELS, getMachineStatusLabel } from '@/lib/permissions'
 import { formatWithSystemTimezone, formatDateOnly } from '@/lib/timezone'
 
 interface MachineDetailsModalProps {
@@ -59,7 +59,11 @@ export default function MachineDetailsModal({
   })
 
   // Helper for status badge styles
-  const getStatusBadgeStyle = (status: string) => {
+  const getStatusBadgeStyle = (status: string, ownershipType?: string) => {
+    if (status === 'available' && ownershipType === 'rented') {
+      return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700'
+    }
+
     switch (status) {
       case 'available':
         return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800'
@@ -197,8 +201,9 @@ export default function MachineDetailsModal({
                 {/* Status Card */}
                 <div className="bg-white dark:bg-gray-800/80 p-4 rounded-xl border border-gray-200 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
                   <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Status Atual</div>
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium border ${getStatusBadgeStyle(machine?.status)}`}>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium border ${getStatusBadgeStyle(machine?.status, machine?.ownership_type)}`}>
                     <span className={`w-2 h-2 rounded-full mr-2 ${
+                      machine?.status === 'available' && machine?.ownership_type === 'rented' ? 'bg-gray-400' :
                       machine?.status === 'available' ? 'bg-green-500' :
                       machine?.status === 'allocated' || machine?.status === 'active' ? 'bg-blue-500' :
                       machine?.status === 'maintenance' ? 'bg-yellow-500' :
@@ -209,7 +214,7 @@ export default function MachineDetailsModal({
                       machine?.status === 'finished' || machine?.status === 'inactive' ? 'bg-indigo-500' :
                       'bg-gray-500'
                     }`}></span>
-                    {MACHINE_STATUS_LABELS[machine?.status] || machine?.status || 'Desconhecido'}
+                    {getMachineStatusLabel(machine?.status, machine?.ownership_type) || 'Desconhecido'}
                   </span>
                 </div>
 

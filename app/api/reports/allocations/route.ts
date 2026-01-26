@@ -50,7 +50,12 @@ export async function GET(request: NextRequest) {
 
     if (eventsError) throw eventsError
 
-    // 3. Group events by machine
+    // 4. Calculate state for each machine
+    const referenceDate = !allPeriod && dateTo ? new Date(dateTo) : new Date()
+    if (!allPeriod && dateTo) {
+      referenceDate.setUTCHours(23, 59, 59, 999)
+    }
+
     const eventsByMachine = new Map<string, any[]>()
     const siteTitles = new Map<string, string>()
 
@@ -70,15 +75,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 4. Calculate state for each machine
+    // 5. Calculate state for each machine
     const allocations: any[] = []
     for (const machine of machines) {
       const machineEvents = eventsByMachine.get(machine.id) || []
-      const state = calculateStateFromEvents(machine.id, machineEvents)
+      const state = calculateStateFromEvents(machine.id, machineEvents, referenceDate)
 
-      // Even if not currently allocated, we might want to show it in the report if requested
-      // But the user said "Quais máquinas estão alocadas", so we filter those with a site or in transit
-      if (state.current_site_id || state.status === 'in_transit' || state.status === 'maintenance') {
+      // Only show machines that are currently in an active allocation state
+      // (allocated, exceeded, in_transit, or maintenance).
+      // Available or inactive machines should not appear in this report.
+      if (state.status !== 'available' && state.status !== 'inactive') {
         allocations.push({
           machine_id: machine.id,
           machine_unit_number: machine.unit_number,

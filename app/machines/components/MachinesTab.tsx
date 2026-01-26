@@ -1,6 +1,6 @@
 import { Machine } from '../types'
 import MachineImage from '@/app/components/MachineImage'
-import { MACHINE_STATUS_LABELS, OWNERSHIP_TYPE_LABELS } from '@/lib/permissions'
+import { MACHINE_STATUS_LABELS, OWNERSHIP_TYPE_LABELS, getMachineStatusLabel } from '@/lib/permissions'
 import BaseList from '@/app/components/BaseList'
 import ListActionButton from '@/app/components/ListActionButton'
 
@@ -42,6 +42,10 @@ export default function MachinesTab({
 
     // Cores para status
     const getStatusColor = () => {
+      if (machine.status === 'available' && machine.ownership_type === 'rented') {
+        return 'text-gray-500 dark:text-gray-400'
+      }
+      
       switch (machine.status) {
         case 'available':
           return 'text-green-600 dark:text-green-400'
@@ -99,6 +103,7 @@ export default function MachinesTab({
                 {/* Status com bolinha + texto */}
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
                   <div className={`w-2 h-2 rounded-full ${
+                    machine.status === 'available' && machine.ownership_type === 'rented' ? 'bg-gray-400' :
                     machine.status === 'available' ? 'bg-green-500' :
                     machine.status === 'allocated' || machine.status === 'active' ? 'bg-blue-500' :
                     machine.status === 'maintenance' ? 'bg-yellow-500' :
@@ -110,7 +115,7 @@ export default function MachinesTab({
                     'bg-gray-500'
                   }`}></div>
                   <span className={`text-xs font-semibold ${getStatusColor()}`}>
-                    {MACHINE_STATUS_LABELS[machine.status] || machine.status}
+                    {getMachineStatusLabel(machine.status, machine.ownership_type)}
                   </span>
                 </div>
                 {/* Ownership com bolinha + texto */}

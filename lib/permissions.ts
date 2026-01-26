@@ -120,3 +120,14 @@ export const OWNERSHIP_TYPE_LABELS: Record<string, string> = {
   owned: 'Própria',
   rented: 'Alugada',
 }
+
+/**
+ * Retorna o label amigável para o status da máquina, considerando o tipo de propriedade.
+ * Caso a máquina seja alugada e esteja disponível, o status exibido será "Devolvida".
+ */
+export function getMachineStatusLabel(status: string, ownershipType?: string): string {
+  if (status === 'available' && ownershipType === 'rented') {
+    return 'Devolvida'
+  }
+  return MACHINE_STATUS_LABELS[status] || status
+}
