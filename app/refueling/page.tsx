@@ -425,7 +425,7 @@ export default function RefuelingPage() {
     const sunday = new Date(monday.getTime() + 6 * ONE_DAY_MS)
     
     const start = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate(), 0, 0, 0)
-    const end = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate(), 23, 59, 59)
+    const end = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6, 23, 59, 59)
     
     // Use a wider range for the query to avoid timezone edge cases
     // We fetch from the day before Monday to the day after Sunday
@@ -439,11 +439,20 @@ export default function RefuelingPage() {
       start: startISO, 
       end: endISO, 
       labelStart: monday, 
-      labelEnd: sunday 
+      labelEnd: new Date(monday.getTime() + 6 * ONE_DAY_MS),
+      viewStart: start,
+      viewEnd: end
     }
   }, [weekOffset])
 
-  const { start, end, labelStart, labelEnd } = weekRange
+  const { start, end, labelStart, labelEnd, viewStart, viewEnd } = weekRange
+
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      const adjustedDate = adjustDateToSystemTimezone(event.event_date)
+      return adjustedDate >= viewStart && adjustedDate <= viewEnd
+    })
+  }, [events, viewStart, viewEnd])
 
   const fetchSitesAndMachines = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -810,7 +819,7 @@ export default function RefuelingPage() {
     return (
       <BaseList
         title="Cronograma Semanal"
-        items={events}
+        items={filteredEvents}
         loading={loading}
         onRefresh={fetchEvents}
         showRefresh={true}
