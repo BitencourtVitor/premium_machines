@@ -605,6 +605,19 @@ export default function SiteDetailsModal({
                             <p className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate uppercase tracking-tight">
                               {allocation.machine_type}
                             </p>
+
+                            {(allocation.construction_type || allocation.lot_building_number) && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">
+                                  {allocation.construction_type === 'lot' ? 'Lote' : 'Prédio'} {allocation.lot_building_number}
+                                </span>
+                              </div>
+                            )}
+
                             <div className="flex flex-col gap-1 mt-2">
                               <div className="flex items-center gap-1.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600"></span>
@@ -916,9 +929,16 @@ export default function SiteDetailsModal({
                                                 {formatWithSystemTimezone(event.event_date, { hour: '2-digit', minute: '2-digit' })}
                                               </p>
                                               {(event.event_type === 'transport_arrival' || event.event_type === 'start_allocation' || isOtherSiteEvent) && event.site?.address && (
-                                                <p className="text-[9px] text-gray-500 mt-0.5 italic">
-                                                  {event.site.address}
-                                                </p>
+                                                <div className="mt-0.5">
+                                                  <p className="text-[9px] text-gray-500 italic">
+                                                    {event.site.address}
+                                                  </p>
+                                                  {(event.construction_type || event.lot_building_number) && (
+                                                    <p className="text-[8px] font-bold text-gray-600 dark:text-gray-400 uppercase mt-0.5">
+                                                      {event.construction_type === 'lot' ? 'Lote' : 'Prédio'} {event.lot_building_number}
+                                                    </p>
+                                                  )}
+                                                </div>
                                               )}
                                             </div>
                                           </div>
@@ -1091,7 +1111,17 @@ export default function SiteDetailsModal({
                                 {/* NOVO: Endereço para Alocação de Máquina e Chegada em Obra */}
                                 {(event.event_type === 'start_allocation' || event.event_type === 'transport_arrival' || isOtherSiteEvent) && event.site && (
                                   <div className="text-sm text-gray-600 dark:text-gray-300 mt-1 mb-2 italic">
-                                    <span className="font-medium not-italic">Local:</span> {event.site.address || event.site.title}
+                                    <div className="flex flex-col gap-0.5">
+                                      <div><span className="font-medium not-italic">Local:</span> {event.site.address || event.site.title}</div>
+                                      {(event.construction_type || event.lot_building_number) && (
+                                        <div className="flex items-center gap-1">
+                                          <span className="font-medium not-italic text-xs">Endereço:</span> 
+                                          <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-[10px] font-bold rounded uppercase">
+                                            {event.construction_type === 'lot' ? 'Lote' : 'Prédio'} {event.lot_building_number}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 )}
                                 

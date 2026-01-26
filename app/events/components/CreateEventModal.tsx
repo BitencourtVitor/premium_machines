@@ -11,7 +11,7 @@ interface CreateEventModalProps {
   showCreateModal: boolean
   setShowCreateModal: (show: boolean) => void
   newEvent: NewEventState
-  setNewEvent: (event: NewEventState) => void
+  setNewEvent: React.Dispatch<React.SetStateAction<NewEventState>>
   machines: any[]
   sites: any[]
   suppliers: any[]
@@ -93,10 +93,10 @@ export default function CreateEventModal({
     if (newEvent.event_type === 'start_allocation' && newEvent.machine_id && !newEvent.supplier_id && !editingEventId) {
       const machine = machines.find(m => m.id === newEvent.machine_id)
       if (machine?.supplier_id) {
-        setNewEvent({ ...newEvent, supplier_id: machine.supplier_id })
+        setNewEvent((prev: NewEventState) => ({ ...prev, supplier_id: machine.supplier_id }))
       }
     }
-  }, [newEvent.machine_id, newEvent.event_type, machines, editingEventId])
+  }, [newEvent.machine_id, newEvent.event_type, newEvent.supplier_id, machines, editingEventId, setNewEvent])
 
   // Auto-preencher site_id para fim de alocação baseado no histórico
   useEffect(() => {
@@ -115,22 +115,22 @@ export default function CreateEventModal({
         const newConstructionType = lastSiteEvent.construction_type || ''
         const newLotBuildingNumber = lastSiteEvent.lot_building_number || ''
 
-        // Só atualiza se for diferente para evitar loops infinitos se newEvent for adicionado às dependências
+        // Só atualiza se for diferente para evitar loops infinitos
         if (
           newEvent.site_id !== newSiteId ||
           newEvent.construction_type !== newConstructionType ||
           newEvent.lot_building_number !== newLotBuildingNumber
         ) {
-          setNewEvent({
-            ...newEvent,
+          setNewEvent((prev: NewEventState) => ({
+            ...prev,
             site_id: newSiteId,
             construction_type: newConstructionType,
             lot_building_number: newLotBuildingNumber
-          })
+          }))
         }
       }
     }
-  }, [newEvent, showCreateModal, events, editingEventId, setNewEvent])
+  }, [newEvent.machine_id, newEvent.event_type, newEvent.site_id, newEvent.construction_type, newEvent.lot_building_number, showCreateModal, events, editingEventId, setNewEvent])
 
   const validateForm = () => {
     if (!newEvent.event_date) return 'A data do evento é obrigatória.'
@@ -164,12 +164,13 @@ export default function CreateEventModal({
       if (!newEvent.downtime_reason) return 'O motivo da manutenção é obrigatório.'
     }
 
-    // Bloqueia se o tipo exige documento e não há arquivos selecionados nem links do SharePoint (apenas na criação)
-    if (MANDATORY_DOC_TYPES.includes(newEvent.event_type) && !editingEventId) {
-      const hasFiles = files.length > 0;
+    // Bloqueia se o tipo exige documento e não há arquivos selecionados, arquivos existentes nem links do SharePoint
+    if (MANDATORY_DOC_TYPES.includes(newEvent.event_type)) {
+      const hasNewFiles = files.length > 0;
+      const hasExistingFiles = editingEventId ? existingFiles.length > 0 : false;
       const hasLinks = (newEvent.sharepoint_links || []).some(link => link.url.trim() !== '');
       
-      if (!hasFiles && !hasLinks) {
+      if (!hasNewFiles && !hasExistingFiles && !hasLinks) {
         return 'Este tipo de evento exige obrigatoriamente o anexo de documentos (Imagem ou PDF) ou pelo menos um link do SharePoint.';
       }
     }
@@ -1001,6 +1002,9 @@ export default function CreateEventModal({
                               const newLinks = [...(newEvent.sharepoint_links || [])]
                               newLinks[index] = { ...newLinks[index], url: e.target.value }
                               setNewEvent({ ...newEvent, sharepoint_links: newLinks })
+                              if (validationError && (validationError.includes('documento') || validationError.includes('SharePoint'))) {
+                                setValidationError(null)
+                              }
                             }}
                             className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                             placeholder="https://sharepoint.com/..."
@@ -1013,6 +1017,9 @@ export default function CreateEventModal({
                             ...newEvent, 
                             sharepoint_links: [...(newEvent.sharepoint_links || []), { label: '', url: '' }] 
                           })
+                          if (validationError && (validationError.includes('documento') || validationError.includes('SharePoint'))) {
+                            setValidationError(null)
+                          }
                         }}
                         className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
                       >
