@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
-import { validateEvent } from '@/lib/allocationService'
+import { validateEvent, getActiveDowntimeByMachine, getActiveTransportByMachine } from '@/lib/allocationService'
 import { createAuditLog } from '@/lib/auditLog'
-import { getActiveDowntimeByMachine } from '@/lib/allocationService'
 import { updateAllocationNotification } from '@/lib/notificationService'
 
 export const dynamic = 'force-dynamic'
