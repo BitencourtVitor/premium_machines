@@ -9,7 +9,7 @@ CREATE TABLE public.allocation_events (
   extension_id uuid,
   event_date timestamp with time zone NOT NULL,
   end_date timestamp with time zone,
-  downtime_reason character varying CHECK (downtime_reason IS NULL OR (downtime_reason::text = ANY (ARRAY['defect'::character varying, 'lack_of_supplies'::character varying, 'weather'::character varying, 'lack_of_operator'::character varying, 'holiday'::character varying, 'maintenance'::character varying, 'other'::character varying]::text[]))),
+  downtime_reason character varying,
   downtime_description text,
   status character varying DEFAULT 'pending'::character varying CHECK (status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying]::text[])),
   approved_by uuid,

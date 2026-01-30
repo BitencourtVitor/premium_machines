@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
         site:sites(id, title, address),
         extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),
-        created_by_user:users!allocation_events_created_by_fkey(id, nome),
-        approved_by_user:users!allocation_events_approved_by_fkey(id, nome)
+        created_by_user:users!created_by(id, nome),
+        approved_by_user:users!approved_by(id, nome)
       `)
 
     if (machineId) {
@@ -105,6 +105,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Se for transport_arrival e não tiver site_id ou corrects_event_id, buscar automaticamente do transport_start
+    if (body.event_type === 'transport_arrival' && (!body.site_id || !body.corrects_event_id)) {
+      const activeTransport = await getActiveTransportByMachine(body.machine_id)
+      if (activeTransport) {
+        if (!body.site_id) body.site_id = activeTransport.destination_site_id
+        if (!body.corrects_event_id) body.corrects_event_id = activeTransport.transport_start_event_id
+      }
+    }
+
     // Validação usando o allocationService
     const validation = await validateEvent(body)
     if (!validation.valid) {
@@ -144,7 +153,7 @@ export async function POST(request: NextRequest) {
         site:sites(id, title),
         extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),
-        created_by_user:users!allocation_events_created_by_fkey(id, nome)
+        created_by_user:users!created_by(id, nome)
       `)
       .single()
 

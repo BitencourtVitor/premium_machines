@@ -1,5 +1,5 @@
 import { supabaseServer } from '../supabase-server'
-import { ActiveAllocation, ActiveDowntime, SiteAllocationSummary, MachineAllocationState } from './types'
+import { ActiveAllocation, ActiveDowntime, ActiveTransport, SiteAllocationSummary, MachineAllocationState } from './types'
 import { calculateMachineAllocationState, calculateStateFromEvents } from './stateCalculation'
 
 /**
@@ -451,5 +451,48 @@ export async function getActiveDowntimeByMachine(machineId: string): Promise<Act
     downtime_reason: downtimeEvent.downtime_reason || '',
     downtime_description: downtimeEvent.downtime_description,
     downtime_start: downtimeEvent.event_date,
+  }
+}
+
+/**
+ * Retorna o transporte ativo de uma máquina específica
+ */
+export async function getActiveTransportByMachine(machineId: string): Promise<ActiveTransport | null> {
+  const state = await calculateMachineAllocationState(machineId)
+  
+  if (state.status !== 'in_transit' || !state.current_allocation_event_id) {
+    return null
+  }
+
+  const { data: transportEvent } = await supabaseServer
+    .from('allocation_events')
+    .select(`
+      id,
+      event_date,
+      site_id,
+      site:sites(id, title)
+    `)
+    .eq('id', state.current_allocation_event_id)
+    .single()
+
+  if (!transportEvent || !transportEvent.site_id) {
+    return null
+  }
+
+  const { data: machine } = await supabaseServer
+    .from('machines')
+    .select('unit_number')
+    .eq('id', machineId)
+    .single()
+
+  return {
+    transport_start_event_id: transportEvent.id,
+    machine_id: machineId,
+    machine_unit_number: machine?.unit_number || '',
+    origin_site_id: state.previous_site_id || null,
+    origin_site_title: state.current_site_title || null,
+    destination_site_id: transportEvent.site_id,
+    destination_site_title: (transportEvent.site as any)?.title || null,
+    transport_start: transportEvent.event_date,
   }
 }

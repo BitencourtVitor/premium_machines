@@ -1,7 +1,10 @@
+'use client'
+
 import React, { useEffect, useRef, useState } from 'react'
 import MachineImage from '@/app/components/MachineImage'
 import { MACHINE_STATUS_LABELS, OWNERSHIP_TYPE_LABELS, EVENT_TYPE_LABELS, getMachineStatusLabel } from '@/lib/permissions'
 import { formatWithSystemTimezone, formatDateOnly } from '@/lib/timezone'
+import EventDocumentPopover from '../events/components/EventDocumentPopover'
 
 interface MachineDetailsModalProps {
   isOpen: boolean
@@ -291,6 +294,12 @@ export default function MachineDetailsModal({
                                     {formatDateOnly(event.event_date)}
                                   </span>
                                 </div>
+
+                                <EventDocumentPopover 
+                                  eventId={event.id} 
+                                  unitNumber={machine?.unit_number || 'S/N'} 
+                                  sharepointLinks={event.sharepoint_links}
+                                />
                               </div>
                               
                               <div className="text-sm text-gray-600 dark:text-gray-300 space-y-2">

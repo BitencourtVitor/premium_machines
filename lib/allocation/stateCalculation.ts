@@ -38,6 +38,8 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
   // Processar eventos em ordem cronológica
   for (const event of events) {
     // Se o evento é futuro em relação à data de referência, ignoramos para o estado "atual"
+    if (!event.event_date) continue
+
     const eventDateStr = event.event_date.split('T')[0]
     if (eventDateStr > refDateStr) {
       break
@@ -251,7 +253,8 @@ export async function calculateMachineAllocationState(machineId: string, referen
       extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment))
     `)
     .or(`machine_id.eq.${machineId},extension_id.eq.${machineId}`)
-    .or('status.eq.approved,event_type.neq.refueling')
+    .eq('status', 'approved')
+    .neq('event_type', 'refueling')
     .order('event_date', { ascending: true })
     .order('created_at', { ascending: true }) // Ordem determinística para eventos no mesmo dia
 
@@ -273,7 +276,8 @@ export async function calculateExtensionState(extensionId: string): Promise<Exte
       machine:machines(id, unit_number)
     `)
     .eq('extension_id', extensionId)
-    .or('status.eq.approved,event_type.neq.refueling')
+    .eq('status', 'approved')
+    .neq('event_type', 'refueling')
     .in('event_type', ['extension_attach', 'extension_detach', 'end_allocation'])
     .order('event_date', { ascending: true })
     .order('created_at', { ascending: true })

@@ -754,10 +754,8 @@ export default function CreateEventModal({
                       onChange={(value) => setNewEvent({ ...newEvent, downtime_reason: value || '' })}
                       options={[
                         { value: '', label: 'Selecione...' },
-                        ...Object.entries(DOWNTIME_REASON_LABELS).map(([value, label]) => ({
-                          value,
-                          label: label as string
-                        }))
+                        { value: 'preventive', label: 'Preventiva' },
+                        { value: 'corrective', label: 'Corretiva' }
                       ]}
                       placeholder="Selecione o motivo da parada"
                       required

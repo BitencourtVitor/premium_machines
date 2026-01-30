@@ -215,7 +215,19 @@ export const filterMachinesForEvent = (
 
     case 'downtime_end':
       // Máquinas que estão em manutenção
-      return baseFiltered.filter(m => downtimeIds.includes(m.id))
+      return baseFiltered.filter(m => {
+        // Se já está na lista de downtimes ativos (calculados pelo estado), ok
+        if (downtimeIds.includes(m.id)) return true
+
+        // Caso contrário, verificamos se há uma manutenção "aberta" na história completa (similar ao transporte)
+        const downtimeEvents = events
+          .filter(e => e.machine?.id === m.id && 
+                       e.status === 'approved' && 
+                       ['downtime_start', 'downtime_end'].includes(e.event_type))
+          .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
+
+        return downtimeEvents.length > 0 && downtimeEvents[0].event_type === 'downtime_start'
+      })
       
     case 'transport_start':
       // Máquinas que podem iniciar transporte

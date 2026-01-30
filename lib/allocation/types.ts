@@ -76,6 +76,17 @@ export interface ActiveDowntime {
   downtime_start: string
 }
 
+export interface ActiveTransport {
+  transport_start_event_id: string
+  machine_id: string
+  machine_unit_number: string
+  origin_site_id: string | null
+  origin_site_title: string | null
+  destination_site_id: string | null
+  destination_site_title: string | null
+  transport_start: string
+}
+
 export interface MachineAllocationState {
   machine_id: string
   current_site_id: string | null

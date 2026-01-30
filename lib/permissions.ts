@@ -83,8 +83,10 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
 
 // Downtime reason labels
 export const DOWNTIME_REASON_LABELS: Record<string, string> = {
-  preventive: 'Manutenção Preventiva',
-  corrective: 'Manutenção Corretiva',
+  preventive: 'Preventiva',
+  corrective: 'Corretiva',
+  maintenance: 'Preventiva',
+  defect: 'Corretiva',
 }
 
 // Machine status labels

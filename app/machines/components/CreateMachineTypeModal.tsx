@@ -1,4 +1,15 @@
 import { MachineType } from '../types'
+import MachineImage from '@/app/components/MachineImage'
+
+const AVAILABLE_ICONS = [
+  { id: 'boomlift', name: 'Boomlift' },
+  { id: 'fork-extensions', name: 'Fork Extensions' },
+  { id: 'forklift', name: 'Forklift' },
+  { id: 'man-basket', name: 'Man Basket' },
+  { id: 'mini-storage-container', name: 'Mini Storage Container' },
+  { id: 'trash-hopper', name: 'Trash Hopper' },
+  { id: 'truss-boom', name: 'Truss Boom' },
+]
 
 interface CreateMachineTypeModalProps {
   showTypeModal: boolean
@@ -71,18 +82,56 @@ export default function CreateMachineTypeModal({
             />
           </div>
 
-          {user?.role === 'dev' && (
+          {(user?.role === 'dev' || user?.role === 'admin') && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Ícone
               </label>
-              <input
-                type="text"
-                value={newType.icon}
-                onChange={(e) => setNewType({ ...newType, icon: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="Nome do ícone (opcional)"
-              />
+              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                <button
+                  type="button"
+                  onClick={() => setNewType({ ...newType, icon: '' })}
+                  className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                    !newType.icon 
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-500' 
+                      : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-white dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
+                    <span className="text-[10px] text-gray-500 font-bold uppercase">None</span>
+                  </div>
+                  <span className="text-sm text-gray-900 dark:text-white font-medium">Sem ícone</span>
+                </button>
+                {AVAILABLE_ICONS.map((icon) => {
+                  const jpgTypes = ['fork-extensions', 'man-basket', 'truss-boom']
+                  const extension = jpgTypes.includes(icon.id) ? '.jpg' : '.png'
+                  const imagePath = `/${icon.id}${extension}`
+                  
+                  return (
+                    <button
+                      key={icon.id}
+                      type="button"
+                      onClick={() => setNewType({ ...newType, icon: icon.id })}
+                      className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                        newType.icon === icon.id 
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-500' 
+                          : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-white dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <div className="w-8 h-8 relative rounded overflow-hidden bg-white dark:bg-gray-800 flex-shrink-0 border border-gray-100 dark:border-gray-600">
+                        <MachineImage
+                          src={imagePath}
+                          alt={icon.name}
+                          size={32}
+                          className="w-full h-full object-contain p-0.5"
+                          showFallback={false}
+                        />
+                      </div>
+                      <span className="text-sm text-gray-900 dark:text-white font-medium truncate text-left">{icon.id}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )}
 
