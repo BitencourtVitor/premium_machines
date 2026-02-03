@@ -10,31 +10,35 @@ export async function GET(request: NextRequest) {
   try {
     console.log('API: GET /api/events')
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit') || '100')
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : null
     const machineId = searchParams.get('machine_id')
     const siteId = searchParams.get('site_id')
     const status = searchParams.get('status')
     const eventType = searchParams.get('event_type')
     const startDate = searchParams.get('start_date')
     const endDate = searchParams.get('end_date')
+    const bulk = searchParams.get('bulk') === 'true'
 
+    // Ação: Replicar o mecanismo de alocações ativas (bulk fetch)
+    // Se 'bulk' for true ou estivermos filtrando por máquina, queremos buscar um volume maior de eventos
+    // sem as restrições de limite padrão de 100, assim como o getActiveAllocations faz.
     let query = supabaseServer
-      .from('allocation_events')
-      .select(`
-        *,
-        machine:machines(id, unit_number),
-        requested_machine_type:machine_types!machine_type_id(id, nome),
-        site:sites(id, title, address),
-        extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
-        supplier:suppliers(id, nome, supplier_type),
-        created_by_user:users!created_by(id, nome),
-        approved_by_user:users!approved_by(id, nome)
-      `)
+          .from('allocation_events')
+          .select(`
+            *,
+            machine:machines!machine_id(id, unit_number),
+            requested_machine_type:machine_types(id, nome),
+            site:sites(id, title, address),
+            extension:machines!extension_id(id, unit_number, machine_type:machine_types(id, nome, icon, is_attachment)),
+            supplier:suppliers(id, nome, supplier_type),
+            created_by_user:users!created_by(id, nome),
+            approved_by_user:users!approved_by(id, nome)
+          `)
 
     if (machineId) {
-      query = query.eq('machine_id', machineId)
+      query = query.or(`machine_id.eq.${machineId},extension_id.eq.${machineId}`)
     }
-
+    
     if (siteId) {
       query = query.eq('site_id', siteId)
     }
@@ -55,10 +59,17 @@ export async function GET(request: NextRequest) {
       query = query.lte('event_date', endDate)
     }
 
-    const { data: events, error } = await query
+    // Ordenação consistente
+    query = query
       .order('event_date', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(limit)
+
+    // Se for bulk fetch (estilo active allocations), aumentamos drasticamente o limite
+    // para garantir que pegamos o histórico necessário para o estado e visualização completa.
+    const finalLimit = limit || (bulk || machineId ? 2000 : 100)
+    query = query.limit(finalLimit)
+
+    const { data: events, error } = await query
 
     if (error) {
       console.error('Error fetching events:', error)

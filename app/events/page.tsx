@@ -103,9 +103,11 @@ export default function EventsPage() {
 
   const loadEvents = useCallback(async () => {
     setLoadingEvents(true)
-    console.log('Loading events...')
+    console.log('Loading events (bulk mode)...')
     try {
-      const response = await fetch('/api/events')
+      // Usando bulk=true para replicar o mecanismo de alocações ativas e garantir
+      // que todas as máquinas (incluindo extensões como PF3) apareçam no histórico.
+      const response = await fetch('/api/events?bulk=true')
       console.log('Events response status:', response.status)
       const data = await response.json()
 
@@ -649,12 +651,14 @@ export default function EventsPage() {
     if (searchTerm) {
       const search = searchTerm.toLowerCase()
       const unitNumber = event.machine?.unit_number?.toLowerCase() || ''
+      const extensionUnitNumber = event.extension?.unit_number?.toLowerCase() || ''
       const siteTitle = event.site?.title?.toLowerCase() || ''
       const machineTypeName = event.requested_machine_type?.nome?.toLowerCase() || ''
       const creatorName = event.created_by_user?.nome?.toLowerCase() || ''
       const notes = event.notas?.toLowerCase() || ''
 
       matchesSearch = unitNumber.includes(search) || 
+                      extensionUnitNumber.includes(search) ||
                       siteTitle.includes(search) || 
                       machineTypeName.includes(search) ||
                       creatorName.includes(search) ||

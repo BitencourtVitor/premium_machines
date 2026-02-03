@@ -32,6 +32,7 @@ CREATE TABLE public.allocation_events (
   CONSTRAINT allocation_events_corrects_event_id_fkey FOREIGN KEY (corrects_event_id) REFERENCES public.allocation_events(id),
   CONSTRAINT allocation_events_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
   CONSTRAINT allocation_events_machine_id_fkey FOREIGN KEY (machine_id) REFERENCES public.machines(id),
+  CONSTRAINT allocation_events_extension_id_fkey FOREIGN KEY (extension_id) REFERENCES public.machines(id),
   CONSTRAINT allocation_events_site_id_fkey FOREIGN KEY (site_id) REFERENCES public.sites(id),
   CONSTRAINT allocation_events_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id),
   CONSTRAINT allocation_events_machine_type_id_fkey FOREIGN KEY (machine_type_id) REFERENCES public.machine_types(id)
