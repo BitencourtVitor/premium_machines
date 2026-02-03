@@ -14,9 +14,9 @@ export async function getMachineEventHistory(machineId: string): Promise<{
       .from('allocation_events')
       .select(`
         *,
-        machine:machines(id, unit_number),
+        machine:machines!machine_id(id, unit_number),
         site:sites(id, title),
-        extension:machine_extensions(id, unit_number),
+        extension:machines!extension_id(id, unit_number),
         supplier:suppliers(id, nome),
         created_by_user:users!allocation_events_created_by_fkey(id, nome),
         approved_by_user:users!allocation_events_approved_by_fkey(id, nome)

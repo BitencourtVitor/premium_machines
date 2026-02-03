@@ -16,10 +16,10 @@ export async function GET(
       .from('allocation_events')
       .select(`
         *,
-        machine:machines(id, unit_number),
+        machine:machines!machine_id(id, unit_number),
         requested_machine_type:machine_types!machine_type_id(id, nome),
         site:sites(id, title),
-        extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
+        extension:machines!extension_id(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),
         created_by_user:users!allocation_events_created_by_fkey(id, nome)
       `)
@@ -111,10 +111,10 @@ export async function PUT(
       .eq('id', id)
       .select(`
         *,
-        machine:machines(id, unit_number),
+        machine:machines!machine_id(id, unit_number),
         machine_type:machine_types!machine_type_id(id, nome),
         site:sites(id, title),
-        extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
+        extension:machines!extension_id(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),
         created_by_user:users!allocation_events_created_by_fkey(id, nome)
       `)

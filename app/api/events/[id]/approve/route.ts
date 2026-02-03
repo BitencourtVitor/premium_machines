@@ -25,7 +25,7 @@ export async function POST(
       .from('allocation_events')
       .select(`
         *,
-        machine:machines(id, unit_number),
+        machine:machines!machine_id(id, unit_number),
         site:sites(id, title),
         supplier:suppliers(id, nome, supplier_type),
         created_by_user:users!allocation_events_created_by_fkey(id, nome),
@@ -72,7 +72,7 @@ export async function POST(
       .from('allocation_events')
       .select(`
         *,
-        machine:machines(id, unit_number),
+        machine:machines!machine_id(id, unit_number),
         site:sites(id, title),
         supplier:suppliers(id, nome, supplier_type),
         created_by_user:users!allocation_events_created_by_fkey(id, nome),

@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         site:sites(id, title),
-        extension:machines(id, unit_number, machine_type:machine_types(id, nome, icon, is_attachment))
+        extension:machines!extension_id(id, unit_number, machine_type:machine_types(id, nome, icon, is_attachment))
       `)
       .or('status.eq.approved,event_type.neq.refueling')
       .order('event_date', { ascending: true })

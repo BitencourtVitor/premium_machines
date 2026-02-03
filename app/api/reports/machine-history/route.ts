@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         site:sites(*),
-        extension:machines(id, unit_number, machine_type:machine_types(nome)),
+        extension:machines!extension_id(id, unit_number, machine_type:machine_types(nome)),
         user:users!allocation_events_created_by_fkey(id, nome)
       `)
       .or(`machine_id.eq.${machineId},extension_id.eq.${machineId}`)

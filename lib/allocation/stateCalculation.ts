@@ -250,7 +250,7 @@ export async function calculateMachineAllocationState(machineId: string, referen
     .select(`
       *,
       site:sites(id, title),
-      extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment))
+      extension:machines!extension_id(id, unit_number, machine_type:machine_types(id, nome, is_attachment))
     `)
     .or(`machine_id.eq.${machineId},extension_id.eq.${machineId}`)
     .eq('status', 'approved')
@@ -273,7 +273,7 @@ export async function calculateExtensionState(extensionId: string): Promise<Exte
     .from('allocation_events')
     .select(`
       *,
-      machine:machines(id, unit_number)
+      machine:machines!machine_id(id, unit_number)
     `)
     .eq('extension_id', extensionId)
     .eq('status', 'approved')

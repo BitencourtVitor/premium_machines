@@ -18,7 +18,7 @@ export async function GET() {
           status,
           notas,
           approved_at,
-          machine:machines(id, unit_number, supplier_id),
+          machine:machines!machine_id(id, unit_number, supplier_id),
           site:sites(id, title),
           approved_by_user:users!allocation_events_approved_by_fkey(id, nome)
         `)

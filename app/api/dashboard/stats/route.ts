@@ -70,7 +70,7 @@ export async function GET() {
         status,
         event_date,
         created_at,
-        machine:machines(id, unit_number),
+        machine:machines!machine_id(id, unit_number),
         site:sites(id, title)
       `)
       .order('event_date', { ascending: false })

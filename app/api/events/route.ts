@@ -158,10 +158,10 @@ export async function POST(request: NextRequest) {
       })
       .select(`
         *,
-        machine:machines(id, unit_number),
+        machine:machines!machine_id(id, unit_number),
         requested_machine_type:machine_types!machine_type_id(id, nome),
         site:sites(id, title),
-        extension:machines(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
+        extension:machines!extension_id(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
         supplier:suppliers(id, nome, supplier_type),
         created_by_user:users!created_by(id, nome)
       `)

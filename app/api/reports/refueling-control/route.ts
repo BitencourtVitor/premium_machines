@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       .from('allocation_events')
       .select(`
         *,
-        machine:machines(id, unit_number, machine_type:machine_types(nome)),
+        machine:machines!machine_id(id, unit_number, machine_type:machine_types(nome)),
         site:sites(id, title, address),
         user:users!allocation_events_created_by_fkey(id, nome)
       `)

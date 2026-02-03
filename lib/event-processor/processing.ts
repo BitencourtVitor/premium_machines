@@ -74,9 +74,9 @@ export async function processEventApproval(
       .from('allocation_events')
       .select(`
         *,
-        machine:machines(id, unit_number),
+        machine:machines!machine_id(id, unit_number),
         site:sites(id, title),
-        extension:machines(id, unit_number)
+        extension:machines!extension_id(id, unit_number)
       `)
       .eq('id', eventId)
       .single()
