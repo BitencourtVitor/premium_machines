@@ -5,6 +5,34 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+/**
+ * Gets the public URL for a machine icon from a specific bucket.
+ */
+export const getMachineIconUrlFromBucket = (icon: string | null | undefined, bucketName: string): string | null => {
+  if (!icon || icon === 'undefined' || icon === 'null') return null
+  
+  // Se já for uma URL completa, retorna ela
+  if (icon.startsWith('http') || icon.startsWith('/')) return icon
+
+  // Limpa o nome do ícone caso venha com o nome do bucket ou algo do tipo
+  const cleanIcon = icon.includes('/') ? icon.split('/').pop()! : icon
+
+  const { data: { publicUrl } } = supabase.storage
+    .from(bucketName)
+    .getPublicUrl(cleanIcon)
+  
+  return publicUrl
+}
+
+// Keep the old ones for compatibility
+export const getMachineIconUrl = (icon: string | null | undefined): string | null => {
+  return getMachineIconUrlFromBucket(icon, 'Machine Types')
+}
+
+export const getMachineIconUrlSingular = (icon: string | null | undefined): string | null => {
+  return getMachineIconUrlFromBucket(icon, 'Machine Types')
+}
+
 // Types for the database
 export interface User {
   id: string

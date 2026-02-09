@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['api.mapbox.com'],
+    domains: ['api.mapbox.com', 'hgsomlyazuotaaxldqnb.supabase.co'],
   },
   // Suppress hydration warnings for dark mode
   compiler: {

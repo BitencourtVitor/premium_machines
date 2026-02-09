@@ -2,6 +2,7 @@ import { MachineType } from '../types'
 import MachineImage from '@/app/components/MachineImage'
 import BaseList from '@/app/components/BaseList'
 import ListActionButton from '@/app/components/ListActionButton'
+import { getMachineIconUrl } from '@/lib/supabase'
 
 interface MachineTypesTabProps {
   loadingTypes: boolean
@@ -23,19 +24,7 @@ export default function MachineTypesTab({
   loadMachineTypes
 }: MachineTypesTabProps) {
   const renderTypeItem = (type: MachineType) => {
-    // Determinar o caminho da imagem baseado no campo icon
-    const getImagePath = () => {
-      const icon = type.icon
-      if (!icon) return null
-      
-      if (icon.includes('.')) return `/${icon}`
-      
-      const jpgTypes = ['fork-extensions', 'man-basket', 'truss-boom']
-      const extension = jpgTypes.includes(icon) ? '.jpg' : '.png'
-      return `/${icon}${extension}`
-    }
-
-    const imagePath = getImagePath() || ''
+    const imagePath = getMachineIconUrl(type.icon) || ''
 
     return (
       <div

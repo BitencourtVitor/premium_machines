@@ -5,6 +5,7 @@ import MachineImage from '@/app/components/MachineImage'
 import { MACHINE_STATUS_LABELS, OWNERSHIP_TYPE_LABELS, EVENT_TYPE_LABELS, getMachineStatusLabel } from '@/lib/permissions'
 import { formatWithSystemTimezone, formatDateOnly } from '@/lib/timezone'
 import EventDocumentPopover from '../events/components/EventDocumentPopover'
+import { getMachineIconUrl } from '@/lib/supabase'
 
 interface MachineDetailsModalProps {
   isOpen: boolean
@@ -145,17 +146,7 @@ export default function MachineDetailsModal({
             {/* Machine Image */}
             <div className="flex-shrink-0 w-16 h-16 relative rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700">
               {(() => {
-                const getMachineImagePath = () => {
-                  const icon = machine?.machine_type?.icon
-                  if (!icon) return null
-                  
-                  if (icon.includes('.')) return `/${icon}`
-                  
-                  const jpgTypes = ['fork-extensions', 'man-basket', 'truss-boom']
-                  const extension = jpgTypes.includes(icon) ? '.jpg' : '.png'
-                  return `/${icon}${extension}`
-                }
-                const imagePath = getMachineImagePath()
+                const imagePath = getMachineIconUrl(machine?.machine_type?.icon)
                 return imagePath ? (
                   <MachineImage src={imagePath} alt={machine?.machine_type?.nome} size={64} className="w-full h-full object-cover" />
                 ) : (

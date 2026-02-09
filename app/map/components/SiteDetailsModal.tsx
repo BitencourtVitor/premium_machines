@@ -5,6 +5,8 @@ import { getEventConfig, formatDate, formatDateOnly } from '@/app/events/utils'
 import { adjustDateToSystemTimezone, formatWithSystemTimezone } from '@/lib/timezone'
 import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 
+import { getMachineIconUrl } from '@/lib/supabase'
+
 interface SiteDetailsModalProps {
   isOpen: boolean
   onClose: () => void
@@ -548,18 +550,7 @@ export default function SiteDetailsModal({
                       const vencimento = allocation.planned_end_date ? formatDateOnly(allocation.planned_end_date) : null
 
                       // Determinar o caminho da imagem baseada no tipo de máquina
-                      const getMachineImagePath = () => {
-                        const icon = allocation.machine_type_icon
-                        if (!icon) return null
-                        
-                        if (icon.includes('.')) return `/${icon}`
-                        
-                        const jpgTypes = ['fork-extensions', 'man-basket', 'truss-boom']
-                        const extension = jpgTypes.includes(icon) ? '.jpg' : '.png'
-                        return `/${icon}${extension}`
-                      }
-
-                      const machineImagePath = getMachineImagePath()
+                      const machineImagePath = getMachineIconUrl(allocation.machine_type_icon)
 
                       const isExceeded = allocationStatus.label === 'Ativa Excedida'
 

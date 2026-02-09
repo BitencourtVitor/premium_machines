@@ -1,15 +1,7 @@
+import { useState, useEffect } from 'react'
 import { MachineType } from '../types'
 import MachineImage from '@/app/components/MachineImage'
-
-const AVAILABLE_ICONS = [
-  { id: 'boomlift', name: 'Boomlift' },
-  { id: 'fork-extensions', name: 'Fork Extensions' },
-  { id: 'forklift', name: 'Forklift' },
-  { id: 'man-basket', name: 'Man Basket' },
-  { id: 'mini-storage-container', name: 'Mini Storage Container' },
-  { id: 'trash-hopper', name: 'Trash Hopper' },
-  { id: 'truss-boom', name: 'Truss Boom' },
-]
+import { supabase, getMachineIconUrlFromBucket } from '@/lib/supabase'
 
 interface CreateMachineTypeModalProps {
   showTypeModal: boolean
@@ -36,6 +28,53 @@ export default function CreateMachineTypeModal({
   user,
   error
 }: CreateMachineTypeModalProps) {
+  const [availableIcons, setAvailableIcons] = useState<{ id: string, name: string, url: string, bucketName: string }[]>([])
+  const [loadingIcons, setLoadingIcons] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<string>('')
+
+  useEffect(() => {
+    if (showTypeModal) {
+      fetchIcons()
+    }
+  }, [showTypeModal])
+
+  const fetchIcons = async () => {
+    setLoadingIcons(true)
+    setDebugInfo('Buscando em "Machine Types"... ')
+    try {
+      const { data, error } = await supabase.storage.from('Machine Types').list('', {
+        limit: 100,
+        sortBy: { column: 'name', order: 'asc' }
+      })
+
+      if (error) {
+        console.error('Erro detalhado do Supabase:', error)
+        setDebugInfo(`Erro Supabase: ${error.message} (Code: ${error.name})`)
+        return
+      }
+
+      if (data && data.length > 0) {
+        const filteredData = data.filter(file => file.name !== '.emptyFolderPlaceholder')
+        setDebugInfo(`Encontrados ${filteredData.length} arquivos em "Machine Types"`)
+        
+        const icons = filteredData.map(file => ({
+          id: file.name,
+          name: file.name.split('.')[0], // Mantém hifens conforme padrão do sistema
+          url: file.name,
+          bucketName: 'Machine Types'
+        }))
+        setAvailableIcons(icons)
+      } else {
+        setDebugInfo('Bucket "Machine Types" está vazio ou não retornou dados.')
+      }
+    } catch (err: any) {
+      console.error('Erro catch fatal:', err)
+      setDebugInfo(`Erro fatal: ${err.message}`)
+    } finally {
+      setLoadingIcons(false)
+    }
+  }
+
   if (!showTypeModal) return null
 
   return (
@@ -82,58 +121,69 @@ export default function CreateMachineTypeModal({
             />
           </div>
 
-          {(user?.role === 'dev' || user?.role === 'admin') && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Ícone
-              </label>
-              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                <button
-                  type="button"
-                  onClick={() => setNewType({ ...newType, icon: '' })}
-                  className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
-                    !newType.icon 
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-500' 
-                      : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-white dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
-                    <span className="text-[10px] text-gray-500 font-bold uppercase">None</span>
-                  </div>
-                  <span className="text-sm text-gray-900 dark:text-white font-medium">Sem ícone</span>
-                </button>
-                {AVAILABLE_ICONS.map((icon) => {
-                  const jpgTypes = ['fork-extensions', 'man-basket', 'truss-boom']
-                  const extension = jpgTypes.includes(icon.id) ? '.jpg' : '.png'
-                  const imagePath = `/${icon.id}${extension}`
-                  
-                  return (
-                    <button
-                      key={icon.id}
-                      type="button"
-                      onClick={() => setNewType({ ...newType, icon: icon.id })}
-                      className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
-                        newType.icon === icon.id 
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-500' 
-                          : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-white dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      <div className="w-8 h-8 relative rounded overflow-hidden bg-white dark:bg-gray-800 flex-shrink-0 border border-gray-100 dark:border-gray-600">
-                        <MachineImage
-                          src={imagePath}
-                          alt={icon.name}
-                          size={32}
-                          className="w-full h-full object-contain p-0.5"
-                          showFallback={false}
-                        />
-                      </div>
-                      <span className="text-sm text-gray-900 dark:text-white font-medium truncate text-left">{icon.id}</span>
-                    </button>
-                  )
-                })}
-              </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Ícone
+            </label>
+            {debugInfo && (
+              <p className="text-[10px] text-gray-400 mb-1 font-mono">{debugInfo}</p>
+            )}
+            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+              <button
+                type="button"
+                onClick={() => setNewType({ ...newType, icon: '' })}
+                className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                  !newType.icon 
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-500' 
+                    : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-white dark:hover:bg-gray-700'
+                }`}
+              >
+                <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
+                  <span className="text-[10px] text-gray-500 font-bold uppercase">None</span>
+                </div>
+                <span className="text-sm text-gray-900 dark:text-white font-medium">Sem ícone</span>
+              </button>
+              {loadingIcons ? (
+                <div className="col-span-2 py-4 flex justify-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                </div>
+              ) : availableIcons.length > 0 ? (
+                availableIcons.map((icon) => (
+                  <button
+                    key={icon.id}
+                    type="button"
+                    onClick={() => setNewType({ ...newType, icon: icon.id })}
+                    className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                      newType.icon === icon.id 
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-500' 
+                        : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-white dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <div className="w-8 h-8 relative rounded overflow-hidden bg-white dark:bg-gray-800 flex-shrink-0 border border-gray-100 dark:border-gray-600">
+                      <MachineImage
+                        src={getMachineIconUrlFromBucket(icon.url, icon.bucketName) || ''}
+                        alt={icon.name}
+                        size={32}
+                        className="w-full h-full object-contain p-0.5"
+                        showFallback={false}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-900 dark:text-white font-medium truncate text-left">{icon.name}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="col-span-2 py-8 text-center flex flex-col items-center justify-center gap-2">
+                  <span className="text-xs text-gray-500">Nenhum ícone encontrado no Storage</span>
+                  <button 
+                    onClick={() => fetchIcons()}
+                    className="text-[10px] text-blue-500 hover:underline"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           <div>
             <label className="flex items-center gap-2">

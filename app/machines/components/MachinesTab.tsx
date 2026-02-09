@@ -3,6 +3,7 @@ import MachineImage from '@/app/components/MachineImage'
 import { MACHINE_STATUS_LABELS, OWNERSHIP_TYPE_LABELS, getMachineStatusLabel } from '@/lib/permissions'
 import BaseList from '@/app/components/BaseList'
 import ListActionButton from '@/app/components/ListActionButton'
+import { getMachineIconUrl } from '@/lib/supabase'
 
 interface MachinesTabProps {
   loadingMachines: boolean
@@ -26,19 +27,7 @@ export default function MachinesTab({
   onMachineClick
 }: MachinesTabProps) {
   const renderMachineItem = (machine: Machine) => {
-    // Determinar o caminho da imagem baseado no tipo de máquina
-    const getMachineImagePath = () => {
-      const icon = machine.machine_type?.icon
-      if (!icon) return null
-      
-      if (icon.includes('.')) return `/${icon}`
-      
-      const jpgTypes = ['fork-extensions', 'man-basket', 'truss-boom']
-      const extension = jpgTypes.includes(icon) ? '.jpg' : '.png'
-      return `/${icon}${extension}`
-    }
-
-    const machineImagePath = getMachineImagePath()
+    const machineImagePath = getMachineIconUrl(machine.machine_type?.icon)
 
     // Cores para status
     const getStatusColor = () => {

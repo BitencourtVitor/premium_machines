@@ -34,7 +34,7 @@ export default function EventDocumentPopover({ eventId, unitNumber, sharepointLi
     setLoading(true)
     try {
       const { data, error: storageError } = await supabase.storage
-        .from('Allocation Documents')
+        .from('Machines Types')
         .list(eventId)
 
       if (!storageError) {
@@ -63,7 +63,7 @@ export default function EventDocumentPopover({ eventId, unitNumber, sharepointLi
   const handleDownload = async (fileName: string) => {
     try {
       const { data, error: downloadError } = await supabase.storage
-        .from('Allocation Documents')
+        .from('Machines Types')
         .download(`${eventId}/${fileName}`)
 
       if (downloadError) throw downloadError
@@ -85,7 +85,7 @@ export default function EventDocumentPopover({ eventId, unitNumber, sharepointLi
   const handleView = async (fileName: string) => {
     try {
       const { data: { publicUrl } } = supabase.storage
-        .from('Allocation Documents')
+        .from('Machines Types')
         .getPublicUrl(`${eventId}/${fileName}`)
 
       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName)

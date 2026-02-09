@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 
 interface MachineImageProps {
@@ -11,8 +11,26 @@ interface MachineImageProps {
 
 export default function MachineImage({ src, alt, size = 48, className = '', showFallback = true }: MachineImageProps) {
   const [error, setError] = useState(false)
+  const [retryWithPng, setRetryWithPng] = useState(false)
+  const [retryWithJpg, setRetryWithJpg] = useState(false)
 
-  if (error) {
+  // Basic validation to prevent rendering invalid URLs
+  const isValidSrc = src && typeof src === 'string' && src.length > 0 && !src.includes('localhost:3000')
+
+  // Reset error when src changes
+  useEffect(() => {
+    setError(false)
+    setRetryWithPng(false)
+    setRetryWithJpg(false)
+  }, [src])
+
+  const hasExtension = (path: string) => {
+    if (!path) return false
+    const lastPart = path.split('/').pop() || ''
+    return lastPart.includes('.')
+  }
+
+  if ((error && !retryWithPng && !retryWithJpg) || !isValidSrc) {
     if (!showFallback) return null
     
     return (
@@ -27,15 +45,33 @@ export default function MachineImage({ src, alt, size = 48, className = '', show
     )
   }
 
+  let finalSrc = src
+  if (retryWithPng && !hasExtension(src)) finalSrc = `${src}.png`
+  else if (retryWithJpg && !hasExtension(src)) finalSrc = `${src}.jpg`
+
   return (
     <div className={`relative overflow-hidden rounded-lg ${className}`} style={{ width: size, height: size }}>
       <Image
-        src={src}
+        src={finalSrc}
         alt={alt}
         width={size}
         height={size}
         className="object-cover w-full h-full"
-        onError={() => setError(true)}
+        unoptimized={true} // Bypass Next.js optimization to avoid 400 errors from Supabase
+        onError={() => {
+          if (!hasExtension(finalSrc)) {
+            if (!retryWithPng && !retryWithJpg) {
+              setRetryWithPng(true)
+            } else if (retryWithPng) {
+              setRetryWithPng(false)
+              setRetryWithJpg(true)
+            } else {
+              setError(true)
+            }
+          } else {
+            setError(true)
+          }
+        }}
       />
     </div>
   )
