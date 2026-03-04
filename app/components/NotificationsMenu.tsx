@@ -208,7 +208,7 @@ export default function NotificationsMenu() {
                       <div className={`mt-1 flex-shrink-0 w-2 h-2 rounded-full ${isUnread ? 'bg-blue-600' : 'bg-transparent'}`}></div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{notification.titulo}</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">{notification.mensagem}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2 whitespace-pre-line">{notification.mensagem}</p>
                         <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-2">
                           {new Date(notification.trigger_date || notification.created_at).toLocaleDateString('pt-BR')}
                         </p>

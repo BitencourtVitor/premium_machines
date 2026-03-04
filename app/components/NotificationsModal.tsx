@@ -147,7 +147,7 @@ export default function NotificationsModal({ isOpen, onClose }: NotificationsMod
                             {isUnread && <span className="w-2 h-2 rounded-full bg-blue-600"></span>}
                             <h4 className="font-semibold text-gray-900 dark:text-white">{notification.titulo}</h4>
                           </div>
-                          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">{notification.mensagem}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2 whitespace-pre-line">{notification.mensagem}</p>
                           <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                             <span>{new Date(notification.trigger_date || notification.created_at).toLocaleDateString('pt-BR')}</span>
                             <span className="capitalize px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700">{notification.root_type}</span>
