@@ -208,15 +208,15 @@ export default function EventsTab({
                   </div>
                 )}
 
-                <div className="flex items-center gap-4 text-gray-500 dark:text-gray-400 lg:col-span-2">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4 text-gray-500 dark:text-gray-400 lg:col-span-2 min-w-0">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <FiUser className="flex-shrink-0" />
                     <span>{event.created_by_user?.nome}</span>
                   </div>
                   {event.notas && (
-                    <div className="flex items-center gap-2 text-gray-400 italic border-l border-gray-200 dark:border-gray-700 pl-4">
+                    <div className="flex items-center gap-2 text-gray-400 italic border-l border-gray-200 dark:border-gray-700 pl-4 min-w-0 max-w-[300px] lg:max-w-[400px]">
                       <FiInfo className="flex-shrink-0 text-xs" />
-                      <span className="truncate">{event.notas}</span>
+                      <span className="truncate text-xs" title={event.notas}>{event.notas}</span>
                     </div>
                   )}
                 </div>
