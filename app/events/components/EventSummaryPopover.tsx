@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { createPortal } from 'react-dom'
 import { FiMessageSquare, FiDownload, FiCheck, FiLoader } from 'react-icons/fi'
 import { FaWhatsapp } from 'react-icons/fa'
@@ -213,10 +214,13 @@ export default function EventSummaryPopover({ event }: EventSummaryPopoverProps)
                 </div>
               ) : imageUrl ? (
                 <div className="w-full rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden bg-white">
-                  <img 
+                  <Image 
                     src={imageUrl} 
                     alt="Preview" 
+                    width={420}
+                    height={300}
                     className="w-full h-auto"
+                    unoptimized
                   />
                 </div>
               ) : (

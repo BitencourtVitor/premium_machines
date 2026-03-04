@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { supabase, Notification } from '@/lib/supabase'
 import { getSessionUser } from '@/lib/session'
 import NotificationsModal from './NotificationsModal'
@@ -23,6 +23,24 @@ export default function NotificationsMenu() {
 
   const canSeeNotifications = user && (user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'dev')
 
+  const fetchNotifications = useCallback(async () => {
+    if (!user?.id) return
+
+    try {
+      const response = await fetch(`/api/notifications?userId=${user.id}&limit=20`)
+      const result = await response.json()
+
+      if (result.success) {
+        setNotifications(result.notifications)
+        setUnreadCount(result.notifications.filter((n: any) => !n.viewed_by?.includes(user.id)).length)
+      } else {
+        console.error('Erro ao buscar notificações:', result.message)
+      }
+    } catch (error) {
+      console.error('Erro ao buscar notificações:', error)
+    }
+  }, [user?.id])
+
   useEffect(() => {
     if (canSeeNotifications) {
       fetchNotifications()
@@ -39,25 +57,7 @@ export default function NotificationsMenu() {
         supabase.removeChannel(channel)
       }
     }
-  }, [canSeeNotifications, user?.id])
-
-  async function fetchNotifications() {
-    if (!user?.id) return
-
-    try {
-      const response = await fetch(`/api/notifications?userId=${user.id}&limit=20`)
-      const result = await response.json()
-
-      if (result.success) {
-        setNotifications(result.notifications)
-        setUnreadCount(result.notifications.filter((n: any) => !n.viewed_by?.includes(user.id)).length)
-      } else {
-        console.error('Erro ao buscar notificações:', result.message)
-      }
-    } catch (error) {
-      console.error('Erro ao buscar notificações:', error)
-    }
-  }
+  }, [canSeeNotifications, fetchNotifications])
 
   async function markAsViewed(notification: Notification) {
     if (!user?.id || notification.viewed_by?.includes(user.id)) return

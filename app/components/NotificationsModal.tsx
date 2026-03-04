@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase, Notification } from '@/lib/supabase'
 import { getSessionUser } from '@/lib/session'
 
@@ -21,13 +21,7 @@ export default function NotificationsModal({ isOpen, onClose }: NotificationsMod
     }
   }, [])
 
-  useEffect(() => {
-    if (isOpen && user?.id) {
-      fetchNotifications()
-    }
-  }, [isOpen, user?.id])
-
-  async function fetchNotifications() {
+  const fetchNotifications = useCallback(async () => {
     if (!user?.id) return
     setLoading(true)
     try {
@@ -44,7 +38,13 @@ export default function NotificationsModal({ isOpen, onClose }: NotificationsMod
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id])
+
+  useEffect(() => {
+    if (isOpen && user?.id) {
+      fetchNotifications()
+    }
+  }, [isOpen, user?.id, fetchNotifications])
 
   async function markAsViewed(notification: Notification) {
     if (!user?.id || notification.viewed_by?.includes(user.id)) return

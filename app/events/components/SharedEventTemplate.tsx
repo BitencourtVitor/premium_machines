@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useRef, useEffect, useState } from 'react'
+import Image from 'next/image'
 import { createPortal } from 'react-dom'
 import { FiCalendar, FiMapPin, FiTool, FiUser, FiInfo } from 'react-icons/fi'
 import { LuHash } from 'react-icons/lu'
@@ -69,11 +70,14 @@ export const SharedEventTemplate = React.forwardRef<HTMLDivElement, SharedTempla
               </p>
             </div>
             <div className="flex-shrink-0">
-              <img 
+              <Image 
                 src={logoUrl} 
                 alt="Premium" 
-                className="h-7 object-contain opacity-80"
+                width={100}
+                height={28}
+                className="h-7 w-auto object-contain opacity-80"
                 crossOrigin="anonymous"
+                unoptimized
               />
             </div>
           </div>
@@ -172,7 +176,7 @@ export const SharedEventTemplate = React.forwardRef<HTMLDivElement, SharedTempla
               >
                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] block mb-1">OBSERVAÇÕES</label>
                 <p className="text-xs text-gray-600 leading-normal italic">
-                  "{event.notas}"
+                  &quot;{event.notas}&quot;
                 </p>
               </div>
             )}

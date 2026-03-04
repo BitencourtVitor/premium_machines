@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { FiFile, FiImage, FiDownload, FiEye, FiLoader, FiPaperclip, FiExternalLink } from 'react-icons/fi'
 import DocumentViewerModal from './DocumentViewerModal'
@@ -165,10 +166,13 @@ export default function EventDocumentPopover({ eventId, unitNumber, sharepointLi
                        className="flex items-center justify-between gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors group"
                      >
                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <img 
+                        <Image 
                           src="https://img.icons8.com/?size=100&id=qjbTrcfmKDpq&format=png&color=0078d4" 
                           alt="SharePoint"
-                          className="w-4 h-4 flex-shrink-0 object-contain"
+                          width={16}
+                          height={16}
+                          className="flex-shrink-0 object-contain"
+                          unoptimized
                         />
                         <span className="text-sm text-gray-700 dark:text-gray-300 truncate font-medium">
                           {linkObj.label || `SharePoint Link ${sharepointLinks.length > 1 ? idx + 1 : ''}`}
