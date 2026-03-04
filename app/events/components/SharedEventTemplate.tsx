@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useRef, useEffect, useState } from 'react'
-import Image from 'next/image'
 import { createPortal } from 'react-dom'
 import { FiCalendar, FiMapPin, FiTool, FiUser, FiInfo } from 'react-icons/fi'
 import { LuHash } from 'react-icons/lu'
@@ -70,15 +69,19 @@ export const SharedEventTemplate = React.forwardRef<HTMLDivElement, SharedTempla
               </p>
             </div>
             <div className="flex-shrink-0">
-              <Image 
-                src={logoUrl} 
-                alt="Premium" 
-                width={100}
-                height={28}
-                className="h-7 w-auto object-contain opacity-80"
-                crossOrigin="anonymous"
-                unoptimized
-              />
+              {logoUrl && (
+                <img 
+                  src={logoUrl} 
+                  alt="Premium" 
+                  style={{ 
+                    height: '28px', 
+                    width: 'auto', 
+                    objectFit: 'contain', 
+                    opacity: 0.8 
+                  }}
+                  crossOrigin="anonymous"
+                />
+              )}
             </div>
           </div>
 
@@ -145,26 +148,58 @@ export const SharedEventTemplate = React.forwardRef<HTMLDivElement, SharedTempla
               </div>
             )}
 
-            <div className="pt-3 border-t flex justify-between items-center min-h-[44px]" style={{ borderColor: '#f3f4f6' }}>
-              {event.created_by_user && (
-                <div className="flex items-start gap-2 flex-1 mr-2">
-                  <FiUser size={14} className="mt-0.5 text-gray-400 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-0.5">POR</label>
-                    <p className="text-xs font-bold text-gray-800 leading-tight break-words">{event.created_by_user.nome}</p>
+            <div className="pt-3 border-t flex flex-col gap-3" style={{ borderColor: '#f3f4f6' }}>
+              <div className="flex justify-between items-center min-h-[44px]">
+                {event.created_by_user && (
+                  <div className="flex items-start gap-2 flex-1 mr-2">
+                    <FiUser size={14} className="mt-0.5 text-gray-400 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-0.5">CRIADO POR</label>
+                      <p className="text-xs font-bold text-gray-800 leading-tight break-words">{event.created_by_user.nome}</p>
+                    </div>
                   </div>
-                </div>
-              )}
-              
-              {event.downtime_reason && (
-                <div 
-                  className="h-6 px-3 rounded-full border flex items-center justify-center gap-1.5 flex-shrink-0"
-                  style={{ backgroundColor: '#FFF7ED', borderColor: '#FED7AA', color: '#9A3412' }}
-                >
-                  <FiInfo size={12} className="flex-shrink-0" />
-                  <span className="text-[10px] font-black uppercase leading-none">
-                    {DOWNTIME_REASON_LABELS[event.downtime_reason]}
-                  </span>
+                )}
+                
+                {event.downtime_reason && (
+                  <div 
+                    className="h-6 px-3 rounded-full border flex items-center justify-center gap-1.5 flex-shrink-0"
+                    style={{ backgroundColor: '#FFF7ED', borderColor: '#FED7AA', color: '#9A3412' }}
+                  >
+                    <FiInfo size={12} className="flex-shrink-0" />
+                    <span className="text-[10px] font-black uppercase leading-none">
+                      {DOWNTIME_REASON_LABELS[event.downtime_reason]}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {(event.requested_by_name || event.validated_by_name) && (
+                <div className="grid grid-cols-2 gap-4 pt-3 border-t" style={{ borderColor: '#f3f4f6' }}>
+                  {event.requested_by_name && (
+                    <div className="flex items-start gap-2">
+                      <FiUser size={14} className="mt-0.5 text-gray-400 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-0.5">SOLICITANTE</label>
+                        <p className="text-xs font-bold text-gray-800 leading-tight break-words">{event.requested_by_name}</p>
+                        {event.requested_at && (
+                          <p className="text-[9px] text-gray-400 mt-0.5">{formatDateOnly(event.requested_at)}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {event.validated_by_name && (
+                    <div className="flex items-start gap-2">
+                      <FiUser size={14} className="mt-0.5 text-gray-400 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-0.5">VALIDADOR</label>
+                        <p className="text-xs font-bold text-gray-800 leading-tight break-words">{event.validated_by_name}</p>
+                        {event.validated_at && (
+                          <p className="text-[9px] text-gray-400 mt-0.5">{formatDateOnly(event.validated_at)}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

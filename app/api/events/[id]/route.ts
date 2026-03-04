@@ -93,6 +93,10 @@ export async function PUT(
     if (updateData.lot_building_number === '') updateData.lot_building_number = null
     if (updateData.downtime_reason === '') updateData.downtime_reason = null
     if (updateData.end_date === '') updateData.end_date = null
+    if (updateData.requested_by_name === '') updateData.requested_by_name = null
+    if (updateData.requested_at === '') updateData.requested_at = null
+    if (updateData.validated_by_name === '') updateData.validated_by_name = null
+    if (updateData.validated_at === '') updateData.validated_at = null
     
     // event_date should NEVER be null as it's a required field in DB
     if (updateData.event_date === '') delete updateData.event_date

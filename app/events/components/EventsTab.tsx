@@ -208,13 +208,28 @@ export default function EventsTab({
                   </div>
                 )}
 
-                <div className="flex items-center gap-4 text-gray-500 dark:text-gray-400 lg:col-span-2 min-w-0">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-gray-500 dark:text-gray-400 lg:col-span-3 min-w-0">
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <FiUser className="flex-shrink-0" />
-                    <span>{event.created_by_user?.nome}</span>
+                    <span className="text-xs">Criado por: <span className="font-medium text-gray-700 dark:text-gray-300">{event.created_by_user?.nome}</span></span>
                   </div>
+
+                  {event.requested_by_name && (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <FiUser className="flex-shrink-0 text-blue-500" />
+                      <span className="text-xs">Solicitante: <span className="font-medium text-gray-700 dark:text-gray-300">{event.requested_by_name}</span></span>
+                    </div>
+                  )}
+
+                  {event.validated_by_name && (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <FiUser className="flex-shrink-0 text-green-500" />
+                      <span className="text-xs">Validador: <span className="font-medium text-gray-700 dark:text-gray-300">{event.validated_by_name}</span></span>
+                    </div>
+                  )}
+
                   {event.notas && (
-                    <div className="flex items-center gap-2 text-gray-400 italic border-l border-gray-200 dark:border-gray-700 pl-4 min-w-0 max-w-[300px] lg:max-w-[400px]">
+                    <div className="flex items-center gap-2 text-gray-400 italic border-l border-gray-200 dark:border-gray-700 pl-4 min-w-0 max-w-full">
                       <FiInfo className="flex-shrink-0 text-xs" />
                       <span className="truncate text-xs" title={event.notas}>{event.notas}</span>
                     </div>

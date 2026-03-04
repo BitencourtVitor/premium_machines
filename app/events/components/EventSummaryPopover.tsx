@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import Image from 'next/image'
 import { createPortal } from 'react-dom'
 import { FiMessageSquare, FiDownload, FiCheck, FiLoader } from 'react-icons/fi'
 import { FaWhatsapp } from 'react-icons/fa'
@@ -27,7 +26,7 @@ export default function EventSummaryPopover({ event }: EventSummaryPopoverProps)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    setLogoUrl(`${window.location.origin}/premium_logo_vetorizado.png`)
+    setLogoUrl('/premium_logo_vetorizado.png')
   }, [])
 
   const generateImage = async () => {
@@ -58,7 +57,6 @@ export default function EventSummaryPopover({ event }: EventSummaryPopoverProps)
         scale: 2, // 2x for high quality
         logging: false,
         useCORS: true,
-        allowTaint: true,
         imageTimeout: 5000,
         removeContainer: true
       })
@@ -214,13 +212,10 @@ export default function EventSummaryPopover({ event }: EventSummaryPopoverProps)
                 </div>
               ) : imageUrl ? (
                 <div className="w-full rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden bg-white">
-                  <Image 
+                  <img 
                     src={imageUrl} 
                     alt="Preview" 
-                    width={420}
-                    height={300}
                     className="w-full h-auto"
-                    unoptimized
                   />
                 </div>
               ) : (

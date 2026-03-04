@@ -26,6 +26,7 @@ interface CreateEventModalProps {
 }
 
 const MANDATORY_DOC_TYPES = ['start_allocation', 'end_allocation', 'extension_attach', 'downtime_start', 'downtime_end', 'transport_arrival']
+const EXEMPT_RESPONSIBLE_TYPES = ['downtime_start', 'downtime_end', 'transport_arrival', 'refueling']
 
 export default function CreateEventModal({
   showCreateModal,
@@ -162,6 +163,14 @@ export default function CreateEventModal({
 
     if (newEvent.event_type === 'downtime_start') {
       if (!newEvent.downtime_reason) return 'O motivo da manutenção é obrigatório.'
+    }
+
+    // Validação de responsáveis (Solicitante e Validador)
+    if (!EXEMPT_RESPONSIBLE_TYPES.includes(newEvent.event_type)) {
+      if (!newEvent.requested_by_name) return 'O nome do solicitante é obrigatório.'
+      if (!newEvent.requested_at) return 'A data da solicitação é obrigatória.'
+      if (!newEvent.validated_by_name) return 'O nome do validador é obrigatório.'
+      if (!newEvent.validated_at) return 'A data da validação é obrigatória.'
     }
 
     // Bloqueia se o tipo exige documento e não há arquivos selecionados, arquivos existentes nem links do SharePoint
@@ -1028,6 +1037,69 @@ export default function CreateEventModal({
                       </button>
                     </div>
                   </div>
+
+                  {!EXEMPT_RESPONSIBLE_TYPES.includes(newEvent.event_type) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800/50">
+                      <div className="md:col-span-2">
+                        <h4 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          Responsáveis pela Operação
+                        </h4>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Solicitante *
+                        </label>
+                        <input
+                          type="text"
+                          value={newEvent.requested_by_name}
+                          onChange={(e) => setNewEvent({ ...newEvent, requested_by_name: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          placeholder="Nome de quem solicitou"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Data da Solicitação *
+                        </label>
+                        <input
+                          type="date"
+                          value={newEvent.requested_at}
+                          onChange={(e) => setNewEvent({ ...newEvent, requested_at: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Validador (Campo) *
+                        </label>
+                        <input
+                          type="text"
+                          value={newEvent.validated_by_name}
+                          onChange={(e) => setNewEvent({ ...newEvent, validated_by_name: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          placeholder="Nome de quem validou"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Data da Validação *
+                        </label>
+                        <input
+                          type="date"
+                          value={newEvent.validated_at}
+                          onChange={(e) => setNewEvent({ ...newEvent, validated_at: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
