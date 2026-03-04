@@ -70,6 +70,7 @@ export const SharedEventTemplate = React.forwardRef<HTMLDivElement, SharedTempla
             </div>
             <div className="flex-shrink-0">
               {logoUrl && (
+                /* eslint-disable-next-line @next/next/no-img-element */
                 <img 
                   src={logoUrl} 
                   alt="Premium" 

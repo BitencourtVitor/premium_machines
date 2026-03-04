@@ -95,7 +95,6 @@ export default function EventsPage() {
     downtime_description: '',
     corrects_event_id: '',
     correction_description: '',
-    notas: '',
     supplier_id: '',
     machine_type_id: '',
     notas: '',

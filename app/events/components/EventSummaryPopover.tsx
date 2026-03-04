@@ -212,6 +212,7 @@ export default function EventSummaryPopover({ event }: EventSummaryPopoverProps)
                 </div>
               ) : imageUrl ? (
                 <div className="w-full rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
                     src={imageUrl} 
                     alt="Preview" 
