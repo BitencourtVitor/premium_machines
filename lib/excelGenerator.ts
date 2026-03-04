@@ -14,21 +14,6 @@ export const generateAllocationStatusExcel = (data: any[]) => {
     let status = statusLabels[item.status] || item.status
     if (item.is_in_downtime) status += ' (Downtime)'
 
-    // Calculate days for specific statuses
-    const today = new Date(new Date().toISOString().split('T')[0])
-    
-    if (item.status === 'exceeded' && item.end_date) {
-      const expDate = new Date(item.end_date.split('T')[0])
-      const diffTime = Math.abs(today.getTime() - expDate.getTime())
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      status += ` (${diffDays} dias)`
-    } else if ((item.status === 'in_transit' || item.status === 'maintenance') && item.allocation_start) {
-      const startDate = new Date(item.allocation_start.split('T')[0])
-      const diffTime = Math.abs(today.getTime() - startDate.getTime())
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      status += ` (${diffDays} dias)`
-    }
-
     return {
       'Unidade': item.machine_unit_number,
       'Descrição': item.machine_description || '',
@@ -37,7 +22,8 @@ export const generateAllocationStatusExcel = (data: any[]) => {
       'Lote/Prédio': item.lot_building_number ? `${item.construction_type === 'lot' ? 'Lote' : 'Prédio'} ${item.lot_building_number}` : '-',
       'Status': status,
       'Início': item.allocation_start ? formatDateNoTimezone(item.allocation_start) : '-',
-      'Vencimento': item.end_date ? formatDateNoTimezone(item.end_date) : '-'
+      'Vencimento': item.end_date ? formatDateNoTimezone(item.end_date) : '-',
+      'Dias Restantes': item.days_remaining !== undefined && item.days_remaining !== null ? item.days_remaining : '-'
     }
   })
 

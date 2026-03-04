@@ -85,6 +85,19 @@ export async function GET(request: NextRequest) {
       // (allocated, exceeded, in_transit, or maintenance).
       // Available or inactive machines should not appear in this report.
       if (state.status !== 'available' && state.status !== 'inactive') {
+        // Calculate days remaining
+        let daysRemaining: number | null = null
+        if (state.end_date) {
+          const end = new Date(state.end_date)
+          end.setUTCHours(0, 0, 0, 0)
+          
+          const ref = new Date(referenceDate)
+          ref.setUTCHours(0, 0, 0, 0)
+          
+          const diffTime = end.getTime() - ref.getTime()
+          daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        }
+
         allocations.push({
           machine_id: machine.id,
           machine_unit_number: machine.unit_number,
@@ -97,7 +110,8 @@ export async function GET(request: NextRequest) {
           is_in_downtime: state.is_in_downtime,
           attached_extensions: state.attached_extensions,
           allocation_start: state.allocation_start,
-          end_date: state.end_date
+          end_date: state.end_date,
+          days_remaining: daysRemaining
         })
       }
     }

@@ -18,6 +18,7 @@ interface AllocationData {
   end_date?: string | null
   allocation_start?: string | null
   ownership_type?: string
+  days_remaining?: number | null
 }
 
 interface RentExpirationData {
@@ -94,7 +95,7 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
   
   doc.setFontSize(10)
   doc.setTextColor(100, 100, 100)
-  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 42)
+  doc.text(`Gerado em: ${formatWithSystemTimezone(new Date().toISOString())}`, margin, 42)
 
   let currentY = 60
 
@@ -181,42 +182,102 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
 
       // Iterate over Machines (Level 3)
       machines.forEach((item) => {
-        if (currentY > 275) {
+        if (currentY > 260) {
           doc.addPage()
           currentY = 20
         }
 
-        // Machine Info
+        // 1. Machine Title (Left)
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(10)
         doc.setTextColor(30)
         const machineTitle = `${item.machine_unit_number} - ${item.machine_description || item.machine_type}`
         doc.text(machineTitle, margin + 10, currentY)
 
-        // Status and Exceeded Days
+        // 2. Data Containers (Chips) - Right Aligned
         const statusInfo = getStatusInfo(item.status, item.is_in_downtime, item.ownership_type)
-        let statusLabel = statusInfo.label
-        const today = new Date(new Date().toISOString().split('T')[0])
         
-        if (item.status === 'exceeded' && item.end_date) {
-          const expDate = new Date(item.end_date.split('T')[0])
-          const diffTime = Math.abs(today.getTime() - expDate.getTime())
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-          statusLabel += ` (${diffDays} dias)`
+        // Chip data collector
+        interface ChipData {
+          text: string;
+          color: number[];
+        }
+        const chips: ChipData[] = []
+        
+        // Status
+        chips.push({ text: statusInfo.label, color: statusInfo.color })
+        
+        // Expiration/Days
+        if (item.end_date) {
+          const expDateFormatted = formatDateNoTimezone(item.end_date)
+          const days = item.days_remaining
+          chips.push({ text: `Vence ${expDateFormatted}`, color: [100, 100, 100] })
+          
+          if (days !== undefined && days !== null) {
+            if (days < 0) {
+              chips.push({ text: `Vencido há ${Math.abs(days)} dias`, color: [220, 38, 38] })
+            } else {
+              chips.push({ text: `${days} dias restantes`, color: [22, 163, 74] })
+            }
+          }
         } else if ((item.status === 'in_transit' || item.status === 'maintenance') && item.allocation_start) {
+          const today = new Date(new Date().toISOString().split('T')[0])
           const startDate = new Date(item.allocation_start.split('T')[0])
           const diffTime = Math.abs(today.getTime() - startDate.getTime())
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-          statusLabel += ` (${diffDays} dias)`
+          chips.push({ text: `${diffDays} dias no estado`, color: [100, 100, 100] })
         }
 
-        doc.setFont('helvetica', 'normal')
-        doc.setFontSize(9)
-        doc.setTextColor(statusInfo.color[0], statusInfo.color[1], statusInfo.color[2])
-        const statusWidth = doc.getTextWidth(statusLabel)
-        doc.text(statusLabel, pageWidth - margin - statusWidth, currentY)
+        // Chip Drawing Function
+        const getChipWidth = (text: string) => {
+          doc.setFontSize(7.5)
+          return doc.getTextWidth(text) + 8 // textWidth + 2*hPadding
+        }
 
-        currentY += 5
+        const drawChip = (text: string, color: number[], x: number, y: number) => {
+          doc.setFontSize(7.5)
+          const textWidth = doc.getTextWidth(text)
+          const hPadding = 4
+          const chipWidth = textWidth + (hPadding * 2)
+          const chipHeight = 4.5 // Reduced height for better fit
+          
+          const pastelBG = [
+            Math.floor(color[0] + (255 - color[0]) * 0.9),
+            Math.floor(color[1] + (255 - color[1]) * 0.9),
+            Math.floor(color[2] + (255 - color[2]) * 0.9)
+          ]
+          
+          // Y adjustment for centering text: 
+          // text usually sits on baseline, we need to offset the rect
+          const rectY = y - 3.2 
+          
+          doc.setFillColor(pastelBG[0], pastelBG[1], pastelBG[2])
+          doc.roundedRect(x, rectY, chipWidth, chipHeight, 1, 1, 'F')
+          
+          doc.setDrawColor(color[0], color[1], color[2])
+          doc.setLineWidth(0.1)
+          doc.roundedRect(x, rectY, chipWidth, chipHeight, 1, 1, 'S')
+          
+          doc.setTextColor(color[0], color[1], color[2])
+          // Text is drawn at y, which is the baseline. 
+          // With rectY at y-3.2 and height 4.5, text is better centered.
+          doc.text(text, x + hPadding, y)
+          
+          return chipWidth
+        }
+
+        // Calculate total width of all chips
+        const gap = 2
+        let totalWidth = chips.reduce((acc, chip) => acc + getChipWidth(chip.text), 0) + (chips.length - 1) * gap
+        
+        // Draw chips starting from the right
+        let currentX = pageWidth - margin - totalWidth
+        chips.forEach((chip) => {
+          const width = drawChip(chip.text, chip.color, currentX, currentY)
+          currentX += width + gap
+        })
+
+        currentY += 6 // Reduced from 8 to make it more compact
 
         // Extensions
         if (item.attached_extensions && item.attached_extensions.length > 0) {
@@ -228,11 +289,11 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
           })
         }
 
-        currentY += 4
+        currentY += 2 // Reduced from 4 to make it more compact
         // Thin separator between machines
         doc.setDrawColor(245)
-        doc.line(margin + 10, currentY - 2, pageWidth - margin, currentY - 2)
-        currentY += 2
+        doc.line(margin + 10, currentY - 1, pageWidth - margin, currentY - 1)
+        currentY += 3 // Reduced from 4 to make it more compact
       })
 
       currentY += 4 // Space after each lot group
@@ -258,7 +319,7 @@ export const generateRentExpirationPDF = async (data: RentExpirationData[], peri
   
   doc.setFontSize(10)
   doc.setTextColor(100, 100, 100)
-  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 42)
+  doc.text(`Gerado em: ${formatWithSystemTimezone(new Date().toISOString())}`, margin, 42)
 
   let currentY = 60
 
@@ -352,7 +413,7 @@ export const generateMachineHistoryPDF = async (machine: any, events: any[], per
   
   doc.setFontSize(10)
   doc.setTextColor(100, 100, 100)
-  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 42)
+  doc.text(`Gerado em: ${formatWithSystemTimezone(new Date().toISOString())}`, margin, 42)
 
   // Machine Info Card
   let currentY = 60
@@ -479,7 +540,7 @@ export const generateRefuelingControlPDF = async (data: RefuelingControlData, pe
   doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(100, 100, 100)
-  doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, 42)
+  doc.text(`Gerado em: ${formatWithSystemTimezone(new Date().toISOString())}`, margin, 42)
 
   // Date Interval (Right aligned)
   if (data.period) {

@@ -69,36 +69,50 @@ export const formatWithSystemTimezone = (
 ): string => {
   if (!dateString) return ''
   const adjusted = adjustDateToSystemTimezone(dateString)
-  // Use 'UTC' timezone to prevent the browser from applying its local offset again
-  return adjusted.toLocaleString('pt-BR', { ...options, timeZone: 'UTC' })
+  
+  // Custom MM/DD/YYYY format for dates with time
+  const month = String(adjusted.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(adjusted.getUTCDate()).padStart(2, '0')
+  const year = adjusted.getUTCFullYear()
+  const hours = String(adjusted.getUTCHours()).padStart(2, '0')
+  const minutes = String(adjusted.getUTCMinutes()).padStart(2, '0')
+  const seconds = String(adjusted.getUTCSeconds()).padStart(2, '0')
+
+  let datePart = `${month}/${day}/${year}`
+  
+  if (options.hour && options.minute) {
+    return `${datePart}, ${hours}:${minutes}:${seconds}`
+  }
+  
+  return datePart
 }
 
 /**
  * Formats a date string using the system timezone, date only.
  * @param dateString - ISO date string
- * @returns Formatted string (DD/MM/YYYY)
+ * @returns Formatted string (MM/DD/YYYY)
  */
 export const formatDateOnly = (dateString: string): string => {
   if (!dateString) return ''
-  return formatWithSystemTimezone(dateString, {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  })
+  const adjusted = adjustDateToSystemTimezone(dateString)
+  const month = String(adjusted.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(adjusted.getUTCDate()).padStart(2, '0')
+  const year = adjusted.getUTCFullYear()
+  return `${month}/${day}/${year}`
 }
 
 /**
  * Formats a date string without shifting for timezone.
  * Useful for "whole-day" fields like allocation dates.
  * @param dateString - ISO date string
- * @returns Formatted string (DD/MM/YYYY)
+ * @returns Formatted string (MM/DD/YYYY)
  */
 export const formatDateNoTimezone = (dateString: string | null | undefined): string => {
   if (!dateString) return ''
   const datePart = dateString.split('T')[0]
   const [year, month, day] = datePart.split('-')
   if (!year || !month || !day) return dateString
-  return `${day}/${month}/${year}`
+  return `${month}/${day}/${year}`
 }
 
 /**
