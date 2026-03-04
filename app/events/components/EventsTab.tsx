@@ -18,6 +18,7 @@ import { GiKeyCard } from "react-icons/gi"
 import { LuPuzzle, LuFilterX } from "react-icons/lu"
 import EventDocuments from './EventDocuments'
 import EventDocumentPopover from './EventDocumentPopover'
+import EventSummaryPopover from './EventSummaryPopover'
 
 import BaseList from '@/app/components/BaseList'
 import ListActionButton from '@/app/components/ListActionButton'
@@ -76,8 +77,9 @@ export default function EventsTab({
   }, [])
 
   return (
-    <BaseList
-      title="Eventos"
+    <>
+      <BaseList
+        title="Eventos"
       items={filteredEvents}
       totalCount={filteredEvents.length}
       loading={loadingEvents}
@@ -221,8 +223,8 @@ export default function EventsTab({
               </div>
 
               {event.downtime_reason && (
-                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 flex items-start gap-2">
-                  <FiInfo className="mt-0.5 flex-shrink-0 text-gray-400" />
+                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                  <FiInfo className="flex-shrink-0 text-gray-400" />
                   <span className={`${config.textColor}`}>
                     Motivo: {DOWNTIME_REASON_LABELS[event.downtime_reason]}
                   </span>
@@ -247,6 +249,7 @@ export default function EventsTab({
                   unitNumber={event.machine?.unit_number || 'S/N'} 
                   sharepointLinks={event.sharepoint_links}
                 />
+                <EventSummaryPopover event={event} />
                 <ListActionButton
                   icon="edit"
                   onClick={() => handleEditEvent(event)}
@@ -266,6 +269,7 @@ export default function EventsTab({
           </div>
         )
       }}
-    />
+      />
+    </>
   )
 }
