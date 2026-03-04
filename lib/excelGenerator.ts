@@ -136,6 +136,45 @@ export const generateRefuelingControlExcel = (events: any[]) => {
   ws['!cols'] = maxWidths.map((w: number) => ({ wch: w }))
 
   XLSX.utils.book_append_sheet(wb, ws, 'Abastecimentos')
-  XLSX.writeFile(wb, `controle_abastecimento_${new Date().toISOString().split('T')[0]}.xlsx`)
+    XLSX.writeFile(wb, `controle_abastecimento_${new Date().toISOString().split('T')[0]}.xlsx`)
+}
+
+export const generateMaintenanceTimeExcel = (data: any[]) => {
+    const worksheetData = data.map(item => {
+        const startDate = new Date(item.start_date)
+        const endDate = item.end_date ? new Date(item.end_date) : new Date()
+        
+        const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        const durationText = item.is_ongoing 
+            ? `${diffDays} dias (Em aberto)` 
+            : `${diffDays} dias`
+
+        return {
+            'Unidade': item.machine_unit_number,
+            'Tipo': item.machine_type,
+            'Local': item.site_title,
+            'Início': formatDateOnly(item.start_date),
+            'Fim': item.end_date ? formatDateOnly(item.end_date) : '-',
+            'Duração': durationText,
+            'Descrição': item.description || '-',
+            'Solicitante': item.user_name || '-'
+        }
+    })
+
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.json_to_sheet(worksheetData)
+
+    const maxWidths = worksheetData.reduce((acc: any, row: any) => {
+        Object.keys(row).forEach((key, i) => {
+            const value = String(row[key] || '')
+            acc[i] = Math.max(acc[i] || 10, value.length + 2)
+        })
+        return acc
+    }, [])
+    ws['!cols'] = maxWidths.map((w: number) => ({ wch: w }))
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Manutenções')
+    XLSX.writeFile(wb, `relatorio_manutencao_${new Date().toISOString().split('T')[0]}.xlsx`)
 }
 

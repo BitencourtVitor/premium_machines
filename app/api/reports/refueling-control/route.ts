@@ -8,20 +8,21 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const start_date = searchParams.get('start_date')
     const end_date = searchParams.get('end_date')
+    const allPeriod = searchParams.get('allPeriod') === 'true'
 
     if (!start_date || !end_date) {
       return NextResponse.json({ success: false, message: 'Intervalo de datas é obrigatório' }, { status: 400 })
     }
 
-    // 1. Fetch all refueling events in range
-    const { data: events, error: eventsError } = await supabaseServer
-      .from('allocation_events')
-      .select(`
-        *,
-        machine:machines!machine_id(id, unit_number, machine_type:machine_types(nome)),
-        site:sites(id, title, address),
-        user:users!allocation_events_created_by_fkey(id, nome)
-      `)
+    // 1. Fetch all refueling records within the period
+     const { data: events, error: eventsError } = await supabaseServer
+       .from('allocation_events')
+       .select(`
+         *,
+         machine:machines!machine_id(id, unit_number, ownership_type, machine_type:machine_types(nome)),
+         site:sites(id, title, address),
+         user:users!allocation_events_created_by_fkey(id, nome)
+       `)
       .eq('event_type', 'refueling')
       .gte('event_date', start_date)
       .lte('event_date', end_date)

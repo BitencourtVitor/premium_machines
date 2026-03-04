@@ -9,7 +9,7 @@ export async function GET() {
     // Get machines stats based on allocation engine (events)
     const { data: machines, error: machinesError } = await supabaseServer
       .from('machines')
-      .select('id, ownership_type, ativo')
+      .select('id, unit_number, ownership_type, ativo')
 
     if (machinesError) {
       console.error('Error fetching machines:', machinesError)
@@ -33,8 +33,8 @@ export async function GET() {
     const inTransitMachines = machinesList.filter(m => inTransitMachineIds.has(m.id)).length
     const availableMachines = totalMachines - allocatedMachines
 
-    const ownedMachines = machinesList.filter(m => m.ownership_type === 'owned').length
-    const rentedMachines = machinesList.filter(m => m.ownership_type === 'rented').length
+    const ownedMachines = machinesList.filter(m => m.unit_number?.startsWith('P')).length
+    const rentedMachines = machinesList.filter(m => !m.unit_number?.startsWith('P')).length
 
     // Get sites stats
     const { data: sites, error: sitesError } = await supabaseServer

@@ -604,3 +604,150 @@ export const generateRefuelingControlPDF = async (data: RefuelingControlData, pe
   doc.save(`controle_abastecimento_${new Date().getTime()}.pdf`)
 }
 
+export const generateMaintenanceTimePDF = async (data: any[], periodLabel: string) => {
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth() || 210
+    const margin = 15
+
+    await drawHeader(doc, margin)
+
+    // Report Title
+    doc.setFontSize(12)
+    doc.setTextColor(40)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Relatório de Tempo de Manutenção', margin, 35)
+    
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100, 100, 100)
+    doc.text(`Gerado em: ${formatWithSystemTimezone(new Date().toISOString())}`, margin, 42)
+    doc.text(`Período: ${periodLabel}`, margin, 47)
+
+    let currentY = 60
+
+    if (!data || data.length === 0) {
+        doc.setFont('helvetica', 'italic')
+        doc.text('Nenhuma manutenção encontrada para o período selecionado.', margin, currentY)
+        doc.save(`relatorio_manutencao_${new Date().getTime()}.pdf`)
+        return
+    }
+
+    data.forEach((item, index) => {
+        // Calculate duration
+        const startDate = new Date(item.start_date)
+        const endDate = item.end_date ? new Date(item.end_date) : new Date()
+        const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        const durationText = item.is_ongoing 
+            ? `${diffDays} dias (Em aberto)` 
+            : `${diffDays} dias`
+
+        // Check for page break
+        const descText = item.description || 'N/A'
+        const splitDesc = doc.splitTextToSize(descText, pageWidth - margin * 2 - 35) // More padding
+
+        // Section heights
+        const section1Height = 12
+        const section2Height = (splitDesc.length * 5) + 14 // Increased padding
+        const section3Height = 12
+        const headerHeight = 14
+
+        // Calculate card height dynamically
+        const cardHeight = headerHeight + section1Height + section2Height + section3Height + 10 // More bottom space
+
+        if (currentY + cardHeight > 280) {
+            doc.addPage()
+            currentY = 20
+        }
+
+        // Card Container (Main)
+        doc.setFillColor(252, 252, 252)
+        doc.setDrawColor(200, 200, 200)
+        doc.roundedRect(margin, currentY, pageWidth - margin * 2, cardHeight, 2, 2, 'FD')
+
+        // Header: Machine and Status
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(11)
+        doc.setTextColor(30)
+        doc.text(`${item.machine_unit_number} - ${item.machine_type}`, margin + 5, currentY + 8)
+
+        // Status Badge
+        const statusLabel = item.is_ongoing ? 'EM ABERTO' : 'CONCLUÍDA'
+        const statusColor = item.is_ongoing ? [234, 88, 12] : [22, 163, 74]
+        doc.setFontSize(8)
+        doc.setTextColor(statusColor[0], statusColor[1], statusColor[2])
+        const statusWidth = doc.getTextWidth(statusLabel)
+        doc.text(statusLabel, pageWidth - margin - statusWidth - 8, currentY + 8)
+
+        currentY += headerHeight
+
+        // Internal Content Container
+        const contentWidth = pageWidth - margin * 2 - 10
+        const contentX = margin + 5
+        
+        // Reset colors for Section 1
+        doc.setDrawColor(230, 230, 230)
+        doc.setFillColor(255, 255, 255)
+        doc.roundedRect(contentX, currentY, contentWidth, section1Height, 1, 1, 'FD')
+        
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(9)
+        doc.setTextColor(100, 100, 100)
+        doc.text('Início:', contentX + 5, currentY + 7.5)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(60, 60, 60)
+        doc.text(formatDateOnly(item.start_date), contentX + 18, currentY + 7.5)
+
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(100, 100, 100)
+        doc.text('Fim:', contentX + 60, currentY + 7.5)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(60, 60, 60)
+        doc.text(item.is_ongoing ? '-' : formatDateOnly(item.end_date), contentX + 70, currentY + 7.5)
+
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(100, 100, 100)
+        doc.text('Duração:', contentX + 120, currentY + 7.5)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(60, 60, 60)
+        doc.text(durationText, contentX + 140, currentY + 7.5)
+
+        currentY += section1Height + 2
+
+        // Section 2: Description (Observation)
+        // Explicitly set background color to white and text to dark
+        doc.setDrawColor(230, 230, 230)
+        doc.setFillColor(255, 255, 255)
+        doc.roundedRect(contentX, currentY, contentWidth, section2Height, 1, 1, 'FD')
+        
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(9)
+        doc.setTextColor(100, 100, 100)
+        doc.text('Observação:', contentX + 5, currentY + 6)
+        
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(60, 60, 60)
+        doc.text(splitDesc, contentX + 5, currentY + 12)
+
+        currentY += section2Height + 2
+
+        // Section 3: Responsible
+        // Explicitly set background color to white and text to dark
+        doc.setDrawColor(230, 230, 230)
+        doc.setFillColor(255, 255, 255)
+        doc.roundedRect(contentX, currentY, contentWidth, section3Height, 1, 1, 'FD')
+        
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(9)
+        doc.setTextColor(100, 100, 100)
+        doc.text('Responsável:', contentX + 5, currentY + 7.5)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(60, 60, 60)
+        doc.text(item.user_name || 'N/A', contentX + 30, currentY + 7.5)
+
+        currentY += section3Height + 12 // Increased space between cards and bottom padding
+    })
+
+    doc.save(`relatorio_manutencao_${new Date().getTime()}.pdf`)
+}
+

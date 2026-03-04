@@ -14,13 +14,15 @@ import {
   generateAllocationStatusPDF, 
   generateRentExpirationPDF,
   generateMachineHistoryPDF,
-  generateRefuelingControlPDF
+  generateRefuelingControlPDF,
+  generateMaintenanceTimePDF
 } from '@/lib/reportGenerator'
 import { 
   generateAllocationStatusExcel, 
   generateRentExpirationExcel,
   generateMachineHistoryExcel,
-  generateRefuelingControlExcel
+  generateRefuelingControlExcel,
+  generateMaintenanceTimeExcel
 } from '@/lib/excelGenerator'
 import { adjustDateToSystemTimezone, formatDateOnly } from '@/lib/timezone'
 
@@ -52,6 +54,7 @@ export default function ReportsPage() {
   const [checkingFuelData, setCheckingFuelData] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState<string | null>(null)
   const [generatingExcel, setGeneratingExcel] = useState<string | null>(null)
+  const [providerFilter, setProviderFilter] = useState('all') // 'all', 'owned', 'rented'
 
   // Persist week offset
   useEffect(() => {
@@ -175,12 +178,22 @@ export default function ReportsPage() {
       title: 'Controle de Abastecimento',
       subtitle: 'Para o intervalo selecionado, o que estava planejado, o que foi executado, onde, quando e com qual máquina',
     },
+    {
+      id: 'manutencao',
+      title: 'Tempo de Manutenção',
+      subtitle: 'Mapeamento completo de todos os eventos de manutenção no período selecionado',
+    },
   ]
 
   const isReportReady = (reportId: string) => {
     if (reportId === 'historico') return !!selectedEquipmentId
     if (reportId === 'abastecimento') return true
     if (reportId === 'alocacoes' || reportId === 'vencimento') return allPeriod || (!!dateFrom && !!dateTo)
+    if (reportId === 'manutencao') {
+      const periodSelected = allPeriod || (!!dateFrom && !!dateTo)
+      if (!periodSelected) return false
+      return !!providerFilter
+    }
     return false
   }
 
@@ -195,6 +208,9 @@ export default function ReportsPage() {
           queryParams.append('allPeriod', 'true')
         } else if (dateTo) {
           queryParams.append('dateTo', dateTo)
+        }
+        if (providerFilter !== 'all') {
+          queryParams.append('provider', providerFilter)
         }
 
         const res = await fetch(`/api/reports/allocations?${queryParams.toString()}`)
@@ -214,6 +230,9 @@ export default function ReportsPage() {
           queryParams.append('allPeriod', 'true')
         } else if (dateTo) {
           queryParams.append('dateTo', dateTo)
+        }
+        if (providerFilter !== 'all') {
+          queryParams.append('provider', providerFilter)
         }
 
         const res = await fetch(`/api/reports/rent-expiration?${queryParams.toString()}`)
@@ -251,6 +270,9 @@ export default function ReportsPage() {
           start_date: weekRange.start,
           end_date: weekRange.end
         })
+        if (providerFilter !== 'all') {
+          queryParams.append('provider', providerFilter)
+        }
 
         const res = await fetch(`/api/reports/refueling-control?${queryParams.toString()}`)
         const data = await res.json()
@@ -258,6 +280,27 @@ export default function ReportsPage() {
         if (data.success) {
           const periodLabel = formatWeekRange(weekRange.labelStart, weekRange.labelEnd)
           await generateRefuelingControlPDF(data, periodLabel)
+        } else {
+          alert('Erro ao gerar relatório: ' + data.message)
+        }
+      } else if (reportId === 'manutencao') {
+        const queryParams = new URLSearchParams()
+        if (allPeriod) {
+          queryParams.append('allPeriod', 'true')
+        } else {
+          if (dateFrom) queryParams.append('dateFrom', dateFrom)
+          if (dateTo) queryParams.append('dateTo', dateTo)
+        }
+        if (providerFilter !== 'all') {
+          queryParams.append('provider', providerFilter)
+        }
+
+        const res = await fetch(`/api/reports/maintenance-time?${queryParams.toString()}`)
+        const data = await res.json()
+
+        if (data.success) {
+          const periodLabel = allPeriod ? 'Todo o período' : `${dateFrom ? `De ${formatDateOnly(dateFrom)} ` : ''}Até ${formatDateOnly(dateTo)}`
+          await generateMaintenanceTimePDF(data.maintenanceEvents, periodLabel)
         } else {
           alert('Erro ao gerar relatório: ' + data.message)
         }
@@ -284,6 +327,9 @@ export default function ReportsPage() {
         } else if (dateTo) {
           queryParams.append('dateTo', dateTo)
         }
+        if (providerFilter !== 'all') {
+          queryParams.append('provider', providerFilter)
+        }
 
         const res = await fetch(`/api/reports/allocations?${queryParams.toString()}`)
         const data = await res.json()
@@ -299,6 +345,9 @@ export default function ReportsPage() {
           queryParams.append('allPeriod', 'true')
         } else if (dateTo) {
           queryParams.append('dateTo', dateTo)
+        }
+        if (providerFilter !== 'all') {
+          queryParams.append('provider', providerFilter)
         }
 
         const res = await fetch(`/api/reports/rent-expiration?${queryParams.toString()}`)
@@ -332,12 +381,35 @@ export default function ReportsPage() {
           start_date: weekRange.start,
           end_date: weekRange.end
         })
+        if (providerFilter !== 'all') {
+          queryParams.append('provider', providerFilter)
+        }
 
         const res = await fetch(`/api/reports/refueling-control?${queryParams.toString()}`)
         const data = await res.json()
 
         if (data.success) {
           generateRefuelingControlExcel(data.events)
+        } else {
+          alert('Erro ao gerar relatório Excel: ' + data.message)
+        }
+      } else if (reportId === 'manutencao') {
+        const queryParams = new URLSearchParams()
+        if (allPeriod) {
+          queryParams.append('allPeriod', 'true')
+        } else {
+          if (dateFrom) queryParams.append('dateFrom', dateFrom)
+          if (dateTo) queryParams.append('dateTo', dateTo)
+        }
+        if (providerFilter !== 'all') {
+          queryParams.append('provider', providerFilter)
+        }
+
+        const res = await fetch(`/api/reports/maintenance-time?${queryParams.toString()}`)
+        const data = await res.json()
+
+        if (data.success) {
+          generateMaintenanceTimeExcel(data.maintenanceEvents)
         } else {
           alert('Erro ao gerar relatório Excel: ' + data.message)
         }
@@ -488,6 +560,36 @@ export default function ReportsPage() {
                 </button>
               </div>
               <div className={`flex items-center justify-center transition-all duration-500 ease-out ${hasFuelData ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}>
+                <div className="w-6 h-6 flex items-center justify-center bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-md border border-green-100 dark:border-green-900/30 shadow-sm">
+                  <HiCheck className="w-3.5 h-3.5 stroke-[0.5]" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {report.id === 'manutencao' && (
+            <div className="flex items-center gap-2 mr-2">
+              <div className="flex items-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  {!(allPeriod || (!!dateFrom && !!dateTo)) ? 'Defina o período para gerar o relatório' : ''}
+                </span>
+              </div>
+              {(allPeriod || (!!dateFrom && !!dateTo)) && (
+                <div className="w-44 transition-all duration-300">
+                  <CustomDropdown
+                    label=""
+                    value={providerFilter}
+                    onChange={setProviderFilter}
+                    options={[
+                      { value: 'all', label: 'Todos' },
+                      { value: 'owned', label: 'Equipamento Próprio' },
+                      { value: 'rented', label: 'Equipamento Alugado' }
+                    ]}
+                    className="!py-1"
+                  />
+                </div>
+              )}
+              <div className={`flex items-center justify-center transition-all duration-500 ease-out ${isReportReady(report.id) ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}>
                 <div className="w-6 h-6 flex items-center justify-center bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-md border border-green-100 dark:border-green-900/30 shadow-sm">
                   <HiCheck className="w-3.5 h-3.5 stroke-[0.5]" />
                 </div>
