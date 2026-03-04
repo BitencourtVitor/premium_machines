@@ -28,13 +28,17 @@ export default function EventDocumentPopover({ eventId, unitNumber, sharepointLi
   const [isModalOpen, setIsModalOpen] = useState(false)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
+  useEffect(() => {
+    setFiles([])
+  }, [eventId])
+
   const fetchFiles = async () => {
     if (!eventId || files.length > 0) return
     
     setLoading(true)
     try {
       const { data, error: storageError } = await supabase.storage
-        .from('Machines Types')
+        .from('Allocation Documents')
         .list(eventId)
 
       if (!storageError) {
@@ -63,7 +67,7 @@ export default function EventDocumentPopover({ eventId, unitNumber, sharepointLi
   const handleDownload = async (fileName: string) => {
     try {
       const { data, error: downloadError } = await supabase.storage
-        .from('Machines Types')
+        .from('Allocation Documents')
         .download(`${eventId}/${fileName}`)
 
       if (downloadError) throw downloadError
@@ -85,7 +89,7 @@ export default function EventDocumentPopover({ eventId, unitNumber, sharepointLi
   const handleView = async (fileName: string) => {
     try {
       const { data: { publicUrl } } = supabase.storage
-        .from('Machines Types')
+        .from('Allocation Documents')
         .getPublicUrl(`${eventId}/${fileName}`)
 
       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName)
