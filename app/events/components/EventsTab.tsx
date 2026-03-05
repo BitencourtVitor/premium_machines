@@ -189,7 +189,9 @@ export default function EventsTab({
                 <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                   <FiCalendar className="flex-shrink-0" />
                   <span>
-                    {formatDateOnly(event.event_date)}
+                    {['transport_start', 'transport_arrival', 'downtime_start', 'downtime_end'].includes(event.event_type) 
+                      ? formatDate(event.event_date) 
+                      : formatDateOnly(event.event_date)}
                     {event.end_date && ` - ${formatDateOnly(event.end_date)}`}
                   </span>
                 </div>

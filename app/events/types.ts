@@ -1,7 +1,7 @@
 export interface AllocationEvent {
   id: string
   event_type: string
-  machine: { id: string; unit_number: string }
+  machine: { id: string; unit_number: string; machine_type?: { nome: string } }
   requested_machine_type?: { id: string; nome: string }
   supplier?: { id: string; nome: string }
   site?: { id: string; title: string }

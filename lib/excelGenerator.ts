@@ -84,7 +84,9 @@ export const generateMachineHistoryExcel = (machine: any, events: any[]) => {
   const worksheetData = events.map(event => {
     const config = getEventConfig(event.event_type)
     return {
-      'Data': formatDateOnly(event.event_date),
+      'Data': ['transport_start', 'transport_arrival', 'downtime_start', 'downtime_end'].includes(event.event_type) 
+        ? formatWithSystemTimezone(event.event_date) 
+        : formatDateOnly(event.event_date),
       'Evento': config.label,
       'Local': event.site?.title || '-',
       'Lote/Prédio': event.lot_building_number ? `${event.construction_type === 'lot' ? 'Lote' : 'Prédio'} ${event.lot_building_number}` : '-',

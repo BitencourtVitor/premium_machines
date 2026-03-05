@@ -35,6 +35,13 @@ export interface AllocationEvent {
   notas?: string | null
   created_at: string
   updated_at: string
+  machine?: { id: string; unit_number: string; machine_type?: { nome: string } }
+  requested_machine_type?: { id: string; nome: string }
+  site?: { id: string; title: string }
+  extension?: { id: string; unit_number: string }
+  supplier?: { id: string; nome: string }
+  created_by_user?: { id: string; nome: string }
+  approved_by_user?: { id: string; nome: string }
 }
 
 export interface MachineState {

@@ -76,12 +76,11 @@ export const formatWithSystemTimezone = (
   const year = adjusted.getUTCFullYear()
   const hours = String(adjusted.getUTCHours()).padStart(2, '0')
   const minutes = String(adjusted.getUTCMinutes()).padStart(2, '0')
-  const seconds = String(adjusted.getUTCSeconds()).padStart(2, '0')
 
   let datePart = `${month}/${day}/${year}`
   
   if (options.hour && options.minute) {
-    return `${datePart}, ${hours}:${minutes}:${seconds}`
+    return `${datePart}, ${hours}:${minutes}`
   }
   
   return datePart

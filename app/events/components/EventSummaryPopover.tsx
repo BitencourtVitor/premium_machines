@@ -157,7 +157,7 @@ export default function EventSummaryPopover({ event }: EventSummaryPopoverProps)
         <div
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
-          className="fixed z-[9999] animate-in fade-in slide-in-from-right-2 duration-200 pointer-events-auto"
+          className="fixed z-[10010] animate-in fade-in slide-in-from-right-2 duration-200 pointer-events-auto"
           style={{ 
             top: `${popoverPos.top}px`, 
             left: `${popoverPos.left}px`,

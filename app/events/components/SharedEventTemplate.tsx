@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { FiCalendar, FiMapPin, FiTool, FiUser, FiInfo } from 'react-icons/fi'
 import { LuHash } from 'react-icons/lu'
 import { AllocationEvent } from '../types'
-import { formatDateOnly, getEventConfig } from '../utils'
+import { formatDateOnly, formatDate, getEventConfig } from '../utils'
 import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 
 interface SharedTemplateProps {
@@ -64,6 +64,16 @@ export const SharedEventTemplate = React.forwardRef<HTMLDivElement, SharedTempla
               <h1 className="text-2xl font-black tracking-tight text-gray-900 leading-none mb-1">
                 {event.machine?.unit_number || 'SOLICITAÇÃO'}
               </h1>
+              {event.machine?.machine_type?.nome && (
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">
+                  {event.machine.machine_type.nome}
+                </p>
+              )}
+              {event.event_type === 'request_allocation' && event.requested_machine_type?.nome && (
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">
+                  {event.requested_machine_type.nome}
+                </p>
+              )}
               <p className="text-sm font-bold text-blue-600 uppercase tracking-widest">
                 {config.label}
               </p>
@@ -94,7 +104,9 @@ export const SharedEventTemplate = React.forwardRef<HTMLDivElement, SharedTempla
                 <div className="min-w-0">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block">DATA</label>
                   <p className="text-sm font-bold text-gray-800 leading-tight">
-                    {formatDateOnly(event.event_date)}
+                    {['transport_start', 'transport_arrival', 'downtime_start', 'downtime_end'].includes(event.event_type) 
+                      ? formatDate(event.event_date) 
+                      : formatDateOnly(event.event_date)}
                     {event.end_date && <span className="block text-gray-400 text-[10px]">Vence {formatDateOnly(event.end_date)}</span>}
                   </p>
                 </div>

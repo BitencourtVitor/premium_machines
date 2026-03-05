@@ -213,7 +213,7 @@ export default function ReportsPage() {
           queryParams.append('provider', providerFilter)
         }
 
-        const res = await fetch(`/api/reports/allocations?${queryParams.toString()}`)
+        const res = await fetch(`/api/reports/allocations?${queryParams.toString()}`, { cache: 'no-store' })
         const data = await res.json()
 
         if (data.success) {
@@ -235,7 +235,7 @@ export default function ReportsPage() {
           queryParams.append('provider', providerFilter)
         }
 
-        const res = await fetch(`/api/reports/rent-expiration?${queryParams.toString()}`)
+        const res = await fetch(`/api/reports/rent-expiration?${queryParams.toString()}`, { cache: 'no-store' })
         const data = await res.json()
 
         if (data.success) {
@@ -256,7 +256,7 @@ export default function ReportsPage() {
           if (dateTo) queryParams.append('dateTo', dateTo)
         }
 
-        const res = await fetch(`/api/reports/machine-history?${queryParams.toString()}`)
+        const res = await fetch(`/api/reports/machine-history?${queryParams.toString()}`, { cache: 'no-store' })
         const data = await res.json()
 
         if (data.success) {
@@ -274,7 +274,7 @@ export default function ReportsPage() {
           queryParams.append('provider', providerFilter)
         }
 
-        const res = await fetch(`/api/reports/refueling-control?${queryParams.toString()}`)
+        const res = await fetch(`/api/reports/refueling-control?${queryParams.toString()}`, { cache: 'no-store' })
         const data = await res.json()
 
         if (data.success) {
@@ -295,7 +295,7 @@ export default function ReportsPage() {
           queryParams.append('provider', providerFilter)
         }
 
-        const res = await fetch(`/api/reports/maintenance-time?${queryParams.toString()}`)
+        const res = await fetch(`/api/reports/maintenance-time?${queryParams.toString()}`, { cache: 'no-store' })
         const data = await res.json()
 
         if (data.success) {
@@ -331,7 +331,7 @@ export default function ReportsPage() {
           queryParams.append('provider', providerFilter)
         }
 
-        const res = await fetch(`/api/reports/allocations?${queryParams.toString()}`)
+        const res = await fetch(`/api/reports/allocations?${queryParams.toString()}`, { cache: 'no-store' })
         const data = await res.json()
 
         if (data.success) {
@@ -350,7 +350,7 @@ export default function ReportsPage() {
           queryParams.append('provider', providerFilter)
         }
 
-        const res = await fetch(`/api/reports/rent-expiration?${queryParams.toString()}`)
+        const res = await fetch(`/api/reports/rent-expiration?${queryParams.toString()}`, { cache: 'no-store' })
         const data = await res.json()
 
         if (data.success) {
@@ -368,7 +368,7 @@ export default function ReportsPage() {
           if (dateTo) queryParams.append('dateTo', dateTo)
         }
 
-        const res = await fetch(`/api/reports/machine-history?${queryParams.toString()}`)
+        const res = await fetch(`/api/reports/machine-history?${queryParams.toString()}`, { cache: 'no-store' })
         const data = await res.json()
 
         if (data.success) {
@@ -385,7 +385,7 @@ export default function ReportsPage() {
           queryParams.append('provider', providerFilter)
         }
 
-        const res = await fetch(`/api/reports/refueling-control?${queryParams.toString()}`)
+        const res = await fetch(`/api/reports/refueling-control?${queryParams.toString()}`, { cache: 'no-store' })
         const data = await res.json()
 
         if (data.success) {
@@ -405,7 +405,7 @@ export default function ReportsPage() {
           queryParams.append('provider', providerFilter)
         }
 
-        const res = await fetch(`/api/reports/maintenance-time?${queryParams.toString()}`)
+        const res = await fetch(`/api/reports/maintenance-time?${queryParams.toString()}`, { cache: 'no-store' })
         const data = await res.json()
 
         if (data.success) {

@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
           .from('allocation_events')
           .select(`
             *,
-            machine:machines!machine_id(id, unit_number),
+            machine:machines!machine_id(id, unit_number, machine_type:machine_types(id, nome)),
             requested_machine_type:machine_types(id, nome),
             site:sites(id, title, address),
             extension:machines!extension_id(id, unit_number, machine_type:machine_types(id, nome, icon, is_attachment)),
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
       })
       .select(`
         *,
-        machine:machines!machine_id(id, unit_number),
+        machine:machines!machine_id(id, unit_number, machine_type:machine_types(id, nome)),
         requested_machine_type:machine_types!machine_type_id(id, nome),
         site:sites(id, title),
         extension:machines!extension_id(id, unit_number, machine_type:machine_types(id, nome, is_attachment)),
