@@ -23,6 +23,7 @@ jest.mock('@/lib/permissions', () => ({
 // Mock utils
 jest.mock('../utils', () => ({
   formatDate: (date: string) => date,
+  formatDateOnly: (date: string) => date,
 }))
 
 describe('AllocationsTab', () => {

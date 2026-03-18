@@ -2,6 +2,24 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import EventsTab from '../components/EventsTab'
 import { AllocationEvent } from '../types'
 
+jest.mock('../components/EventDocuments', () => {
+  return function MockEventDocuments() {
+    return <div data-testid="event-documents" />
+  }
+})
+
+jest.mock('../components/EventDocumentPopover', () => {
+  return function MockEventDocumentPopover() {
+    return <div data-testid="event-document-popover" />
+  }
+})
+
+jest.mock('../components/EventSummaryPopover', () => {
+  return function MockEventSummaryPopover() {
+    return <div data-testid="event-summary-popover" />
+  }
+})
+
 // Mock icons
 jest.mock('react-icons/fi', () => ({
   FiCalendar: () => <div data-testid="icon-calendar" />,
@@ -12,6 +30,9 @@ jest.mock('react-icons/fi', () => ({
   FiCheckCircle: () => <div data-testid="icon-check-circle" />,
   FiXCircle: () => <div data-testid="icon-x-circle" />,
   FiFileText: () => <div data-testid="icon-file-text" />,
+  FiFilter: () => <div data-testid="icon-filter" />,
+  FiDownload: () => <div data-testid="icon-download" />,
+  FiArchive: () => <div data-testid="icon-archive" />,
 }))
 
 jest.mock('react-icons/gi', () => ({
@@ -20,6 +41,7 @@ jest.mock('react-icons/gi', () => ({
 
 jest.mock('react-icons/lu', () => ({
   LuPuzzle: () => <div data-testid="icon-puzzle" />,
+  LuFilterX: () => <div data-testid="icon-filter-x" />,
 }))
 
 jest.mock('react-icons/pi', () => ({
@@ -36,6 +58,15 @@ jest.mock('@/lib/permissions', () => ({
 // Mock utils
 jest.mock('../utils', () => ({
   formatDate: (date: string) => date,
+  formatDateOnly: (date: string) => date,
+  getEventConfig: () => ({
+    icon: () => null,
+    color: 'gray',
+    label: 'Evento',
+    bgColor: '',
+    textColor: '',
+    borderColor: ''
+  }),
 }))
 
 describe('EventsTab', () => {
@@ -91,13 +122,13 @@ describe('EventsTab', () => {
   it('shows edit and delete buttons for authorized users', () => {
     render(<EventsTab {...defaultProps} />)
     
-    const editButton = screen.getByLabelText('Editar evento da máquina M001')
+    const editButton = screen.getByTitle('Editar')
     expect(editButton).toBeInTheDocument()
     
     fireEvent.click(editButton)
     expect(defaultProps.handleEditEvent).toHaveBeenCalledWith(mockEvents[0])
 
-    const deleteButton = screen.getByLabelText('Excluir evento da máquina M001')
+    const deleteButton = screen.getByTitle('Excluir')
     expect(deleteButton).toBeInTheDocument()
 
     fireEvent.click(deleteButton)
@@ -107,10 +138,10 @@ describe('EventsTab', () => {
   it('does not show edit/delete buttons for unauthorized users', () => {
     render(<EventsTab {...defaultProps} user={{ role: 'viewer' }} />)
     
-    const editButton = screen.queryByLabelText('Editar evento da máquina M001')
+    const editButton = screen.queryByTitle('Editar')
     expect(editButton).not.toBeInTheDocument()
 
-    const deleteButton = screen.queryByLabelText('Excluir evento da máquina M001')
+    const deleteButton = screen.queryByTitle('Excluir')
     expect(deleteButton).not.toBeInTheDocument()
   })
 })

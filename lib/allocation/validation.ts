@@ -86,6 +86,9 @@ export async function validateEvent(event: Partial<AllocationEvent>): Promise<{
       if (!state) {
         return { valid: false, reason: 'Estado da máquina não pôde ser calculado' }
       }
+      if (state.status === 'in_transit') {
+        return { valid: false, reason: 'Não é possível iniciar manutenção durante transporte' }
+      }
       if (!state.current_site_id) {
         return { valid: false, reason: 'Máquina não está alocada. Downtime só pode ser registrado para máquinas alocadas.' }
       }

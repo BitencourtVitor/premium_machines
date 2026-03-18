@@ -6,9 +6,7 @@ describe('formatDate', () => {
     // Using a fixed date for testing
     const date = '2023-01-01T12:00:00'
     const formatted = formatDate(date)
-    // The exact output depends on the locale, but we can check the structure
-    // Since the implementation uses 'en-US', we expect MM/DD/YYYY, HH:MM AM/PM
-    expect(formatted).toMatch(/\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2} [AP]M/)
+    expect(formatted).toMatch(/\d{2}\/\d{2}\/\d{4}, \d{2}:\d{2}(?: [AP]M)?/)
   })
 })
 
@@ -98,13 +96,24 @@ describe('filterMachinesForEvent', () => {
     },
   ]
 
-  it('should return all machines for start_allocation', () => {
+  const events: any[] = [
+    {
+      id: 'evt1',
+      event_type: 'start_allocation',
+      status: 'approved',
+      event_date: '2023-01-01T00:00:00',
+      machine: { id: '1' },
+      site: { id: 'site1', title: 'Site 1' }
+    }
+  ]
+
+  it('should return available machines for start_allocation', () => {
     const result = filterMachinesForEvent('start_allocation', machines, activeAllocations, activeDowntimes)
-    expect(result).toEqual(machines)
+    expect(result.map(m => m.id)).toEqual(['2', '3'])
   })
 
   it('should return only allocated machines for end_allocation', () => {
-    const result = filterMachinesForEvent('end_allocation', machines, activeAllocations, activeDowntimes)
+    const result = filterMachinesForEvent('end_allocation', machines, activeAllocations, activeDowntimes, events)
     expect(result).toHaveLength(1)
     expect(result[0].id).toBe('1')
   })

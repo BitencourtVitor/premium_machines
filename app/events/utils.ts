@@ -161,6 +161,7 @@ export const filterMachinesForEvent = (
   // Identificar se o evento é específico de extensão ou transporte
   const isExtensionEvent = ['extension_attach', 'extension_detach'].includes(eventType);
   const isTransportEvent = ['transport_start', 'transport_arrival'].includes(eventType);
+  const isMaintenanceEvent = ['start_downtime', 'downtime_start', 'end_downtime', 'downtime_end'].includes(eventType);
 
   // Filtrar a lista base: 
   // - Se for evento de transporte, manter ambos (máquina e extensão)
@@ -169,7 +170,7 @@ export const filterMachinesForEvent = (
   // - Se for fim de alocação, manter ambos (máquina e extensão)
   const baseFiltered = machines.filter(m => {
     const isExtension = m.extension_type || m.machine_type?.is_attachment;
-    if (isTransportEvent || eventType === 'end_allocation') return true;
+    if (isTransportEvent || isMaintenanceEvent || eventType === 'end_allocation') return true;
     return isExtensionEvent ? isExtension : !isExtension;
   });
 

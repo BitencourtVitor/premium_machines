@@ -105,7 +105,7 @@ describe('SiteDetailsModal', () => {
     expect(screen.getByText('Test Site')).toBeInTheDocument()
     expect(screen.getByText('123 Test St')).toBeInTheDocument()
     expect(screen.getByText('M001')).toBeInTheDocument()
-    expect(screen.getByText('Máquinas')).toBeInTheDocument()
+    expect(screen.getByText('Alocações realizadas')).toBeInTheDocument()
   })
 
   it('should call onClose when close button is clicked', () => {
@@ -158,13 +158,13 @@ describe('SiteDetailsModal', () => {
     )
     
     // Find day 15 which should be allocated (green) since start_allocation was on Jan 1st
-    // The number is inside a div with classes w-8 h-8 ...
+    // O número fica dentro de um círculo com classes w-7/h-7 (ou w-9/h-9 no sm)
     const dayCells = screen.getAllByText('15')
-    const dayCell = dayCells.find(el => el.className.includes('w-8'))
+    const dayCell = dayCells.find(el => el.className.includes('w-7') || el.className.includes('w-9'))
     
     expect(dayCell).toBeInTheDocument()
-    // Check for green background class (working status)
-    expect(dayCell).toHaveClass('bg-green-100')
+    // Status "working" usa emerald
+    expect(dayCell).toHaveClass('bg-emerald-500')
     
     jest.useRealTimers()
   })
