@@ -755,7 +755,7 @@ export const generateAllocationCreditsPDF = async (
   summaryBySupplier: Array<{
     supplier_id: string
     supplier_name: string
-    machine_types: Array<{ machine_type: string; credit_days: number }>
+    machine_types: Array<{ machine_type: string; credit_days: number; base_credit_days: number; maintenance_credit_days: number }>
   }>,
   allocations: Array<{
     unit_number: string
@@ -766,6 +766,9 @@ export const generateAllocationCreditsPDF = async (
     start_date: string
     due_date: string
     end_date: string
+    base_credit_days: number
+    maintenance_credit_days: number
+    maintenance_periods: Array<{ start_date: string; end_date: string; days: number; description: string }>
     credit_days: number
   }>
 ) => {
@@ -877,40 +880,211 @@ export const generateAllocationCreditsPDF = async (
   doc.text('Alocações encerradas', margin, currentY)
   currentY += 10
 
-  const drawFieldBox = (label: string, value: string, x: number, y: number, w: number, h: number, valueColor?: readonly [number, number, number]) => {
+  type IconType = 'start' | 'due' | 'end' | 'maint_start' | 'maint_end' | 'credits' | 'base'
+
+  const neutralIconColor = [120, 120, 120] as const
+
+  const iconColors = {
+    start: neutralIconColor,
+    due: neutralIconColor,
+    end: neutralIconColor,
+    maintStart: neutralIconColor,
+    maintEnd: neutralIconColor,
+    base: neutralIconColor,
+  }
+
+  const faFontName = 'FA'
+  const faFontFile = 'fa-solid-900.ttf'
+  const faFontUrl = '/fontawesome/fa-solid-900.ttf'
+
+  const faGlyphs: Record<IconType, string> = {
+    start: String.fromCodePoint(0xf04b),
+    due: String.fromCodePoint(0xf073),
+    end: String.fromCodePoint(0xf11e),
+    maint_start: String.fromCodePoint(0xf7d9),
+    maint_end: String.fromCodePoint(0xf058),
+    credits: String.fromCodePoint(0xf4c0),
+    base: String.fromCodePoint(0xf017),
+  }
+
+  let faFontLoaded = false
+  const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+    let binary = ''
+    const bytes = new Uint8Array(buffer)
+    const chunk = 0x8000
+    for (let i = 0; i < bytes.length; i += chunk) {
+      const slice = bytes.subarray(i, i + chunk)
+      for (let j = 0; j < slice.length; j++) binary += String.fromCharCode(slice[j])
+    }
+    return btoa(binary)
+  }
+
+  const ensureFaFont = async () => {
+    if (faFontLoaded) return
+    const res = await fetch(faFontUrl)
+    if (!res.ok) return
+    const buf = await res.arrayBuffer()
+    const b64 = arrayBufferToBase64(buf)
+    doc.addFileToVFS(faFontFile, b64)
+    doc.addFont(faFontFile, faFontName, 'normal')
+    faFontLoaded = true
+  }
+
+  await ensureFaFont()
+
+  const drawFaIcon = (
+    iconType: IconType,
+    x: number,
+    y: number,
+    slotW: number,
+    slotH: number,
+    color: readonly [number, number, number],
+    fontSize?: number
+  ) => {
+    if (!faFontLoaded) return
+    const glyph = faGlyphs[iconType]
+    doc.setFont(faFontName, 'normal')
+    doc.setTextColor(color[0], color[1], color[2])
+    doc.setFontSize(fontSize ?? Math.max(10, slotH * 1.15))
+    doc.text(glyph, x + slotW / 2, y + slotH * 0.7, { align: 'center' })
+    doc.setFont('helvetica', 'normal')
+  }
+
+  const drawFieldBox = (
+    label: string,
+    value: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    valueColor?: readonly [number, number, number],
+    iconType?: IconType,
+    iconColor?: readonly [number, number, number]
+  ) => {
     doc.setFillColor(255, 255, 255)
     doc.setDrawColor(230, 230, 230)
     doc.roundedRect(x, y, w, h, 1.5, 1.5, 'FD')
 
+    const iconSlotW = h
+    const contentX = x + (iconType ? iconSlotW : 0) + 3
+
+    if (iconType && iconColor) drawFaIcon(iconType, x, y, iconSlotW, h, iconColor)
+
+    if (iconType) {
+      doc.setDrawColor(235, 235, 235)
+      doc.line(x + iconSlotW, y + 1.4, x + iconSlotW, y + h - 1.4)
+    }
+
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(7)
     doc.setTextColor(120, 120, 120)
-    doc.text(label, x + 2.5, y + 4)
+    doc.text(label, contentX, y + 4)
 
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
     if (valueColor) doc.setTextColor(valueColor[0], valueColor[1], valueColor[2])
     else doc.setTextColor(40, 40, 40)
-    doc.text(value, x + 2.5, y + 8.3)
+    doc.text(value, contentX, y + 9)
+    doc.setFont('helvetica', 'normal')
+  }
+
+  const drawCreditsBox = (
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    creditDays: number,
+    baseDays: number,
+    maintenanceDays: number
+  ) => {
+    doc.setFillColor(255, 255, 255)
+    doc.setDrawColor(230, 230, 230)
+    doc.roundedRect(x, y, w, h, 1.5, 1.5, 'FD')
+
+    const iconSlotW = h
+    const metricsW = Math.min(iconSlotW * 3.0, Math.max(iconSlotW * 2.4, w * 0.48))
+    const dividerX = x + w - metricsW
+    const contentX = x + iconSlotW + 3
+
+    doc.setDrawColor(230, 230, 230)
+    doc.line(dividerX, y + 1.5, dividerX, y + h - 1.5)
+
+    const creditColor = getCreditColor(creditDays)
+    drawFaIcon('credits', x, y, iconSlotW, h, creditColor)
+
+    doc.setDrawColor(235, 235, 235)
+    doc.line(x + iconSlotW, y + 1.4, x + iconSlotW, y + h - 1.4)
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.setTextColor(120, 120, 120)
+    doc.text('Créditos', contentX, y + 4)
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(creditColor[0], creditColor[1], creditColor[2])
+    doc.text(formatCredits(creditDays), contentX, y + 9)
+
+    const colW = metricsW / 2
+
+    const drawMetric = (cellX: number, type: IconType, color: readonly [number, number, number], value: number) => {
+      const slot = h * 0.55
+      const slotY = y + (h - slot) / 2
+      drawFaIcon(type, cellX + 1.6, slotY, slot, slot, color, Math.max(9, slot * 1.05))
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(60, 60, 60)
+      doc.text(String(value), cellX + slot + 4.8, y + h / 2, { baseline: 'middle' })
+      doc.setFont('helvetica', 'normal')
+    }
+
+    drawMetric(dividerX, 'base', iconColors.base, baseDays)
+    drawMetric(dividerX + colW, 'maint_start', iconColors.maintStart, maintenanceDays)
   }
 
   const drawAllocationCard = (a: any) => {
-    const cardHeight = 38
-    ensurePage(cardHeight + 6)
+    const boxGap = 3
+    const boxH = 11
+    const flowGap = 2.5
+
+    const maintenancePeriods = Array.isArray(a.maintenance_periods) ? a.maintenance_periods : []
+    const visibleMaintenancePeriods = maintenancePeriods.slice(0, 3)
+    const hiddenMaintenanceCount = Math.max(0, maintenancePeriods.length - visibleMaintenancePeriods.length)
 
     const cardWidth = pageWidth - margin * 2
     const leftX = margin + 5
     const cardX = margin
-    const cardY = currentY
-
-    doc.setFillColor(252, 252, 252)
-    doc.setDrawColor(210, 210, 210)
-    doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 2, 2, 'FD')
 
     const rightPanelWidth = 78
     const rightPanelX = cardX + cardWidth - rightPanelWidth - 5
 
     const leftMaxWidth = rightPanelX - leftX - 4
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    const location = `${a.site_title}${a.site_address ? ` - ${a.site_address}` : ''}`
+    const locationLines = doc.splitTextToSize(location, leftMaxWidth).slice(0, 2)
+
+    const supplierName = a.supplier_name || 'Fornecedor desconhecido'
+    const supplierLineOffsetY = locationLines.length === 2 ? 24 : 20.5
+
+    const creditBoxOffsetY = supplierLineOffsetY + 2.5
+    const creditBoxW = Math.min(96, leftMaxWidth)
+
+    let flowOffsetY = 7 + boxH + flowGap
+    flowOffsetY += visibleMaintenancePeriods.length * 2 * (boxH + flowGap)
+    if (hiddenMaintenanceCount > 0) flowOffsetY += 8
+    const rightBottomOffsetY = flowOffsetY + boxH
+
+    const cardHeight = Math.max(40, rightBottomOffsetY + 6, creditBoxOffsetY + boxH + 6)
+
+    ensurePage(cardHeight + 6)
+
+    const cardY = currentY
+
+    doc.setFillColor(252, 252, 252)
+    doc.setDrawColor(210, 210, 210)
+    doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 2, 2, 'FD')
 
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10)
@@ -920,29 +1094,60 @@ export const generateAllocationCreditsPDF = async (
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(90, 90, 90)
-    const location = `${a.site_title}${a.site_address ? ` - ${a.site_address}` : ''}`
-    const locationLines = doc.splitTextToSize(location, leftMaxWidth).slice(0, 2)
     doc.text(locationLines, leftX, cardY + 14)
 
-    const supplierName = a.supplier_name || 'Fornecedor desconhecido'
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8.5)
     doc.setTextColor(110, 110, 110)
-    const supplierLineY = cardY + (locationLines.length === 2 ? 24 : 20.5)
-    doc.text(`Fornecedor: ${supplierName}`, leftX, supplierLineY)
+    doc.text(`Fornecedor: ${supplierName}`, leftX, cardY + supplierLineOffsetY)
 
-    const boxGap = 3
+    const baseDays = Number(a.base_credit_days || 0)
+    const maintDays = Number(a.maintenance_credit_days || 0)
+    drawCreditsBox(leftX, cardY + creditBoxOffsetY, creditBoxW, boxH, Number(a.credit_days || 0), baseDays, maintDays)
+
     const boxW = (rightPanelWidth - boxGap) / 2
-    const boxH = 11
-    const topY = cardY + 7
-    const bottomY = topY + boxH + 3
 
-    drawFieldBox('Início', formatDateOnly(a.start_date), rightPanelX, topY, boxW, boxH)
-    drawFieldBox('Vencimento', formatDateOnly(a.due_date), rightPanelX + boxW + boxGap, topY, boxW, boxH)
-    drawFieldBox('Término', formatDateOnly(a.end_date), rightPanelX, bottomY, boxW, boxH)
+    let flowY = cardY + 7
+    drawFieldBox('Início', formatDateOnly(a.start_date), rightPanelX, flowY, rightPanelWidth, boxH, undefined, 'start', iconColors.start)
+    flowY += boxH + flowGap
 
-    const creditColor = getCreditColor(a.credit_days)
-    drawFieldBox('Créditos', formatCredits(a.credit_days), rightPanelX + boxW + boxGap, bottomY, boxW, boxH, creditColor)
+    for (const p of visibleMaintenancePeriods) {
+      drawFieldBox(
+        'Manut. início',
+        formatWithSystemTimezone(p.start_date),
+        rightPanelX,
+        flowY,
+        rightPanelWidth,
+        boxH,
+        undefined,
+        'maint_start',
+        iconColors.maintStart
+      )
+      flowY += boxH + flowGap
+      drawFieldBox(
+        'Manut. fim',
+        formatWithSystemTimezone(p.end_date),
+        rightPanelX,
+        flowY,
+        rightPanelWidth,
+        boxH,
+        undefined,
+        'maint_end',
+        iconColors.maintEnd
+      )
+      flowY += boxH + flowGap
+    }
+
+    if (hiddenMaintenanceCount > 0) {
+      doc.setFont('helvetica', 'italic')
+      doc.setFontSize(7.5)
+      doc.setTextColor(120, 120, 120)
+      doc.text(`+ ${hiddenMaintenanceCount} manutenções`, rightPanelX + 2.5, flowY + 6.5)
+      flowY += 8
+    }
+
+    drawFieldBox('Venc.', formatDateOnly(a.due_date), rightPanelX, flowY, boxW, boxH, undefined, 'due', iconColors.due)
+    drawFieldBox('Término', formatDateOnly(a.end_date), rightPanelX + boxW + boxGap, flowY, boxW, boxH, undefined, 'end', iconColors.end)
 
     currentY += cardHeight + 8
   }

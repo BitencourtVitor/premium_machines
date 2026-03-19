@@ -184,7 +184,7 @@ export const generateAllocationCreditsExcel = (
   summaryBySupplier: Array<{
     supplier_id: string
     supplier_name: string
-    machine_types: Array<{ machine_type: string; credit_days: number }>
+    machine_types: Array<{ machine_type: string; credit_days: number; base_credit_days: number; maintenance_credit_days: number }>
   }>,
   allocations: Array<{
     unit_number: string
@@ -195,6 +195,9 @@ export const generateAllocationCreditsExcel = (
     start_date: string
     due_date: string
     end_date: string
+    base_credit_days: number
+    maintenance_credit_days: number
+    maintenance_periods: Array<{ start_date: string; end_date: string; days: number; description: string }>
     credit_days: number
   }>
 ) => {
@@ -202,31 +205,60 @@ export const generateAllocationCreditsExcel = (
     const supplierName = supplier.supplier_name || 'Fornecedor desconhecido'
     const types = supplier.machine_types || []
     if (!types.length) {
-      return [{ Fornecedor: supplierName, 'Tipo de máquina': '-', 'Crédito (dias)': 0 }]
+      return [
+        {
+          Fornecedor: supplierName,
+          'Tipo de máquina': '-',
+          'Crédito base (dias)': 0,
+          'Crédito manutenção (dias)': 0,
+          'Crédito total (dias)': 0,
+        },
+      ]
     }
     return types.map(t => ({
       Fornecedor: supplierName,
       'Tipo de máquina': t.machine_type,
-      'Crédito (dias)': t.credit_days,
+      'Crédito base (dias)': t.base_credit_days,
+      'Crédito manutenção (dias)': t.maintenance_credit_days,
+      'Crédito total (dias)': t.credit_days,
     }))
   })
 
-  const allocationsData = (allocations || []).map(a => ({
-    Fornecedor: a.supplier_name || 'Fornecedor desconhecido',
-    Unidade: a.unit_number,
-    Tipo: a.machine_type,
-    Obra: a.site_title,
-    Endereço: a.site_address,
-    Início: a.start_date ? formatDateNoTimezone(a.start_date) : '-',
-    Vencimento: a.due_date ? formatDateNoTimezone(a.due_date) : '-',
-    Término: a.end_date ? formatDateNoTimezone(a.end_date) : '-',
-    'Créditos (dias)': a.credit_days,
-  }))
+  const allocationsData = (allocations || []).map(a => {
+    const periodsText = (a.maintenance_periods || [])
+      .map(p => `${formatDateNoTimezone(p.start_date)}–${formatDateNoTimezone(p.end_date)} (${p.days}d)`)
+      .join('; ')
+
+    return {
+      Fornecedor: a.supplier_name || 'Fornecedor desconhecido',
+      Unidade: a.unit_number,
+      Tipo: a.machine_type,
+      Obra: a.site_title,
+      Endereço: a.site_address,
+      Início: a.start_date ? formatDateNoTimezone(a.start_date) : '-',
+      Vencimento: a.due_date ? formatDateNoTimezone(a.due_date) : '-',
+      Término: a.end_date ? formatDateNoTimezone(a.end_date) : '-',
+      'Crédito base (dias)': a.base_credit_days,
+      'Crédito manutenção (dias)': a.maintenance_credit_days,
+      'Crédito total (dias)': a.credit_days,
+      'Períodos de manutenção': periodsText || '-',
+    }
+  })
 
   const wb = XLSX.utils.book_new()
 
   const wsSummary = XLSX.utils.json_to_sheet(
-    summaryData.length ? summaryData : [{ Fornecedor: '-', 'Tipo de máquina': '-', 'Crédito (dias)': '-' }]
+    summaryData.length
+      ? summaryData
+      : [
+          {
+            Fornecedor: '-',
+            'Tipo de máquina': '-',
+            'Crédito base (dias)': '-',
+            'Crédito manutenção (dias)': '-',
+            'Crédito total (dias)': '-',
+          },
+        ]
   )
   const wsAllocations = XLSX.utils.json_to_sheet(
     allocationsData.length
@@ -241,7 +273,10 @@ export const generateAllocationCreditsExcel = (
             Início: '-',
             Vencimento: '-',
             Término: '-',
-            'Créditos (dias)': '-',
+            'Crédito base (dias)': '-',
+            'Crédito manutenção (dias)': '-',
+            'Crédito total (dias)': '-',
+            'Períodos de manutenção': '-',
           },
         ]
   )
@@ -257,7 +292,17 @@ export const generateAllocationCreditsExcel = (
   }
 
   wsSummary['!cols'] = autoSize(
-    summaryData.length ? summaryData : [{ Fornecedor: '-', 'Tipo de máquina': '-', 'Crédito (dias)': '-' }]
+    summaryData.length
+      ? summaryData
+      : [
+          {
+            Fornecedor: '-',
+            'Tipo de máquina': '-',
+            'Crédito base (dias)': '-',
+            'Crédito manutenção (dias)': '-',
+            'Crédito total (dias)': '-',
+          },
+        ]
   ).map(
     (w: number) => ({ wch: w })
   )
@@ -274,7 +319,10 @@ export const generateAllocationCreditsExcel = (
             Início: '-',
             Vencimento: '-',
             Término: '-',
-            'Créditos (dias)': '-',
+            'Crédito base (dias)': '-',
+            'Crédito manutenção (dias)': '-',
+            'Crédito total (dias)': '-',
+            'Períodos de manutenção': '-',
           },
         ]
   ).map((w: number) => ({ wch: w }))
