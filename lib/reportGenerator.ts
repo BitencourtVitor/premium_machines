@@ -751,3 +751,205 @@ export const generateMaintenanceTimePDF = async (data: any[], periodLabel: strin
     doc.save(`relatorio_manutencao_${new Date().getTime()}.pdf`)
 }
 
+export const generateAllocationCreditsPDF = async (
+  summaryBySupplier: Array<{
+    supplier_id: string
+    supplier_name: string
+    machine_types: Array<{ machine_type: string; credit_days: number }>
+  }>,
+  allocations: Array<{
+    unit_number: string
+    supplier_name: string
+    machine_type: string
+    site_title: string
+    site_address: string
+    start_date: string
+    due_date: string
+    end_date: string
+    credit_days: number
+  }>
+) => {
+  const doc = new jsPDF()
+  const pageWidth = doc.internal.pageSize.getWidth() || 210
+  const margin = 15
+
+  await drawHeader(doc, margin)
+
+  doc.setFontSize(12)
+  doc.setTextColor(40)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Créditos de alocação', margin, 35)
+
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 100, 100)
+  doc.text(`Gerado em: ${formatWithSystemTimezone(new Date().toISOString())}`, margin, 42)
+
+  let currentY = 54
+
+  const ensurePage = (neededHeight: number) => {
+    if (currentY + neededHeight <= 280) return
+    doc.addPage()
+    currentY = 20
+  }
+
+  const formatCredits = (creditDays: number) => {
+    const sign = creditDays > 0 ? '+' : ''
+    return `${sign}${creditDays} dias`
+  }
+
+  const getCreditColor = (creditDays: number) => {
+    if (creditDays > 0) return [22, 163, 74] as const
+    if (creditDays < 0) return [220, 38, 38] as const
+    return [100, 100, 100] as const
+  }
+
+  const drawSupplierSummaryCard = (supplier: any) => {
+    const types = supplier.machine_types || []
+    const headerHeight = 10
+    const rowHeight = 6
+    const padding = 6
+    const cardHeight = headerHeight + Math.max(1, types.length) * rowHeight + padding + 2
+
+    ensurePage(cardHeight + 4)
+
+    doc.setFillColor(252, 252, 252)
+    doc.setDrawColor(210, 210, 210)
+    doc.roundedRect(margin, currentY, pageWidth - margin * 2, cardHeight, 2, 2, 'FD')
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(40, 40, 40)
+    doc.text((supplier.supplier_name || 'Fornecedor desconhecido').toUpperCase(), margin + 5, currentY + 8)
+
+    let y = currentY + headerHeight + 2
+    if (!types.length) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(110, 110, 110)
+      doc.text('Nenhum crédito encontrado.', margin + 5, y + 4)
+      currentY += cardHeight + 8
+      return
+    }
+
+    for (const t of types) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(60, 60, 60)
+      doc.text(`${t.machine_type}:`, margin + 5, y + 4)
+
+      doc.setFont('helvetica', 'bold')
+      const c = getCreditColor(t.credit_days)
+      doc.setTextColor(c[0], c[1], c[2])
+      doc.text(formatCredits(t.credit_days), pageWidth - margin - 5, y + 4, { align: 'right' })
+      y += rowHeight
+    }
+
+    currentY += cardHeight + 8
+  }
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.setTextColor(60, 60, 60)
+  doc.text('Saldo de créditos por fornecedor e tipo de máquina', margin, currentY)
+  currentY += 10
+
+  for (const supplier of summaryBySupplier || []) {
+    drawSupplierSummaryCard(supplier)
+  }
+
+  ensurePage(16)
+  doc.setFont('helvetica', 'italic')
+  doc.setFontSize(9)
+  doc.setTextColor(110, 110, 110)
+  doc.text(
+    'Nas páginas a seguir, você verá o descritivo de cada alocação já encerrada. Role para baixo para continuar.',
+    margin,
+    currentY
+  )
+
+  doc.addPage()
+  currentY = 20
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.setTextColor(60, 60, 60)
+  doc.text('Alocações encerradas', margin, currentY)
+  currentY += 10
+
+  const drawFieldBox = (label: string, value: string, x: number, y: number, w: number, h: number, valueColor?: readonly [number, number, number]) => {
+    doc.setFillColor(255, 255, 255)
+    doc.setDrawColor(230, 230, 230)
+    doc.roundedRect(x, y, w, h, 1.5, 1.5, 'FD')
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.setTextColor(120, 120, 120)
+    doc.text(label, x + 2.5, y + 4)
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    if (valueColor) doc.setTextColor(valueColor[0], valueColor[1], valueColor[2])
+    else doc.setTextColor(40, 40, 40)
+    doc.text(value, x + 2.5, y + 8.3)
+  }
+
+  const drawAllocationCard = (a: any) => {
+    const cardHeight = 38
+    ensurePage(cardHeight + 6)
+
+    const cardWidth = pageWidth - margin * 2
+    const leftX = margin + 5
+    const cardX = margin
+    const cardY = currentY
+
+    doc.setFillColor(252, 252, 252)
+    doc.setDrawColor(210, 210, 210)
+    doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 2, 2, 'FD')
+
+    const rightPanelWidth = 78
+    const rightPanelX = cardX + cardWidth - rightPanelWidth - 5
+
+    const leftMaxWidth = rightPanelX - leftX - 4
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(30, 30, 30)
+    doc.text(`${a.unit_number} - ${a.machine_type}`, leftX, cardY + 8)
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(90, 90, 90)
+    const location = `${a.site_title}${a.site_address ? ` - ${a.site_address}` : ''}`
+    const locationLines = doc.splitTextToSize(location, leftMaxWidth).slice(0, 2)
+    doc.text(locationLines, leftX, cardY + 14)
+
+    const supplierName = a.supplier_name || 'Fornecedor desconhecido'
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    doc.setTextColor(110, 110, 110)
+    const supplierLineY = cardY + (locationLines.length === 2 ? 24 : 20.5)
+    doc.text(`Fornecedor: ${supplierName}`, leftX, supplierLineY)
+
+    const boxGap = 3
+    const boxW = (rightPanelWidth - boxGap) / 2
+    const boxH = 11
+    const topY = cardY + 7
+    const bottomY = topY + boxH + 3
+
+    drawFieldBox('Início', formatDateOnly(a.start_date), rightPanelX, topY, boxW, boxH)
+    drawFieldBox('Vencimento', formatDateOnly(a.due_date), rightPanelX + boxW + boxGap, topY, boxW, boxH)
+    drawFieldBox('Término', formatDateOnly(a.end_date), rightPanelX, bottomY, boxW, boxH)
+
+    const creditColor = getCreditColor(a.credit_days)
+    drawFieldBox('Créditos', formatCredits(a.credit_days), rightPanelX + boxW + boxGap, bottomY, boxW, boxH, creditColor)
+
+    currentY += cardHeight + 8
+  }
+
+  for (const a of allocations || []) {
+    drawAllocationCard(a)
+  }
+
+  doc.save(`creditos_alocacao_${new Date().getTime()}.pdf`)
+}

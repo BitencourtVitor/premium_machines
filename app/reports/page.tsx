@@ -15,14 +15,16 @@ import {
   generateRentExpirationPDF,
   generateMachineHistoryPDF,
   generateRefuelingControlPDF,
-  generateMaintenanceTimePDF
+  generateMaintenanceTimePDF,
+  generateAllocationCreditsPDF
 } from '@/lib/reportGenerator'
 import { 
   generateAllocationStatusExcel, 
   generateRentExpirationExcel,
   generateMachineHistoryExcel,
   generateRefuelingControlExcel,
-  generateMaintenanceTimeExcel
+  generateMaintenanceTimeExcel,
+  generateAllocationCreditsExcel
 } from '@/lib/excelGenerator'
 import { adjustDateToSystemTimezone, formatDateOnly } from '@/lib/timezone'
 
@@ -183,9 +185,15 @@ export default function ReportsPage() {
       title: 'Tempo de Manutenção',
       subtitle: 'Mapeamento completo de todos os eventos de manutenção no período selecionado',
     },
+    {
+      id: 'allocation-credits',
+      title: 'Créditos de alocação',
+      subtitle: 'Créditos (dias) gerados por alocações finalizadas, agrupados por fornecedor',
+    },
   ]
 
   const isReportReady = (reportId: string) => {
+    if (reportId === 'allocation-credits') return true
     if (reportId === 'historico') return !!selectedEquipmentId
     if (reportId === 'abastecimento') return true
     if (reportId === 'alocacoes' || reportId === 'vencimento') return allPeriod || (!!dateFrom && !!dateTo)
@@ -304,6 +312,15 @@ export default function ReportsPage() {
         } else {
           alert('Erro ao gerar relatório: ' + data.message)
         }
+      } else if (reportId === 'allocation-credits') {
+        const res = await fetch(`/api/reports/allocation-credits`, { cache: 'no-store' })
+        const data = await res.json()
+
+        if (data.success) {
+          await generateAllocationCreditsPDF(data.summaryBySupplier, data.allocations)
+        } else {
+          alert('Erro ao gerar relatório: ' + data.message)
+        }
       } else {
         console.log(`Gerando PDF para ${reportId}`, reportId === 'abastecimento' ? weekRange : { dateFrom, dateTo, allPeriod })
       }
@@ -410,6 +427,15 @@ export default function ReportsPage() {
 
         if (data.success) {
           generateMaintenanceTimeExcel(data.maintenanceEvents)
+        } else {
+          alert('Erro ao gerar relatório Excel: ' + data.message)
+        }
+      } else if (reportId === 'allocation-credits') {
+        const res = await fetch(`/api/reports/allocation-credits`, { cache: 'no-store' })
+        const data = await res.json()
+
+        if (data.success) {
+          generateAllocationCreditsExcel(data.summaryBySupplier, data.allocations)
         } else {
           alert('Erro ao gerar relatório Excel: ' + data.message)
         }

@@ -180,3 +180,108 @@ export const generateMaintenanceTimeExcel = (data: any[]) => {
     XLSX.writeFile(wb, `relatorio_manutencao_${new Date().toISOString().split('T')[0]}.xlsx`)
 }
 
+export const generateAllocationCreditsExcel = (
+  summaryBySupplier: Array<{
+    supplier_id: string
+    supplier_name: string
+    machine_types: Array<{ machine_type: string; credit_days: number }>
+  }>,
+  allocations: Array<{
+    unit_number: string
+    supplier_name: string
+    machine_type: string
+    site_title: string
+    site_address: string
+    start_date: string
+    due_date: string
+    end_date: string
+    credit_days: number
+  }>
+) => {
+  const summaryData = (summaryBySupplier || []).flatMap(supplier => {
+    const supplierName = supplier.supplier_name || 'Fornecedor desconhecido'
+    const types = supplier.machine_types || []
+    if (!types.length) {
+      return [{ Fornecedor: supplierName, 'Tipo de máquina': '-', 'Crédito (dias)': 0 }]
+    }
+    return types.map(t => ({
+      Fornecedor: supplierName,
+      'Tipo de máquina': t.machine_type,
+      'Crédito (dias)': t.credit_days,
+    }))
+  })
+
+  const allocationsData = (allocations || []).map(a => ({
+    Fornecedor: a.supplier_name || 'Fornecedor desconhecido',
+    Unidade: a.unit_number,
+    Tipo: a.machine_type,
+    Obra: a.site_title,
+    Endereço: a.site_address,
+    Início: a.start_date ? formatDateNoTimezone(a.start_date) : '-',
+    Vencimento: a.due_date ? formatDateNoTimezone(a.due_date) : '-',
+    Término: a.end_date ? formatDateNoTimezone(a.end_date) : '-',
+    'Créditos (dias)': a.credit_days,
+  }))
+
+  const wb = XLSX.utils.book_new()
+
+  const wsSummary = XLSX.utils.json_to_sheet(
+    summaryData.length ? summaryData : [{ Fornecedor: '-', 'Tipo de máquina': '-', 'Crédito (dias)': '-' }]
+  )
+  const wsAllocations = XLSX.utils.json_to_sheet(
+    allocationsData.length
+      ? allocationsData
+      : [
+          {
+            Fornecedor: '-',
+            Unidade: '-',
+            Tipo: '-',
+            Obra: '-',
+            Endereço: '-',
+            Início: '-',
+            Vencimento: '-',
+            Término: '-',
+            'Créditos (dias)': '-',
+          },
+        ]
+  )
+
+  const autoSize = (rows: any[]) => {
+    return rows.reduce((acc: any, row: any) => {
+      Object.keys(row).forEach((key, i) => {
+        const value = String(row[key] ?? '')
+        acc[i] = Math.max(acc[i] || 10, value.length + 2)
+      })
+      return acc
+    }, [])
+  }
+
+  wsSummary['!cols'] = autoSize(
+    summaryData.length ? summaryData : [{ Fornecedor: '-', 'Tipo de máquina': '-', 'Crédito (dias)': '-' }]
+  ).map(
+    (w: number) => ({ wch: w })
+  )
+  wsAllocations['!cols'] = autoSize(
+    allocationsData.length
+      ? allocationsData
+      : [
+          {
+            Fornecedor: '-',
+            Unidade: '-',
+            Tipo: '-',
+            Obra: '-',
+            Endereço: '-',
+            Início: '-',
+            Vencimento: '-',
+            Término: '-',
+            'Créditos (dias)': '-',
+          },
+        ]
+  ).map((w: number) => ({ wch: w }))
+
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo')
+  XLSX.utils.book_append_sheet(wb, wsAllocations, 'Alocações')
+
+  XLSX.writeFile(wb, `creditos_alocacao_${new Date().toISOString().split('T')[0]}.xlsx`)
+}
+
