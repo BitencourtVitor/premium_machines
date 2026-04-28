@@ -8,6 +8,10 @@ export const supabaseServer = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false
+  },
+  global: {
+    // Bypass Next.js 14 Data Cache so all queries always hit the DB directly
+    fetch: (url, options = {}) => fetch(url, { ...options, cache: 'no-store' })
   }
 })
 
