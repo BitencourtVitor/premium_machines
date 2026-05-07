@@ -12,6 +12,7 @@ interface UseMapInitializationProps {
   onMoveEnd: () => void
   onClick: (e: mapboxgl.MapMouseEvent) => void
   isDark: boolean
+  onWebGLError?: () => void
 }
 
 export function useMapInitialization({
@@ -24,7 +25,8 @@ export function useMapInitialization({
   onZoomEnd,
   onMoveEnd,
   onClick,
-  isDark
+  isDark,
+  onWebGLError,
 }: UseMapInitializationProps) {
   const resizeHandlersRef = useRef<(() => void)[]>([])
 
@@ -51,6 +53,12 @@ export function useMapInitialization({
       return () => clearTimeout(timeoutId)
     }
 
+    if (!mapboxgl.supported()) {
+      console.error('WebGL not supported in this browser/environment')
+      onWebGLError?.()
+      return
+    }
+
     mapboxgl.accessToken = mapboxToken
 
     // Determinar estilo: satélite ou mapa (claro/escuro baseado no tema)
@@ -73,19 +81,26 @@ export function useMapInitialization({
     // Zoom mais retraído em mobile (ajustado para 6.0)
     const initialZoom = isMobile ? 6.0 : 7.5
 
-    mapRef.current = new mapboxgl.Map({
-      container: container,
-      style: styleUrl,
-      center: [-71.5119217, 42.1031736], // 1B Landing Lane, Hopedale, MA 01747 - Sede Real
-      zoom: initialZoom,
-      touchZoomRotate: true,
-      touchPitch: true,
-      doubleClickZoom: true,
-      dragRotate: false, // Desabilitar rotação por arraste em mobile
-      pitchWithRotate: false,
-      antialias: false,
-      preserveDrawingBuffer: false,
-    })
+    try {
+      mapRef.current = new mapboxgl.Map({
+        container: container,
+        style: styleUrl,
+        center: [-71.5119217, 42.1031736],
+        zoom: initialZoom,
+        touchZoomRotate: true,
+        touchPitch: true,
+        doubleClickZoom: true,
+        dragRotate: false,
+        pitchWithRotate: false,
+        antialias: false,
+        preserveDrawingBuffer: false,
+        failIfMajorPerformanceCaveat: false,
+      })
+    } catch (err) {
+      console.error('Failed to initialize Mapbox map:', err)
+      onWebGLError?.()
+      return
+    }
 
     mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
     mapRef.current.addControl(new mapboxgl.FullscreenControl(), 'top-right')
@@ -132,7 +147,7 @@ export function useMapInitialization({
         // Note: we are NOT removing the map instance here to avoid flashing on re-renders
         // The parent component should handle full cleanup if needed
     }
-  }, [mapStyle, mapboxToken, mapContainer, mapRef, onMapLoad, onZoomUpdate, onZoomEnd, onMoveEnd, onClick, isDark])
+  }, [mapStyle, mapboxToken, mapContainer, mapRef, onMapLoad, onZoomUpdate, onZoomEnd, onMoveEnd, onClick, isDark, onWebGLError])
 
   // Effect to update style dynamically without recreating map
   useEffect(() => {

@@ -38,6 +38,7 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [markersInitialized, setMarkersInitialized] = useState(false)
+  const [webglError, setWebglError] = useState(false)
   const [sites, setSites] = useState<Site[]>([])
   const [selectedSite, setSelectedSite] = useState<Site | null>(null)
   const [mapStyle, setMapStyle] = useState<'map' | 'satellite'>('map')
@@ -272,6 +273,11 @@ export default function MapPage() {
     }
   }, [])
 
+  const handleWebGLError = useCallback(() => {
+    setWebglError(true)
+    setLoading(false)
+  }, [])
+
   // Initialize Map
   useMapInitialization({
     mapContainer,
@@ -283,7 +289,8 @@ export default function MapPage() {
     onZoomEnd: handleZoomEnd,
     onMoveEnd: handleMoveEnd,
     onClick: handleClick,
-    isDark
+    isDark,
+    onWebGLError: handleWebGLError,
   })
 
   // Effects
@@ -370,8 +377,22 @@ export default function MapPage() {
             {/* Map Container */}
             <div ref={mapContainer} className="map-container w-full h-full" />
 
+            {/* WebGL Error */}
+            {webglError && (
+              <div className="absolute inset-0 bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center z-50 p-6 text-center">
+                <div className="text-5xl mb-4">🗺️</div>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
+                  Mapa indisponível
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm">
+                  Seu navegador ou dispositivo não suporta WebGL, necessário para renderizar o mapa.
+                  Tente habilitar a aceleração de hardware nas configurações do navegador ou atualize os drivers de vídeo.
+                </p>
+              </div>
+            )}
+
             {/* Loading Overlay */}
-            {(loading || !mapLoaded || !markersInitialized) && (
+            {!webglError && (loading || !mapLoaded || !markersInitialized) && (
               <div className="absolute inset-0 bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center z-50">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 dark:border-blue-400 mb-4"></div>
                 <p className="text-gray-600 dark:text-gray-400 font-medium animate-pulse">

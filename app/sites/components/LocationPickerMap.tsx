@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 
 interface LocationPickerMapProps {
@@ -14,6 +14,7 @@ export default function LocationPickerMap({ mapCoordinates, setMapCoordinates }:
   const markerRef = useRef<mapboxgl.Marker | null>(null)
   const themeObserverRef = useRef<MutationObserver | null>(null)
   const mediaQueryRef = useRef<MediaQueryList | null>(null)
+  const [webglError, setWebglError] = useState(false)
 
   useEffect(() => {
     if (!mapCoordinates || !mapModalContainer.current) {
@@ -25,12 +26,18 @@ export default function LocationPickerMap({ mapCoordinates, setMapCoordinates }:
       return
     }
 
-    mapboxgl.accessToken = MAPBOX_TOKEN
-
     if (!MAPBOX_TOKEN) {
       console.warn('MAPBOX_TOKEN não configurado')
       return
     }
+
+    if (!mapboxgl.supported()) {
+      console.error('WebGL not supported')
+      setWebglError(true)
+      return
+    }
+
+    mapboxgl.accessToken = MAPBOX_TOKEN
 
     // Se o mapa já existe, apenas redimensionar e atualizar posição
     if (mapModal.current) {
@@ -62,15 +69,21 @@ export default function LocationPickerMap({ mapCoordinates, setMapCoordinates }:
         (!localStorage.theme && window.matchMedia('(prefers-color-scheme: dark)').matches)
       )
 
-      // Criar mapa com estilo baseado no tema
-      mapModal.current = new mapboxgl.Map({
-        container: mapModalContainer.current,
-        style: currentIsDark 
-          ? 'mapbox://styles/mapbox/dark-v11'
-          : 'mapbox://styles/mapbox/streets-v12',
-        center: [mapCoordinates.lng, mapCoordinates.lat],
-        zoom: 15,
-      })
+      try {
+        mapModal.current = new mapboxgl.Map({
+          container: mapModalContainer.current,
+          style: currentIsDark
+            ? 'mapbox://styles/mapbox/dark-v11'
+            : 'mapbox://styles/mapbox/streets-v12',
+          center: [mapCoordinates.lng, mapCoordinates.lat],
+          zoom: 15,
+          failIfMajorPerformanceCaveat: false,
+        })
+      } catch (err) {
+        console.error('Failed to initialize location picker map:', err)
+        setWebglError(true)
+        return
+      }
 
       // Adicionar controles
       mapModal.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
@@ -199,8 +212,21 @@ export default function LocationPickerMap({ mapCoordinates, setMapCoordinates }:
     }
   }, [mapCoordinates, setMapCoordinates])
 
+  if (webglError) {
+    return (
+      <div
+        className="w-full h-64 rounded-lg border border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-800 text-center p-4"
+        style={{ minHeight: '256px' }}
+      >
+        <span className="text-3xl mb-2">🗺️</span>
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Mapa indisponível</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">WebGL não suportado neste dispositivo</p>
+      </div>
+    )
+  }
+
   return (
-    <div 
+    <div
       ref={mapModalContainer}
       className="w-full h-64 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600"
       style={{ minHeight: '256px' }}
