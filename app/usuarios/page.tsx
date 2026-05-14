@@ -6,14 +6,18 @@ import Sidebar from '@/app/components/Sidebar'
 import PageTabs from '@/app/components/PageTabs'
 import ConfirmModal from '@/app/components/ConfirmModal'
 import { useSidebar } from '@/lib/useSidebar'
+import { useSession } from '@/lib/useSession'
 import UserModal from './components/UserModal'
 import SupplierModal from './components/SupplierModal'
 import UsersTab from './components/UsersTab'
 import SuppliersTab from './components/SuppliersTab'
+import EmailRecipientsTab from './components/EmailRecipientsTab'
 import { useUsersPage } from './hooks/useUsersPage'
 
 export default function UsuariosPage() {
   const { isExpanded } = useSidebar()
+  const { user: sessionUser } = useSession()
+  const isAdmin = sessionUser?.role === 'admin' || sessionUser?.role === 'dev'
   const {
     users,
     suppliers,
@@ -88,10 +92,11 @@ export default function UsuariosPage() {
                 tabs={[
                   { id: 'users', label: 'Funcionários' },
                   { id: 'suppliers', label: 'Fornecedores' },
+                  ...(isAdmin ? [{ id: 'email-recipients', label: 'E-mail' }] : []),
                 ]}
                 activeId={activeTab}
                 onChange={(id) => {
-                  setActiveTab(id as 'users' | 'suppliers')
+                  setActiveTab(id as 'users' | 'suppliers' | 'email-recipients')
                   if (id === 'suppliers') {
                     loadSuppliers()
                   }
@@ -109,6 +114,11 @@ export default function UsuariosPage() {
                 onValidate={handleValidate}
                 onDelete={openDeleteConfirm}
               />
+            )}
+
+            {/* Email Recipients Tab */}
+            {activeTab === 'email-recipients' && (
+              <EmailRecipientsTab />
             )}
 
             {/* Suppliers Tab */}

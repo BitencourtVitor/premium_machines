@@ -81,6 +81,12 @@ export default function EventsPage() {
   const [activeAllocations, setActiveAllocations] = useState<ActiveAllocation[]>([])
   const [activeDowntimes, setActiveDowntimes] = useState<ActiveDowntime[]>([])
   const [loadingAllocations, setLoadingAllocations] = useState(false)
+
+  // Feature 009: Event confirmations
+  const [confirmations, setConfirmations] = useState<Record<string, { confirmed_at: string; attachment_url: string; attachment_name?: string }>>({})
+  const [confirmPopup, setConfirmPopup] = useState<{ eventId: string; file: File | null; uploading: boolean } | null>(null)
+  // Feature 010: Filter unconfirmed
+  const [showUnconfirmedOnly, setShowUnconfirmedOnly] = useState(false)
   
   const [newEvent, setNewEvent] = useState<NewEventState>({
     event_type: 'start_allocation',
@@ -103,6 +109,11 @@ export default function EventsPage() {
     validated_by_name: '',
     validated_at: '',
     sharepoint_links: [],
+    gera_backcharge: false,
+    backcharge_suppliers: [],
+    subcontractor_receipt_links: [],
+    used_by: [],
+    allocation_subcontractors: [],
   })
 
   const loadEvents = useCallback(async () => {
@@ -117,6 +128,24 @@ export default function EventsPage() {
 
       if (data.success) {
         setEvents(data.events)
+        // Load confirmations for fetched events
+        const ids = (data.events as AllocationEvent[]).map(e => e.id)
+        if (ids.length > 0) {
+          try {
+            const { supabase } = await import('@/lib/supabase')
+            const { data: confData } = await supabase
+              .from('allocation_event_confirmations')
+              .select('event_id, confirmed_at, attachment_url, attachment_name')
+              .in('event_id', ids)
+            if (confData) {
+              const map: Record<string, { confirmed_at: string; attachment_url: string; attachment_name?: string }> = {}
+              confData.forEach((c: any) => { map[c.event_id] = c })
+              setConfirmations(map)
+            }
+          } catch (confError) {
+            console.error('Error loading confirmations:', confError)
+          }
+        }
       } else {
         console.error('Failed to load events:', data.message)
       }
@@ -185,6 +214,24 @@ export default function EventsPage() {
       }
     } catch (error) {
       console.error('Error loading machine types:', error)
+    }
+  }, [])
+
+  const loadConfirmations = useCallback(async (eventIds: string[]) => {
+    if (eventIds.length === 0) return
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { data } = await supabase
+        .from('allocation_event_confirmations')
+        .select('event_id, confirmed_at, attachment_url, attachment_name')
+        .in('event_id', eventIds)
+      if (data) {
+        const map: Record<string, { confirmed_at: string; attachment_url: string; attachment_name?: string }> = {}
+        data.forEach((c: any) => { map[c.event_id] = c })
+        setConfirmations(map)
+      }
+    } catch (error) {
+      console.error('Error loading confirmations:', error)
     }
   }, [])
 
@@ -325,6 +372,11 @@ export default function EventsPage() {
           supplier_id: '',
           machine_type_id: '',
           sharepoint_links: [],
+          gera_backcharge: false,
+          backcharge_suppliers: [],
+          subcontractor_receipt_links: [],
+          used_by: [],
+          allocation_subcontractors: [],
         })
         loadEvents()
         if (activeTab === 'allocations') loadActiveAllocations()
@@ -374,6 +426,11 @@ export default function EventsPage() {
       supplier_id: '',
       machine_type_id: '',
       sharepoint_links: [],
+      gera_backcharge: false,
+      backcharge_suppliers: [],
+      subcontractor_receipt_links: [],
+      used_by: [],
+      allocation_subcontractors: [],
     })
     setShowCreateModal(true)
   }
@@ -416,6 +473,11 @@ export default function EventsPage() {
       machine_type_id: event.machine_type_id || '',
       supplier_id: event.supplier_id || '',
       sharepoint_links: event.sharepoint_links || [],
+      gera_backcharge: (event as any).gera_backcharge || false,
+      backcharge_suppliers: (event as any).backcharge_suppliers || [],
+      subcontractor_receipt_links: (event as any).subcontractor_receipt_links || [],
+      used_by: (event as any).used_by || [],
+      allocation_subcontractors: (event as any).allocation_subcontractors || [],
     })
     setShowCreateModal(true)
   }
@@ -455,7 +517,12 @@ export default function EventsPage() {
       supplier_id: request.supplier_id || '',
       machine_type_id: request.machine_type_id || '',
       sharepoint_links: [],
-      from_request_id: request.id
+      from_request_id: request.id,
+      gera_backcharge: false,
+      backcharge_suppliers: [],
+      subcontractor_receipt_links: [],
+      used_by: [],
+      allocation_subcontractors: [],
     })
     setShowCreateModal(true)
   }
@@ -640,6 +707,41 @@ export default function EventsPage() {
     })
   }
 
+  const handleConfirmEvent = async () => {
+    if (!confirmPopup || !confirmPopup.file) return
+    setConfirmPopup(prev => prev ? { ...prev, uploading: true } : null)
+    try {
+      const formData = new FormData()
+      formData.append('file', confirmPopup.file)
+      formData.append('confirmed_by', user?.id || '')
+      formData.append('user_role', user?.role || '')
+      const response = await fetch(`/api/events/${confirmPopup.eventId}/confirm`, {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await response.json()
+      if (data.success) {
+        setConfirmations(prev => ({
+          ...prev,
+          [confirmPopup.eventId]: {
+            confirmed_at: new Date().toISOString(),
+            attachment_url: '',
+            attachment_name: confirmPopup.file?.name,
+          }
+        }))
+        setConfirmPopup(null)
+        loadEvents()
+      } else {
+        alert(data.message || 'Erro ao confirmar evento')
+        setConfirmPopup(prev => prev ? { ...prev, uploading: false } : null)
+      }
+    } catch (err) {
+      console.error('Error confirming event:', err)
+      alert('Erro ao confirmar evento')
+      setConfirmPopup(prev => prev ? { ...prev, uploading: false } : null)
+    }
+  }
+
   const filteredEvents = events.filter(event => {
     // Para o abastecimento em particular, apenas os aprovados sejam levados em consideração
     if (event.event_type === 'refueling' && event.status !== 'approved') {
@@ -685,8 +787,12 @@ export default function EventsPage() {
                       notes.includes(search)
     }
     
-    return matchesType && matchesDate && matchesSearch
+    const matchesConfirmation = !showUnconfirmedOnly || !confirmations[event.id]
+
+    return matchesType && matchesDate && matchesSearch && matchesConfirmation
   })
+
+  const unconfirmedCount = events.filter(e => !confirmations[e.id]).length
 
 
   if (loading) {
@@ -757,6 +863,11 @@ export default function EventsPage() {
                 handleStartFromRequest={handleStartFromRequest}
                 handleDeleteEvent={handleDeleteEvent}
                 machineTypes={machineTypes}
+                confirmations={confirmations}
+                setConfirmPopup={setConfirmPopup}
+                showUnconfirmedOnly={showUnconfirmedOnly}
+                setShowUnconfirmedOnly={setShowUnconfirmedOnly}
+                unconfirmedCount={unconfirmedCount}
               />
             )}
           </div>
@@ -780,6 +891,58 @@ export default function EventsPage() {
         onInputChange={setRejectionReason}
         inputPlaceholder={confirmModal.inputPlaceholder}
       />
+
+      {/* Confirmation Popup (Feature 009) */}
+      {confirmPopup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10020] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Confirmar Evento</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Anexe um documento para confirmar este evento.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Documento de Confirmação *
+              </label>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,application/pdf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null
+                  setConfirmPopup(prev => prev ? { ...prev, file } : null)
+                }}
+                className="w-full text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              {confirmPopup.file && (
+                <p className="mt-2 text-xs text-gray-500">{confirmPopup.file.name} ({(confirmPopup.file.size / 1024).toFixed(0)} KB)</p>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmPopup(null)}
+                disabled={confirmPopup.uploading}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmEvent}
+                disabled={!confirmPopup.file || confirmPopup.uploading}
+                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {confirmPopup.uploading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Confirmando...</span>
+                  </>
+                ) : (
+                  <span>Confirmar</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Event Modal */}
       <CreateEventModal

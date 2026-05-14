@@ -39,7 +39,7 @@ export interface ActiveAllocation {
   machine_supplier_name: string | null
   site_id: string
   site_title: string
-  construction_type: 'lot' | 'building' | null
+  construction_type: 'house' | 'building' | null
   lot_building_number: string | null
   allocation_start: string
   end_date?: string | null
@@ -81,4 +81,11 @@ export interface NewEventState {
   validated_at: string
   sharepoint_links: { label: string; url: string }[]
   from_request_id?: string
+  // Feature 005: Backcharge fields
+  gera_backcharge: boolean
+  backcharge_suppliers: { id: string; nome: string }[]
+  subcontractor_receipt_links: { label: string; url: string }[]
+  // Feature 006: Used by fields
+  used_by: string[]
+  allocation_subcontractors: string[]
 }

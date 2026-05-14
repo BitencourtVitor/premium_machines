@@ -166,6 +166,7 @@ interface SiteListProps {
   handleRefresh: () => void
   handleOpenModal: (site?: Site) => void
   handleArchiveSite: (site: Site) => void
+  onCalendar?: (site: Site) => void
 }
 
 export default function SiteList({
@@ -176,6 +177,7 @@ export default function SiteList({
   handleRefresh,
   handleOpenModal,
   handleArchiveSite,
+  onCalendar,
 }: SiteListProps) {
 
 
@@ -205,6 +207,15 @@ export default function SiteList({
             </div>
             <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
               <MachineCount site={site} />
+              {onCalendar && (
+                <ListActionButton
+                  icon="calendar"
+                  onClick={() => onCalendar(site)}
+                  variant="purple"
+                  title="Ver calendário"
+                  className="p-1.5 md:p-2"
+                />
+              )}
               <ListActionButton
                 icon="edit"
                 onClick={() => handleOpenModal(site)}

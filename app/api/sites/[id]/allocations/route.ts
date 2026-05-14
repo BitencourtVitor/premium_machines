@@ -50,7 +50,7 @@ export async function GET(
     
     for (const allocation of summary.allocations) {
       const locationKey = allocation.construction_type && allocation.lot_building_number
-        ? `${allocation.construction_type === 'lot' ? 'Lote' : 'Prédio'} ${allocation.lot_building_number}`
+        ? `${allocation.construction_type === 'house' ? 'House' : 'Building'} ${allocation.lot_building_number}`
         : 'Sem localização específica'
       
       if (!allocationsByLocation[locationKey]) {

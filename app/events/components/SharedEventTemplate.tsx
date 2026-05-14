@@ -127,7 +127,7 @@ export const SharedEventTemplate = React.forwardRef<HTMLDivElement, SharedTempla
                           style={{ backgroundColor: '#EFF6FF', color: '#1E40AF' }}
                         >
                           <span className="text-[10px] font-black uppercase leading-none">
-                            LOTE: {event.lot_building_number}
+                            {event.construction_type === 'house' ? 'HOUSE' : `BUILDING: ${event.lot_building_number}`}
                           </span>
                         </div>
                       )}

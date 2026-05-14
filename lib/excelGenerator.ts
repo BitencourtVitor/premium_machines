@@ -19,7 +19,7 @@ export const generateAllocationStatusExcel = (data: any[]) => {
       'Descrição': item.machine_description || '',
       'Tipo': item.machine_type,
       'Obra': item.site_title,
-      'Lote/Prédio': item.lot_building_number ? `${item.construction_type === 'lot' ? 'Lote' : 'Prédio'} ${item.lot_building_number}` : '-',
+      'House/Building': item.lot_building_number ? `${item.construction_type === 'house' ? 'House' : 'Building'} ${item.lot_building_number}` : '-',
       'Status': status,
       'Início': item.allocation_start ? formatDateNoTimezone(item.allocation_start) : '-',
       'Vencimento': item.end_date ? formatDateNoTimezone(item.end_date) : '-',
@@ -89,7 +89,7 @@ export const generateMachineHistoryExcel = (machine: any, events: any[]) => {
         : formatDateOnly(event.event_date),
       'Evento': config.label,
       'Local': event.site?.title || '-',
-      'Lote/Prédio': event.lot_building_number ? `${event.construction_type === 'lot' ? 'Lote' : 'Prédio'} ${event.lot_building_number}` : '-',
+      'House/Building': event.lot_building_number ? `${event.construction_type === 'house' ? 'House' : 'Building'} ${event.lot_building_number}` : '-',
       'Operador': event.user?.nome || '-',
       'Status': event.status === 'approved' ? 'Aprovado' : event.status === 'pending' ? 'Pendente' : 'Rejeitado',
       'Observações': event.notas || ''

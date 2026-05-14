@@ -3,6 +3,7 @@ import { ActiveAllocation, ActiveDowntime } from '../types'
 import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 import { formatDate, formatDateOnly } from '../utils'
 import { FiCalendar, FiMapPin, FiTool, FiAlertTriangle, FiCheckCircle, FiPlay, FiStopCircle, FiXCircle, FiRefreshCw } from 'react-icons/fi'
+import { formatConstruction } from '@/lib/allocation/formatConstruction'
 
 interface AllocationsTabProps {
   activeAllocations: ActiveAllocation[]
@@ -125,7 +126,7 @@ export default function AllocationsTab({
                       <p className="font-medium">{allocation.site_title}</p>
                       {(allocation.construction_type || allocation.lot_building_number) && (
                         <p className="text-xs text-blue-500/80">
-                          {allocation.construction_type === 'lot' ? 'Lote' : 'Prédio'} {allocation.lot_building_number}
+                          {formatConstruction(allocation.construction_type, allocation.lot_building_number)}
                         </p>
                       )}
                     </div>

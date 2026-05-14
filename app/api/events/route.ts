@@ -3,6 +3,7 @@ import { supabaseServer } from '@/lib/supabase-server'
 import { validateEvent, getActiveDowntimeByMachine, getActiveTransportByMachine } from '@/lib/allocationService'
 import { createAuditLog } from '@/lib/auditLog'
 import { updateAllocationNotification } from '@/lib/notificationService'
+import { sendEventNotification } from '@/lib/email/sendEventNotification'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('start_date')
     const endDate = searchParams.get('end_date')
     const bulk = searchParams.get('bulk') === 'true'
+    const naoConfirmado = searchParams.get('nao_confirmado') === 'true'
 
     // Ação: Replicar o mecanismo de alocações ativas (bulk fetch)
     // Se 'bulk' for true ou estivermos filtrando por máquina, queremos buscar um volume maior de eventos
@@ -57,6 +59,16 @@ export async function GET(request: NextRequest) {
 
     if (endDate) {
       query = query.lte('event_date', endDate)
+    }
+
+    if (naoConfirmado) {
+      const { data: confirmed } = await supabaseServer
+        .from('allocation_event_confirmations')
+        .select('event_id')
+      const confirmedIds = (confirmed || []).map((c: any) => c.event_id)
+      if (confirmedIds.length > 0) {
+        query = query.not('id', 'in', `(${confirmedIds.join(',')})`)
+      }
     }
 
     // Ordenação consistente
@@ -157,6 +169,11 @@ export async function POST(request: NextRequest) {
         validated_by_name: body.validated_by_name || null,
         validated_at: body.validated_at || null,
         sharepoint_links: body.sharepoint_links || [],
+        gera_backcharge: body.gera_backcharge || false,
+        backcharge_suppliers: body.backcharge_suppliers || [],
+        subcontractor_receipt_links: body.subcontractor_receipt_links || [],
+        used_by: body.used_by || [],
+        allocation_subcontractors: body.allocation_subcontractors || [],
         created_by: body.created_by,
         status: body.event_type === 'refueling' ? 'pending' : 'approved',
       })
@@ -187,6 +204,9 @@ export async function POST(request: NextRequest) {
 
     // Update notifications if applicable
     await updateAllocationNotification(event)
+
+    // Fire-and-forget email notification
+    void sendEventNotification(event.id)
 
     return NextResponse.json({ success: true, event })
   } catch (error) {

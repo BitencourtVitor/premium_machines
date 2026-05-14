@@ -37,7 +37,7 @@ describe('AllocationsTab', () => {
       machine_supplier_name: null,
       site_id: 's1',
       site_title: 'Obra 1',
-      construction_type: 'lot',
+      construction_type: 'house',
       lot_building_number: '10',
       allocation_start: '2024-01-01',
       is_in_downtime: false,

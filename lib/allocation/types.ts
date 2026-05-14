@@ -7,7 +7,7 @@ export interface AllocationEvent {
   extension_id: string | null
   supplier_id: string | null
   machine_type_id: string | null
-  construction_type: 'lot' | 'building' | null
+  construction_type: 'house' | 'building' | null
   lot_building_number: string | null
   event_date: string
   end_date: string | null
@@ -45,7 +45,7 @@ export interface ActiveAllocation {
   machine_supplier_name: string | null
   site_id: string | null
   site_title: string
-  construction_type: 'lot' | 'building' | null
+  construction_type: 'house' | 'building' | null
   lot_building_number: string | null
   allocation_start: string
   start_date?: string
@@ -92,7 +92,7 @@ export interface MachineAllocationState {
   current_site_id: string | null
   current_site_title: string | null
   current_allocation_event_id: string | null
-  construction_type: 'lot' | 'building' | null
+  construction_type: 'house' | 'building' | null
   lot_building_number: string | null
   status: 'available' | 'allocated' | 'maintenance' | 'inactive' | 'in_transit' | 'exceeded'
   is_in_downtime: boolean

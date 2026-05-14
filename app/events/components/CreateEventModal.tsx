@@ -51,6 +51,13 @@ export default function CreateEventModal({
   const [existingFiles, setExistingFiles] = useState<any[]>([])
   const [loadingExisting, setLoadingExisting] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  // Feature 005: maintenance suppliers for backcharge
+  const [maintenanceSuppliers, setMaintenanceSuppliers] = useState<{ id: string; nome: string }[]>([])
+  const [subcontractorReceiptFiles, setSubcontractorReceiptFiles] = useState<File[]>([])
+  const [uploadingReceipts, setUploadingReceipts] = useState(false)
+  // Feature 006: subcontractor input
+  const [subcontractorInput, setSubcontractorInput] = useState('')
+  const [usedByError, setUsedByError] = useState<string | null>(null)
 
   // Reset step when modal closes or editing changes
   useEffect(() => {
@@ -88,6 +95,23 @@ export default function CreateEventModal({
       setStep('form')
     }
   }, [showCreateModal, editingEventId, newEvent.machine_id, newEvent.event_type, newEvent.from_request_id])
+
+  // Feature 005: fetch maintenance suppliers when backcharge becomes active
+  useEffect(() => {
+    if (
+      newEvent.event_type === 'downtime_start' &&
+      newEvent.downtime_reason === 'corrective' &&
+      newEvent.gera_backcharge &&
+      maintenanceSuppliers.length === 0
+    ) {
+      fetch('/api/suppliers?type=maintenance')
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) setMaintenanceSuppliers(data.suppliers || [])
+        })
+        .catch(err => console.error('Error fetching maintenance suppliers:', err))
+    }
+  }, [newEvent.event_type, newEvent.downtime_reason, newEvent.gera_backcharge, maintenanceSuppliers.length])
 
   // Auto-preencher fornecedor quando a máquina é selecionada
   useEffect(() => {
@@ -156,13 +180,17 @@ export default function CreateEventModal({
         return 'A data de vencimento é obrigatória.'
       }
       
-      if (newEvent.construction_type && !newEvent.lot_building_number) {
-        return 'O número do lote/prédio é obrigatório quando o tipo de construção é selecionado.'
+      if (newEvent.construction_type === 'building' && !newEvent.lot_building_number) {
+        return 'O número do building é obrigatório quando o tipo de construção é Building.'
       }
     }
 
     if (newEvent.event_type === 'downtime_start') {
       if (!newEvent.downtime_reason) return 'O motivo da manutenção é obrigatório.'
+    }
+
+    if (newEvent.event_type === 'start_allocation') {
+      if (!newEvent.used_by || newEvent.used_by.length === 0) return 'Selecione ao menos um usuário (Quem vai usar?).'
     }
 
     // Validação de responsáveis (Solicitante e Validador)
@@ -187,13 +215,39 @@ export default function CreateEventModal({
     return null
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const error = validateForm()
     if (error) {
       setValidationError(error)
       return
     }
     setValidationError(null)
+
+    // Feature 005: upload subcontractor receipt files before creating event
+    if (subcontractorReceiptFiles.length > 0 && newEvent.gera_backcharge) {
+      setUploadingReceipts(true)
+      try {
+        const { supabase } = await import('@/lib/supabase')
+        const uploadedLinks: { label: string; url: string }[] = []
+        for (const file of subcontractorReceiptFiles) {
+          const tempId = editingEventId || `temp_${Date.now()}`
+          const filePath = `subcontractor-receipts/${tempId}/${Date.now()}_${file.name}`
+          const { error: uploadErr } = await supabase.storage
+            .from('Allocation Documents')
+            .upload(filePath, file, { upsert: true })
+          if (!uploadErr) {
+            const { data: urlData } = supabase.storage.from('Allocation Documents').getPublicUrl(filePath)
+            uploadedLinks.push({ label: file.name, url: urlData.publicUrl })
+          }
+        }
+        setNewEvent(prev => ({ ...prev, subcontractor_receipt_links: [...(prev.subcontractor_receipt_links || []), ...uploadedLinks] }))
+        setUploadingReceipts(false)
+      } catch (err) {
+        console.error('Error uploading receipts:', err)
+        setUploadingReceipts(false)
+      }
+    }
+
     handleCreateEvent(files)
   }
 
@@ -620,15 +674,15 @@ export default function CreateEventModal({
                   <CustomDropdown
                     label="Tipo de Construção"
                     value={newEvent.construction_type || ''}
-                    onChange={(value) => setNewEvent({ ...newEvent, construction_type: value as any, lot_building_number: value ? newEvent.lot_building_number : '' })}
+                    onChange={(value) => setNewEvent({ ...newEvent, construction_type: value as any, lot_building_number: value === 'building' ? newEvent.lot_building_number : '' })}
                     options={[
                       { value: '', label: 'Nenhum' },
-                      { value: 'lot', label: 'Lote' },
-                      { value: 'building', label: 'Prédio' }
+                      { value: 'house', label: 'House' },
+                      { value: 'building', label: 'Building' }
                     ]}
                     placeholder="Selecione..."
                   />
-                  {newEvent.construction_type && (
+                  {newEvent.construction_type === 'building' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Número *
@@ -638,7 +692,7 @@ export default function CreateEventModal({
                         value={newEvent.lot_building_number || ''}
                         onChange={(e) => setNewEvent({ ...newEvent, lot_building_number: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder={newEvent.construction_type === 'lot' ? "Nº do Lote" : "Nº do Prédio"}
+                        placeholder="Nº do Building"
                       />
                     </div>
                   )}
@@ -664,7 +718,7 @@ export default function CreateEventModal({
                      </p>
                      {currentSiteInfo.construction_type && (
                         <p className="text-xs text-red-600 dark:text-red-300 mt-1">
-                          Tipo: {currentSiteInfo.construction_type === 'lot' ? 'Lote' : 'Prédio'} {currentSiteInfo.lot_building_number}
+                          Tipo: {currentSiteInfo.construction_type === 'house' ? 'House' : `Building ${currentSiteInfo.lot_building_number ?? ''}`}
                         </p>
                      )}
                   </div>
@@ -714,6 +768,119 @@ export default function CreateEventModal({
                   placeholder="Selecione o fornecedor"
                   required
                 />
+              )}
+
+              {/* Feature 006: Quem vai usar? (start_allocation only) */}
+              {newEvent.event_type === 'start_allocation' && (
+                <div className="space-y-3 p-4 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/50 rounded-xl">
+                  <h4 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                    Quem vai usar?
+                  </h4>
+                  <div className="flex gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={(newEvent.used_by || []).includes('premium')}
+                        onChange={(e) => {
+                          const current = newEvent.used_by || []
+                          setNewEvent({
+                            ...newEvent,
+                            used_by: e.target.checked
+                              ? [...current, 'premium']
+                              : current.filter(v => v !== 'premium')
+                          })
+                          setUsedByError(null)
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Premium</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={(newEvent.used_by || []).includes('subcontractor')}
+                        onChange={(e) => {
+                          const current = newEvent.used_by || []
+                          setNewEvent({
+                            ...newEvent,
+                            used_by: e.target.checked
+                              ? [...current, 'subcontractor']
+                              : current.filter(v => v !== 'subcontractor'),
+                            allocation_subcontractors: e.target.checked ? (newEvent.allocation_subcontractors || []) : []
+                          })
+                          setUsedByError(null)
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Subcontratado</span>
+                    </label>
+                  </div>
+                  {usedByError && (
+                    <p className="text-xs text-red-500">{usedByError}</p>
+                  )}
+                  {/* Subcontractor name input */}
+                  {(newEvent.used_by || []).includes('subcontractor') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Nome dos Subcontratados
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={subcontractorInput}
+                          onChange={(e) => setSubcontractorInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && subcontractorInput.trim()) {
+                              e.preventDefault()
+                              setNewEvent({
+                                ...newEvent,
+                                allocation_subcontractors: [...(newEvent.allocation_subcontractors || []), subcontractorInput.trim()]
+                              })
+                              setSubcontractorInput('')
+                            }
+                          }}
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                          placeholder="Nome do subcontratado (Enter para adicionar)"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (subcontractorInput.trim()) {
+                              setNewEvent({
+                                ...newEvent,
+                                allocation_subcontractors: [...(newEvent.allocation_subcontractors || []), subcontractorInput.trim()]
+                              })
+                              setSubcontractorInput('')
+                            }
+                          }}
+                          className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                        >
+                          +
+                        </button>
+                      </div>
+                      {(newEvent.allocation_subcontractors || []).length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {(newEvent.allocation_subcontractors || []).map((name, i) => (
+                            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                              {name}
+                              <button
+                                onClick={() => setNewEvent({
+                                  ...newEvent,
+                                  allocation_subcontractors: (newEvent.allocation_subcontractors || []).filter((_, idx) => idx !== i)
+                                })}
+                                className="ml-1 hover:text-blue-600"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -783,6 +950,125 @@ export default function CreateEventModal({
                       placeholder="Descreva o motivo da parada..."
                     />
                   </div>
+
+                  {/* Feature 005: Backcharge section (corrective only) */}
+                  {newEvent.downtime_reason === 'corrective' && (
+                    <div className="space-y-3 p-4 bg-amber-50/60 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-xl">
+                      <h4 className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Backcharge
+                      </h4>
+
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={newEvent.gera_backcharge || false}
+                            onChange={(e) => setNewEvent({ ...newEvent, gera_backcharge: e.target.checked })}
+                            className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                          />
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Gera Backcharge?</span>
+                        </label>
+                      </div>
+
+                      {newEvent.gera_backcharge && (
+                        <>
+                          {/* Multi-select suppliers */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              Fornecedores Responsáveis
+                            </label>
+                            <div className="space-y-2">
+                              {maintenanceSuppliers.map(s => {
+                                const isSelected = (newEvent.backcharge_suppliers || []).some(bs => bs.id === s.id)
+                                return (
+                                  <label key={s.id} className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={(e) => {
+                                        const current = newEvent.backcharge_suppliers || []
+                                        if (e.target.checked) {
+                                          setNewEvent({ ...newEvent, backcharge_suppliers: [...current, { id: s.id, nome: s.nome }] })
+                                        } else {
+                                          setNewEvent({ ...newEvent, backcharge_suppliers: current.filter(bs => bs.id !== s.id) })
+                                        }
+                                      }}
+                                      className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                                    />
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">{s.nome}</span>
+                                  </label>
+                                )
+                              })}
+                              {maintenanceSuppliers.length === 0 && (
+                                <p className="text-xs text-gray-400 italic">Nenhum fornecedor de manutenção disponível</p>
+                              )}
+                            </div>
+                            {/* Selected badges */}
+                            {(newEvent.backcharge_suppliers || []).length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {(newEvent.backcharge_suppliers || []).map(bs => (
+                                  <span key={bs.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300">
+                                    {bs.nome}
+                                    <button
+                                      onClick={() => setNewEvent({ ...newEvent, backcharge_suppliers: (newEvent.backcharge_suppliers || []).filter(b => b.id !== bs.id) })}
+                                      className="ml-1 hover:text-amber-600"
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Subcontractor receipt upload */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Documento de recebimento pelo subcontratado
+                            </label>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              onChange={(e) => {
+                                const selectedFiles = Array.from(e.target.files || [])
+                                setSubcontractorReceiptFiles(prev => [...prev, ...selectedFiles])
+                              }}
+                              className="w-full text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
+                            />
+                            {subcontractorReceiptFiles.length > 0 && (
+                              <ul className="mt-2 space-y-1">
+                                {subcontractorReceiptFiles.map((f, i) => (
+                                  <li key={i} className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/20 px-2 py-1 rounded">
+                                    <span className="truncate">{f.name}</span>
+                                    <button onClick={() => setSubcontractorReceiptFiles(prev => prev.filter((_, idx) => idx !== i))} className="ml-2 text-red-400 hover:text-red-600">
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {(newEvent.subcontractor_receipt_links || []).length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                <span className="text-xs text-gray-500 font-medium">Já anexados:</span>
+                                {(newEvent.subcontractor_receipt_links || []).map((link, i) => (
+                                  <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="block text-xs text-blue-600 hover:underline truncate">
+                                    {link.label}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
               

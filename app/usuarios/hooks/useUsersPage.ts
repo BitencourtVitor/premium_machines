@@ -12,10 +12,12 @@ export function useUsersPage() {
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [loadingSuppliers, setLoadingSuppliers] = useState(false)
   
-  const [activeTab, setActiveTab] = useState<'users' | 'suppliers'>(() => {
+  const [activeTab, setActiveTab] = useState<'users' | 'suppliers' | 'email-recipients'>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
-      return params.get('tab') === 'suppliers' ? 'suppliers' : 'users'
+      const tab = params.get('tab')
+      if (tab === 'suppliers') return 'suppliers'
+      if (tab === 'email-recipients') return 'email-recipients'
     }
     return 'users'
   })

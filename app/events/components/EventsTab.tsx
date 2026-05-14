@@ -3,10 +3,10 @@ import MultiSelectDropdown from '../../components/MultiSelectDropdown'
 import { AllocationEvent } from '../types'
 import { EVENT_STATUS_LABELS, EVENT_TYPE_LABELS, DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 import { formatDate, formatDateOnly, getEventConfig } from '../utils'
-import { 
-  FiCalendar, 
-  FiUser, 
-  FiMapPin, 
+import {
+  FiCalendar,
+  FiUser,
+  FiMapPin,
   FiInfo,
   FiTool,
   FiCheckCircle,
@@ -14,6 +14,7 @@ import {
   FiFileText,
   FiFilter
 } from 'react-icons/fi'
+import { MdCheckCircle, MdOutlineCheckCircle } from 'react-icons/md'
 import { GiKeyCard } from "react-icons/gi"
 import { LuPuzzle, LuFilterX } from "react-icons/lu"
 import EventDocuments from './EventDocuments'
@@ -42,6 +43,11 @@ interface EventsTabProps {
   setStartDate: (date: string) => void
   endDate: string
   setEndDate: (date: string) => void
+  confirmations?: Record<string, { confirmed_at: string; attachment_url: string; attachment_name?: string }>
+  setConfirmPopup?: (popup: { eventId: string; file: File | null; uploading: boolean } | null) => void
+  showUnconfirmedOnly?: boolean
+  setShowUnconfirmedOnly?: (v: boolean) => void
+  unconfirmedCount?: number
 }
 
 export default function EventsTab({
@@ -62,7 +68,12 @@ export default function EventsTab({
   startDate,
   setStartDate,
   endDate,
-  setEndDate
+  setEndDate,
+  confirmations = {},
+  setConfirmPopup,
+  showUnconfirmedOnly = false,
+  setShowUnconfirmedOnly,
+  unconfirmedCount = 0
 }: EventsTabProps) {
   const [showFilter, setShowFilter] = useState(false)
   const filterRef = useRef<HTMLDivElement>(null)
@@ -90,7 +101,7 @@ export default function EventsTab({
       onSearchChange={setSearchTerm}
       searchPlaceholder="Buscar por máquina, obra ou solicitante..."
       showFilter={true}
-      isFiltering={filterType.length > 0 || startDate !== '' || endDate !== '' || searchTerm !== ''}
+      isFiltering={filterType.length > 0 || startDate !== '' || endDate !== '' || searchTerm !== '' || showUnconfirmedOnly}
       filterConfig={{
         title: 'Filtrar Eventos',
         popoverWidth: 'w-80'
@@ -100,9 +111,28 @@ export default function EventsTab({
         setStartDate('')
         setEndDate('')
         setSearchTerm('')
+        setShowUnconfirmedOnly?.(false)
       }}
       filterPanelContent={
         <>
+          {/* Toggle: não confirmados */}
+          <label className="flex items-center justify-between gap-3 cursor-pointer select-none py-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Não confirmados</span>
+              {unconfirmedCount > 0 && (
+                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                  {unconfirmedCount}
+                </span>
+              )}
+            </div>
+            <input
+              type="checkbox"
+              checked={showUnconfirmedOnly}
+              onChange={e => setShowUnconfirmedOnly?.(e.target.checked)}
+              className="w-4 h-4 rounded accent-blue-600"
+            />
+          </label>
+
           <MultiSelectDropdown
             label="Tipo de Evento"
             value={filterType}
@@ -261,7 +291,27 @@ export default function EventsTab({
                     title="Iniciar Alocação"
                   />
                 )}
-                <EventDocumentPopover 
+                {/* Feature 009: Confirmation icon */}
+                {(user?.role === 'admin' || user?.role === 'dev') && setConfirmPopup && (
+                  confirmations[event.id] ? (
+                    <button
+                      disabled
+                      title={`Confirmado em ${new Date(confirmations[event.id].confirmed_at).toLocaleDateString('pt-BR')}`}
+                      className="p-1.5 text-green-500 cursor-default"
+                    >
+                      <MdCheckCircle className="w-5 h-5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmPopup({ eventId: event.id, file: null, uploading: false })}
+                      title="Confirmar evento com documento"
+                      className="p-1.5 text-gray-400 hover:text-green-500 transition-colors"
+                    >
+                      <MdOutlineCheckCircle className="w-5 h-5" />
+                    </button>
+                  )
+                )}
+                <EventDocumentPopover
                   eventId={event.id} 
                   unitNumber={event.machine?.unit_number || 'S/N'} 
                   sharepointLinks={event.sharepoint_links}

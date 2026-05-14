@@ -101,6 +101,13 @@ export async function PUT(
     // event_date should NEVER be null as it's a required field in DB
     if (updateData.event_date === '') delete updateData.event_date
 
+    // Ensure new JSONB fields default correctly if not provided
+    if (updateData.gera_backcharge === undefined) updateData.gera_backcharge = false
+    if (updateData.backcharge_suppliers === undefined) updateData.backcharge_suppliers = []
+    if (updateData.subcontractor_receipt_links === undefined) updateData.subcontractor_receipt_links = []
+    if (updateData.used_by === undefined) updateData.used_by = []
+    if (updateData.allocation_subcontractors === undefined) updateData.allocation_subcontractors = []
+
     // Remove joined objects that might be in the body if it came from a full event object
     delete updateData.machine
     delete updateData.site

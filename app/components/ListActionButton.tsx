@@ -1,21 +1,22 @@
 import React from 'react'
-import { 
-  HiOutlinePencilSquare, 
-  HiOutlineTrash, 
-  HiOutlineArchiveBox, 
+import {
+  HiOutlinePencilSquare,
+  HiOutlineTrash,
+  HiOutlineArchiveBox,
   HiOutlineArchiveBoxArrowDown,
   HiOutlineCheck,
   HiOutlinePlus,
   HiOutlineChevronDown,
-  HiOutlineChevronUp
+  HiOutlineChevronUp,
+  HiOutlineCalendarDays
 } from 'react-icons/hi2'
 
 interface ListActionButtonProps {
-  icon: 'edit' | 'delete' | 'archive' | 'unarchive' | 'check' | 'add' | 'expand' | 'collapse' | React.ReactNode
+  icon: 'edit' | 'delete' | 'archive' | 'unarchive' | 'check' | 'add' | 'expand' | 'collapse' | 'calendar' | React.ReactNode
   onClick: (e: React.MouseEvent) => void
   title?: string
   className?: string
-  variant?: 'blue' | 'red' | 'gray' | 'orange' | 'green'
+  variant?: 'blue' | 'red' | 'gray' | 'orange' | 'green' | 'purple'
 }
 
 export default function ListActionButton({
@@ -30,7 +31,8 @@ export default function ListActionButton({
     red: 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30',
     gray: 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/30',
     orange: 'text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/30',
-    green: 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'
+    green: 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30',
+    purple: 'text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30'
   }
 
   const defaultIcons = {
@@ -41,7 +43,8 @@ export default function ListActionButton({
     check: <HiOutlineCheck className="w-5 h-5" />,
     add: <HiOutlinePlus className="w-5 h-5" />,
     expand: <HiOutlineChevronDown className="w-5 h-5" />,
-    collapse: <HiOutlineChevronUp className="w-5 h-5" />
+    collapse: <HiOutlineChevronUp className="w-5 h-5" />,
+    calendar: <HiOutlineCalendarDays className="w-5 h-5" />
   }
 
   const iconToRender = typeof icon === 'string' ? defaultIcons[icon as keyof typeof defaultIcons] : icon

@@ -37,11 +37,12 @@ export async function GET() {
     ) || []
     const totalExtensionsAllocated = extensionsInSites.length
 
-    // Alocações/Eventos pendentes de aprovação
+    // Solicitações de alocação pendentes de aprovação
     const { count: pendingAllocations } = await supabaseServer
       .from('allocation_events')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'pending')
+      .eq('event_type', 'request_allocation')
 
     // Máquinas com downtime ativo (paradas por manutenção, quebra, etc.)
     const { count: machinesWithIssues } = await supabaseServer

@@ -4,7 +4,7 @@ import { AllocationEvent } from '@/app/events/types'
 import { getEventConfig, formatDate, formatDateOnly } from '@/app/events/utils'
 import { adjustDateToSystemTimezone, formatWithSystemTimezone } from '@/lib/timezone'
 import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
-
+import { formatConstruction } from '@/lib/allocation/formatConstruction'
 import { getMachineIconUrl } from '@/lib/supabase'
 
 interface SiteDetailsModalProps {
@@ -32,6 +32,12 @@ export default function SiteDetailsModal({
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [activeTab, setActiveTab] = useState<'calendar' | 'history'>('calendar')
   const [, setTimezoneTick] = useState(0)
+  const [onlyActive, setOnlyActive] = useState(true)
+
+  const filteredAllocations = useMemo(() => {
+    if (!onlyActive) return allocations
+    return allocations.filter(a => ['allocated', 'in_transit'].includes(a.status))
+  }, [allocations, onlyActive])
 
   // Memo para a alocação selecionada e seu intervalo de meses
   const selectedAllocation = useMemo(() => {
@@ -527,20 +533,33 @@ export default function SiteDetailsModal({
             <div className="grid grid-cols-1 lg:grid-cols-12 h-full min-h-0">
               {/* Máquinas Alocadas (Lista Selecionável) */}
               <div className="lg:col-span-4 p-6 border-r border-gray-200 dark:border-gray-700 overflow-y-auto bg-gray-50/50 dark:bg-gray-800/50 h-full min-h-0">
-                <div className="flex items-center gap-2 mb-4">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                    Alocações realizadas
-                  </h3>
-                  <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium rounded-full">
-                    {allocations.length}
-                  </span>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                      Alocações realizadas
+                    </h3>
+                    <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium rounded-full">
+                      {filteredAllocations.length}
+                    </span>
+                  </div>
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={onlyActive}
+                      onChange={e => setOnlyActive(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded accent-blue-600"
+                    />
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Apenas ativas</span>
+                  </label>
                 </div>
 
-                {allocations.length === 0 ? (
-                  <p className="text-gray-500 dark:text-gray-400">Nenhuma alocação registrada nesta obra</p>
+                {filteredAllocations.length === 0 ? (
+                  <p className="text-gray-500 dark:text-gray-400">
+                    {onlyActive ? 'Nenhuma alocação ativa nesta obra' : 'Nenhuma alocação registrada nesta obra'}
+                  </p>
                 ) : (
                   <div className="space-y-3">
-                    {allocations.map((allocation) => {
+                    {filteredAllocations.map((allocation) => {
                       const isSelected = selectedAllocationId === allocation.allocation_event_id
                       const allocationStatus = getAllocationStatusToday(allocation)
                       
@@ -604,7 +623,7 @@ export default function SiteDetailsModal({
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
                                 <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">
-                                  {allocation.construction_type === 'lot' ? 'Lote' : 'Prédio'} {allocation.lot_building_number}
+                                  {formatConstruction(allocation.construction_type, allocation.lot_building_number)}
                                 </span>
                               </div>
                             )}
@@ -926,7 +945,7 @@ export default function SiteDetailsModal({
                                                   </p>
                                                   {(event.construction_type || event.lot_building_number) && (
                                                     <p className="text-[8px] font-bold text-gray-600 dark:text-gray-400 uppercase mt-0.5">
-                                                      {event.construction_type === 'lot' ? 'Lote' : 'Prédio'} {event.lot_building_number}
+                                                      {formatConstruction(event.construction_type, event.lot_building_number)}
                                                     </p>
                                                   )}
                                                 </div>
@@ -1108,7 +1127,7 @@ export default function SiteDetailsModal({
                                         <div className="flex items-center gap-1">
                                           <span className="font-medium not-italic text-xs">Endereço:</span> 
                                           <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-[10px] font-bold rounded uppercase">
-                                            {event.construction_type === 'lot' ? 'Lote' : 'Prédio'} {event.lot_building_number}
+                                            {formatConstruction(event.construction_type, event.lot_building_number)}
                                           </span>
                                         </div>
                                       )}

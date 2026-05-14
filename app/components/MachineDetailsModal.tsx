@@ -1,11 +1,165 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import MachineImage from '@/app/components/MachineImage'
 import { MACHINE_STATUS_LABELS, OWNERSHIP_TYPE_LABELS, EVENT_TYPE_LABELS, getMachineStatusLabel } from '@/lib/permissions'
 import { formatWithSystemTimezone, formatDateOnly } from '@/lib/timezone'
 import EventDocumentPopover from '../events/components/EventDocumentPopover'
 import { getMachineIconUrl } from '@/lib/supabase'
+import { formatConstruction } from '@/lib/allocation/formatConstruction'
+
+type CalendarPeriod = {
+  start: string
+  end: string | null
+  type: 'allocated' | 'maintenance' | 'transit'
+  site?: string
+}
+
+function buildMachinePeriods(events: any[]): CalendarPeriod[] {
+  const sorted = [...events]
+    .filter(e => e.status === 'approved' || e.event_type === 'refueling')
+    .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
+
+  const periods: CalendarPeriod[] = []
+  let allocStart: string | null = null
+  let allocSite: string | null = null
+  let maintenStart: string | null = null
+  let transitStart: string | null = null
+
+  for (const e of sorted) {
+    const d = e.event_date.split('T')[0]
+    switch (e.event_type) {
+      case 'start_allocation':
+        allocStart = d; allocSite = e.site?.title || null; break
+      case 'end_allocation':
+        if (allocStart) { periods.push({ start: allocStart, end: d, type: 'allocated', site: allocSite || undefined }); allocStart = null; allocSite = null } break
+      case 'downtime_start':
+        maintenStart = d; break
+      case 'downtime_end':
+        if (maintenStart) { periods.push({ start: maintenStart, end: d, type: 'maintenance' }); maintenStart = null } break
+      case 'transport_start':
+        if (allocStart) { periods.push({ start: allocStart, end: d, type: 'allocated', site: allocSite || undefined }); allocStart = null; allocSite = null }
+        transitStart = d; break
+      case 'transport_arrival':
+        if (transitStart) { periods.push({ start: transitStart, end: d, type: 'transit' }); transitStart = null }
+        allocStart = d; allocSite = e.site?.title || null; break
+    }
+  }
+  if (allocStart) periods.push({ start: allocStart, end: null, type: 'allocated', site: allocSite || undefined })
+  if (maintenStart) periods.push({ start: maintenStart, end: null, type: 'maintenance' })
+  if (transitStart) periods.push({ start: transitStart, end: null, type: 'transit' })
+  return periods
+}
+
+function getDayPeriod(dateStr: string, periods: CalendarPeriod[]): CalendarPeriod | null {
+  const todayStr = new Date().toISOString().split('T')[0]
+  for (const p of periods) {
+    const end = p.end ?? todayStr
+    if (dateStr >= p.start && dateStr <= end) return p
+  }
+  return null
+}
+
+const PERIOD_COLORS = {
+  allocated: 'bg-green-500',
+  maintenance: 'bg-orange-500',
+  transit: 'bg-blue-500',
+}
+
+function MachineHistoryCalendar({ events }: { events: any[] }) {
+  const [tooltip, setTooltip] = useState<{ dateStr: string; period: CalendarPeriod } | null>(null)
+
+  const periods = useMemo(() => buildMachinePeriods(events), [events])
+
+  const months = useMemo(() => {
+    if (periods.length === 0) return []
+    const earliest = periods.reduce((min, p) => p.start < min ? p.start : min, periods[0].start)
+    const start = new Date(earliest + 'T00:00:00')
+    const today = new Date()
+    const result: Date[] = []
+    let m = new Date(today.getFullYear(), today.getMonth(), 1)
+    const limit = new Date(start.getFullYear(), start.getMonth(), 1)
+    while (m >= limit) {
+      result.push(new Date(m))
+      m = new Date(m.getFullYear(), m.getMonth() - 1, 1)
+    }
+    return result
+  }, [periods])
+
+  const firstEventDateStr = useMemo(() => {
+    if (periods.length === 0) return null
+    return periods.reduce((min, p) => p.start < min ? p.start : min, periods[0].start)
+  }, [periods])
+
+  const todayStr = new Date().toISOString().split('T')[0]
+
+  if (months.length === 0) {
+    return <p className="text-sm text-gray-400 dark:text-gray-500">Sem histórico para exibir</p>
+  }
+
+  return (
+    <div className="space-y-1">
+      {/* Legend */}
+      <div className="flex flex-wrap gap-x-3 gap-y-1 mb-3 text-[10px] font-medium text-gray-600 dark:text-gray-400">
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-500 inline-block"></span>Alocado</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-orange-500 inline-block"></span>Manutenção</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block"></span>Trânsito</span>
+      </div>
+
+      <div className="max-h-[500px] overflow-y-auto custom-scrollbar space-y-4 pr-1">
+        {months.map(month => {
+          const year = month.getFullYear()
+          const mo = month.getMonth()
+          const firstDay = new Date(year, mo, 1).getDay()
+          const daysInMonth = new Date(year, mo + 1, 0).getDate()
+          const monthLabel = month.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
+
+          return (
+            <div key={month.toISOString()}>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1 capitalize">{monthLabel}</p>
+              <div className="grid grid-cols-7 gap-px text-center">
+                {['D','S','T','Q','Q','S','S'].map((d, i) => (
+                  <div key={i} className="text-[8px] font-bold text-gray-400 dark:text-gray-500 pb-0.5">{d}</div>
+                ))}
+                {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} />)}
+                {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+                  const dateObj = new Date(year, mo, day)
+                  const dateStr = dateObj.toISOString().split('T')[0]
+                  if (dateStr > todayStr) return <div key={day} className="w-5 h-5 mx-auto" />
+                  const period = getDayPeriod(dateStr, periods)
+                  const hasHistory = firstEventDateStr && dateStr >= firstEventDateStr
+                  const isToday = dateStr === todayStr
+                  const colorClass = period ? PERIOD_COLORS[period.type] : hasHistory ? 'bg-gray-200 dark:bg-gray-700' : ''
+                  return (
+                    <div
+                      key={day}
+                      className={`relative w-5 h-5 mx-auto rounded-sm text-[8px] flex items-center justify-center cursor-default transition-opacity hover:opacity-80
+                        ${colorClass}
+                        ${isToday ? 'ring-1 ring-yellow-400' : ''}
+                        ${period ? 'text-white font-semibold' : hasHistory ? 'text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600'}
+                      `}
+                      onMouseEnter={() => period && setTooltip({ dateStr, period })}
+                      onMouseLeave={() => setTooltip(null)}
+                    >
+                      {day}
+                      {tooltip?.dateStr === dateStr && tooltip.period && (
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-50 bg-gray-900 dark:bg-gray-700 text-white text-[9px] rounded px-1.5 py-1 whitespace-nowrap pointer-events-none shadow-lg">
+                          {tooltip.period.type === 'allocated' ? 'Alocado' : tooltip.period.type === 'maintenance' ? 'Manutenção' : 'Trânsito'}
+                          {tooltip.period.site && <span className="block opacity-75">{tooltip.period.site}</span>}
+                          <span className="block opacity-60">{tooltip.period.start} → {tooltip.period.end ?? 'hoje'}</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 interface MachineDetailsModalProps {
   isOpen: boolean
@@ -237,8 +391,11 @@ export default function MachineDetailsModal({
                 </div>
               </div>
 
+              {/* Content Row: Timeline + Calendar */}
+              <div className="flex flex-col lg:flex-row gap-6 items-start">
+
               {/* Event Timeline */}
-              <div className="bg-white dark:bg-gray-800/50 rounded-2xl border border-gray-200 dark:border-gray-700/50 shadow-sm p-6">
+              <div className="flex-1 min-w-0 bg-white dark:bg-gray-800/50 rounded-2xl border border-gray-200 dark:border-gray-700/50 shadow-sm p-6">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                   <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -310,21 +467,69 @@ export default function MachineDetailsModal({
                                   )}
                                   {event.downtime_reason && (
                                       <p className="flex items-start gap-2">
-                                        <span className="font-semibold text-gray-900 dark:text-white min-w-[60px]">Motivo:</span> 
+                                        <span className="font-semibold text-gray-900 dark:text-white min-w-[60px]">Motivo:</span>
                                         <span>{event.downtime_reason}</span>
                                       </p>
                                   )}
                                   {event.downtime_description && (
                                       <p className="flex items-start gap-2">
-                                        <span className="font-semibold text-gray-900 dark:text-white min-w-[60px]">Detalhes:</span> 
+                                        <span className="font-semibold text-gray-900 dark:text-white min-w-[60px]">Detalhes:</span>
                                         <span className="italic">{event.downtime_description}</span>
                                       </p>
+                                  )}
+                                  {/* Feature 005: Backcharge display */}
+                                  {event.event_type === 'downtime_start' && event.downtime_reason === 'corrective' && event.gera_backcharge && (
+                                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+                                        Backcharge
+                                      </span>
+                                      {(event.backcharge_suppliers || []).map((s: any, i: number) => (
+                                        <span key={i} className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300">
+                                          {s.nome || s}
+                                        </span>
+                                      ))}
+                                      {event.subcontractor_receipt_links?.[0]?.url && (
+                                        <a
+                                          href={event.subcontractor_receipt_links[0].url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                                        >
+                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                          </svg>
+                                          Recibo
+                                        </a>
+                                      )}
+                                    </div>
+                                  )}
+                                  {/* Feature 006: Used by display */}
+                                  {event.event_type === 'start_allocation' && event.used_by && event.used_by.length > 0 && (
+                                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                                      <span className="font-semibold text-gray-900 dark:text-white text-xs min-w-[60px]">Usuário:</span>
+                                      <span className="text-xs text-gray-700 dark:text-gray-300">
+                                        {event.used_by.includes('premium') && event.used_by.includes('subcontractor')
+                                          ? 'Premium + Subcontratado'
+                                          : event.used_by.includes('premium')
+                                          ? 'Premium'
+                                          : 'Subcontratado'}
+                                      </span>
+                                      {(event.allocation_subcontractors || []).length > 0 && (
+                                        <div className="flex flex-wrap gap-1">
+                                          {event.allocation_subcontractors.map((name: string, i: number) => (
+                                            <span key={i} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
+                                              {name}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
                                   )}
                                   {event.construction_type && event.lot_building_number && (
                                       <p className="flex items-center gap-2">
                                         <span className="font-semibold text-gray-900 dark:text-white min-w-[60px]">Local:</span> 
                                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                                          {event.construction_type === 'lot' ? 'Lote' : 'Prédio'} {event.lot_building_number}
+                                          {formatConstruction(event.construction_type, event.lot_building_number)}
                                         </span>
                                       </p>
                                   )}
@@ -345,6 +550,19 @@ export default function MachineDetailsModal({
                   </div>
                 )}
               </div>
+
+              {/* Historical Calendar */}
+              <div className="w-full lg:w-64 flex-shrink-0 bg-white dark:bg-gray-800/50 rounded-2xl border border-gray-200 dark:border-gray-700/50 shadow-sm p-5">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Calendário
+                </h3>
+                <MachineHistoryCalendar events={filteredEvents} />
+              </div>
+
+              </div>{/* end Content Row */}
             </div>
           )}
         </div>

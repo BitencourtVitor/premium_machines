@@ -10,7 +10,7 @@ interface AllocationData {
   machine_description: string
   machine_type: string
   site_title: string
-  construction_type: 'lot' | 'building' | null
+  construction_type: 'house' | 'building' | null
   lot_building_number: string | null
   status: string
   is_in_downtime: boolean
@@ -27,7 +27,7 @@ interface RentExpirationData {
   machine_type: string
   site_title: string
   site_address: string
-  construction_type: 'lot' | 'building' | null
+  construction_type: 'house' | 'building' | null
   lot_building_number: string | null
   allocation_start: string
   expiration_date: string | null
@@ -134,8 +134,8 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
   data.forEach(item => {
     const site = item.site_title || 'Sem Localização'
     const lot = item.lot_building_number 
-      ? `${item.construction_type === 'lot' ? 'Lote' : 'Prédio'} ${item.lot_building_number}`
-      : 'Geral / Sem Lote'
+      ? `${item.construction_type === 'house' ? 'House' : 'Building'} ${item.lot_building_number}`
+      : 'Geral / Sem Localização'
       
     if (!groupedBySite.has(site)) {
       groupedBySite.set(site, new Map<string, AllocationData[]>())
@@ -371,7 +371,7 @@ export const generateRentExpirationPDF = async (data: RentExpirationData[], peri
     doc.setTextColor(120, 120, 120)
     let details = ''
     if (item.construction_type && item.lot_building_number) {
-      const typeLabel = item.construction_type === 'lot' ? 'Lote' : 'Prédio'
+      const typeLabel = item.construction_type === 'house' ? 'House' : 'Building'
       details = `${typeLabel} ${item.lot_building_number}`
     }
     
@@ -495,7 +495,7 @@ export const generateMachineHistoryPDF = async (machine: any, events: any[], per
       if (event.site) detailText += `Local: ${event.site.title}`
       
       if (event.construction_type) {
-        const type = event.construction_type === 'lot' ? 'Lote' : 'Prédio'
+        const type = event.construction_type === 'house' ? 'House' : 'Building'
         detailText += `${detailText ? ' | ' : ''}${type} ${event.lot_building_number}`
       }
       

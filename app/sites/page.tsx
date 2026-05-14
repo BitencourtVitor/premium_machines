@@ -13,6 +13,7 @@ import { Site, SiteMetrics, GeocodingResult } from './types'
 import MetricsCards from './components/MetricsCards'
 import SiteList from './components/SiteList'
 import CreateSiteModal from './components/CreateSiteModal'
+import SiteDetailsModal from '@/app/map/components/SiteDetailsModal'
 
 export default function SitesPage() {
   const router = useRouter()
@@ -57,6 +58,47 @@ export default function SitesPage() {
   const [geocoding, setGeocoding] = useState(false)
   const [geocodingResult, setGeocodingResult] = useState<GeocodingResult | null>(null)
   const [mapCoordinates, setMapCoordinates] = useState<{ lat: number; lng: number } | null>(null)
+
+  // Estado para o modal de calendário do site
+  const [calendarSite, setCalendarSite] = useState<any>(null)
+  const [calendarAllocations, setCalendarAllocations] = useState<any[]>([])
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([])
+  const [calendarLoading, setCalendarLoading] = useState(false)
+  const [showCalendarModal, setShowCalendarModal] = useState(false)
+
+  const handleOpenCalendar = useCallback(async (site: Site) => {
+    setShowCalendarModal(true)
+    setCalendarLoading(true)
+    setCalendarSite(site)
+    setCalendarAllocations([])
+    setCalendarEvents([])
+    try {
+      const [allocRes, eventsRes] = await Promise.all([
+        fetch(`/api/sites/${site.id}/allocations?history=true`),
+        fetch(`/api/events?site_id=${site.id}&limit=1000`)
+      ])
+      const [allocData, eventsData] = await Promise.all([allocRes.json(), eventsRes.json()])
+      const allocs = allocData.success ? (allocData.allocations || []) : []
+      setCalendarAllocations(allocs)
+
+      let allEvents = eventsData.success ? (eventsData.events || []) : []
+      const machineIds = allocs.map((a: any) => a.machine_id).slice(0, 15)
+      if (machineIds.length > 0) {
+        const results = await Promise.all(
+          machineIds.map((mId: string) => fetch(`/api/events?machine_id=${mId}&limit=500`).then(r => r.json()))
+        )
+        results.forEach((res: any) => {
+          if (res.success && res.events) allEvents = [...allEvents, ...res.events]
+        })
+      }
+      const unique = Array.from(new Map(allEvents.map((e: any) => [e.id, e])).values())
+      setCalendarEvents(unique)
+    } catch (err) {
+      console.error('Error loading calendar data:', err)
+    } finally {
+      setCalendarLoading(false)
+    }
+  }, [])
 
   const loadSites = useCallback(async () => {
     setLoadingSites(true)
@@ -333,6 +375,7 @@ export default function SitesPage() {
                 handleRefresh={handleRefresh}
                 handleOpenModal={handleOpenModal}
                 handleArchiveSite={handleArchiveSite}
+                onCalendar={handleOpenCalendar}
               />
             </div>
           </div>
@@ -368,6 +411,14 @@ export default function SitesPage() {
         isDangerous={confirmModal.isDangerous}
         isLoading={confirmModal.isLoading}
         error={confirmModal.error}
+      />
+      <SiteDetailsModal
+        isOpen={showCalendarModal}
+        onClose={() => setShowCalendarModal(false)}
+        site={calendarSite}
+        loading={calendarLoading}
+        allocations={calendarAllocations}
+        events={calendarEvents}
       />
     </div>
   )
