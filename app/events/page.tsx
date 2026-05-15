@@ -117,6 +117,29 @@ export default function EventsPage() {
     allocation_subcontractors: [],
   })
 
+  const loadConfirmations = useCallback(async (eventIds: string[]) => {
+    if (eventIds.length === 0) return
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      // Chunk para evitar URLs gigantes que travam a query (limite ~8KB no PostgREST)
+      const CHUNK_SIZE = 80
+      const map: Record<string, { confirmed_at: string; attachment_url: string; attachment_name?: string }> = {}
+      for (let i = 0; i < eventIds.length; i += CHUNK_SIZE) {
+        const chunk = eventIds.slice(i, i + CHUNK_SIZE)
+        const { data } = await supabase
+          .from('allocation_event_confirmations')
+          .select('event_id, confirmed_at, attachment_url, attachment_name')
+          .in('event_id', chunk)
+        if (data) {
+          data.forEach((c: any) => { map[c.event_id] = c })
+        }
+      }
+      setConfirmations(map)
+    } catch (error) {
+      console.error('Error loading confirmations:', error)
+    }
+  }, [])
+
   const loadEvents = useCallback(async () => {
     setLoadingEvents(true)
     console.log('Loading events (bulk mode)...')
@@ -141,7 +164,7 @@ export default function EventsPage() {
       setLoadingEvents(false)
       setLoading(false)
     }
-  }, [])
+  }, [loadConfirmations])
 
   const loadMachines = useCallback(async () => {
     try {
@@ -200,29 +223,6 @@ export default function EventsPage() {
       }
     } catch (error) {
       console.error('Error loading machine types:', error)
-    }
-  }, [])
-
-  const loadConfirmations = useCallback(async (eventIds: string[]) => {
-    if (eventIds.length === 0) return
-    try {
-      const { supabase } = await import('@/lib/supabase')
-      // Chunk para evitar URLs gigantes que travam a query (limite ~8KB no PostgREST)
-      const CHUNK_SIZE = 80
-      const map: Record<string, { confirmed_at: string; attachment_url: string; attachment_name?: string }> = {}
-      for (let i = 0; i < eventIds.length; i += CHUNK_SIZE) {
-        const chunk = eventIds.slice(i, i + CHUNK_SIZE)
-        const { data } = await supabase
-          .from('allocation_event_confirmations')
-          .select('event_id, confirmed_at, attachment_url, attachment_name')
-          .in('event_id', chunk)
-        if (data) {
-          data.forEach((c: any) => { map[c.event_id] = c })
-        }
-      }
-      setConfirmations(map)
-    } catch (error) {
-      console.error('Error loading confirmations:', error)
     }
   }, [])
 

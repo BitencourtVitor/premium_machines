@@ -21,7 +21,6 @@ const DOWNTIME_REASON_LABELS: Record<string, string> = {
 }
 
 async function buildTransporter() {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const nodemailer = await import('nodemailer' as any)
   return nodemailer.default.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
