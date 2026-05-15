@@ -18,6 +18,7 @@ import {
 import { AllocationEvent, ActiveAllocation, ActiveDowntime, NewEventState } from './types'
 import AllocationsTab from './components/AllocationsTab'
 import EventsTab from './components/EventsTab'
+import EmailRecipientsTab from './components/EmailRecipientsTab'
 import CreateEventModal from './components/CreateEventModal'
 import ConfirmModal from '@/app/components/ConfirmModal'
 
@@ -77,7 +78,7 @@ export default function EventsPage() {
   }, [rejectionReason, confirmModal.showInput])
   
   // Novas funcionalidades: abas e alocações ativas
-  const [activeTab, setActiveTab] = useState<'events' | 'allocations'>('events')
+  const [activeTab, setActiveTab] = useState<'events' | 'allocations' | 'email'>('events')
   const [activeAllocations, setActiveAllocations] = useState<ActiveAllocation[]>([])
   const [activeDowntimes, setActiveDowntimes] = useState<ActiveDowntime[]>([])
   const [loadingAllocations, setLoadingAllocations] = useState(false)
@@ -128,24 +129,9 @@ export default function EventsPage() {
 
       if (data.success) {
         setEvents(data.events)
-        // Load confirmations for fetched events
+        // Fire-and-forget: confirmations não devem bloquear o loading
         const ids = (data.events as AllocationEvent[]).map(e => e.id)
-        if (ids.length > 0) {
-          try {
-            const { supabase } = await import('@/lib/supabase')
-            const { data: confData } = await supabase
-              .from('allocation_event_confirmations')
-              .select('event_id, confirmed_at, attachment_url, attachment_name')
-              .in('event_id', ids)
-            if (confData) {
-              const map: Record<string, { confirmed_at: string; attachment_url: string; attachment_name?: string }> = {}
-              confData.forEach((c: any) => { map[c.event_id] = c })
-              setConfirmations(map)
-            }
-          } catch (confError) {
-            console.error('Error loading confirmations:', confError)
-          }
-        }
+        void loadConfirmations(ids)
       } else {
         console.error('Failed to load events:', data.message)
       }
@@ -221,15 +207,20 @@ export default function EventsPage() {
     if (eventIds.length === 0) return
     try {
       const { supabase } = await import('@/lib/supabase')
-      const { data } = await supabase
-        .from('allocation_event_confirmations')
-        .select('event_id, confirmed_at, attachment_url, attachment_name')
-        .in('event_id', eventIds)
-      if (data) {
-        const map: Record<string, { confirmed_at: string; attachment_url: string; attachment_name?: string }> = {}
-        data.forEach((c: any) => { map[c.event_id] = c })
-        setConfirmations(map)
+      // Chunk para evitar URLs gigantes que travam a query (limite ~8KB no PostgREST)
+      const CHUNK_SIZE = 80
+      const map: Record<string, { confirmed_at: string; attachment_url: string; attachment_name?: string }> = {}
+      for (let i = 0; i < eventIds.length; i += CHUNK_SIZE) {
+        const chunk = eventIds.slice(i, i + CHUNK_SIZE)
+        const { data } = await supabase
+          .from('allocation_event_confirmations')
+          .select('event_id, confirmed_at, attachment_url, attachment_name')
+          .in('event_id', chunk)
+        if (data) {
+          data.forEach((c: any) => { map[c.event_id] = c })
+        }
       }
+      setConfirmations(map)
     } catch (error) {
       console.error('Error loading confirmations:', error)
     }
@@ -819,9 +810,10 @@ export default function EventsPage() {
                 tabs={[
                   { id: 'allocations', label: 'Alocações Ativas' },
                   { id: 'events', label: 'Histórico de Eventos' },
+                  { id: 'email', label: 'Notificações por E-mail' },
                 ]}
                 activeId={activeTab}
-                onChange={(id) => setActiveTab(id as 'events' | 'allocations')}
+                onChange={(id) => setActiveTab(id as 'events' | 'allocations' | 'email')}
               />
             </div>
 
@@ -869,6 +861,11 @@ export default function EventsPage() {
                 setShowUnconfirmedOnly={setShowUnconfirmedOnly}
                 unconfirmedCount={unconfirmedCount}
               />
+            )}
+
+            {/* Tab: Notificações por E-mail */}
+            {activeTab === 'email' && (
+              <EmailRecipientsTab />
             )}
           </div>
         </main>

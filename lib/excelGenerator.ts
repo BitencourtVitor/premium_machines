@@ -19,7 +19,11 @@ export const generateAllocationStatusExcel = (data: any[]) => {
       'Descrição': item.machine_description || '',
       'Tipo': item.machine_type,
       'Obra': item.site_title,
-      'House/Building': item.lot_building_number ? `${item.construction_type === 'house' ? 'House' : 'Building'} ${item.lot_building_number}` : '-',
+      'House/Building': item.construction_type === 'house'
+        ? (item.lot_building_number ? `House ${item.lot_building_number}` : 'House')
+        : item.construction_type === 'building' && item.lot_building_number
+          ? `Building ${item.lot_building_number}`
+          : '-',
       'Status': status,
       'Início': item.allocation_start ? formatDateNoTimezone(item.allocation_start) : '-',
       'Vencimento': item.end_date ? formatDateNoTimezone(item.end_date) : '-',
@@ -44,42 +48,6 @@ export const generateAllocationStatusExcel = (data: any[]) => {
   XLSX.writeFile(wb, `status_alocacoes_${new Date().toISOString().split('T')[0]}.xlsx`)
 }
 
-export const generateRentExpirationExcel = (data: any[]) => {
-  const worksheetData = data.map(item => {
-    const expDateStr = item.expiration_date?.split('T')[0]
-    const todayStr = new Date().toISOString().split('T')[0]
-    const isExpired = expDateStr && todayStr > expDateStr
-
-    return {
-      'Unidade': item.machine_unit_number,
-      'Descrição': item.machine_description || '',
-      'Tipo': item.machine_type || '',
-      'Fornecedor': item.supplier?.nome || 'Próprio',
-      'Obra': item.site_title || 'Sem Obra',
-      'Endereço': item.site_address || '-',
-      'Início': item.allocation_start ? formatDateNoTimezone(item.allocation_start) : '-',
-      'Vencimento': item.expiration_date ? formatDateNoTimezone(item.expiration_date) : '-',
-      'Status': isExpired ? 'Vencido' : 'Em Dia'
-    }
-  })
-
-  const wb = XLSX.utils.book_new()
-  const ws = XLSX.utils.json_to_sheet(worksheetData)
-
-  // Auto-size columns
-  const maxWidths = worksheetData.reduce((acc: any, row: any) => {
-    Object.keys(row).forEach((key, i) => {
-      const value = String(row[key] || '')
-      acc[i] = Math.max(acc[i] || 10, value.length + 2)
-    })
-    return acc
-  }, [])
-  ws['!cols'] = maxWidths.map((w: number) => ({ wch: w }))
-
-  XLSX.utils.book_append_sheet(wb, ws, 'Vencimento de Aluguéis')
-  XLSX.writeFile(wb, `vencimento_alugueis_${new Date().toISOString().split('T')[0]}.xlsx`)
-}
-
 export const generateMachineHistoryExcel = (machine: any, events: any[]) => {
   const worksheetData = events.map(event => {
     const config = getEventConfig(event.event_type)
@@ -89,7 +57,11 @@ export const generateMachineHistoryExcel = (machine: any, events: any[]) => {
         : formatDateOnly(event.event_date),
       'Evento': config.label,
       'Local': event.site?.title || '-',
-      'House/Building': event.lot_building_number ? `${event.construction_type === 'house' ? 'House' : 'Building'} ${event.lot_building_number}` : '-',
+      'House/Building': event.construction_type === 'house'
+        ? (event.lot_building_number ? `House ${event.lot_building_number}` : 'House')
+        : event.construction_type === 'building' && event.lot_building_number
+          ? `Building ${event.lot_building_number}`
+          : '-',
       'Operador': event.user?.nome || '-',
       'Status': event.status === 'approved' ? 'Aprovado' : event.status === 'pending' ? 'Pendente' : 'Rejeitado',
       'Observações': event.notas || ''

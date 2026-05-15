@@ -55,8 +55,8 @@ export default function CreateEventModal({
   const [maintenanceSuppliers, setMaintenanceSuppliers] = useState<{ id: string; nome: string }[]>([])
   const [subcontractorReceiptFiles, setSubcontractorReceiptFiles] = useState<File[]>([])
   const [uploadingReceipts, setUploadingReceipts] = useState(false)
-  // Feature 006: subcontractor input
   const [subcontractorInput, setSubcontractorInput] = useState('')
+  const [backchargeInput, setBackchargeInput] = useState('')
   const [usedByError, setUsedByError] = useState<string | null>(null)
 
   // Reset step when modal closes or editing changes
@@ -975,44 +975,39 @@ export default function CreateEventModal({
 
                       {newEvent.gera_backcharge && (
                         <>
-                          {/* Multi-select suppliers */}
+                          {/* Free-text supplier tags */}
                           <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                              Fornecedores Responsáveis
+                              Subcontratados Responsáveis
                             </label>
-                            <div className="space-y-2">
-                              {maintenanceSuppliers.map(s => {
-                                const isSelected = (newEvent.backcharge_suppliers || []).some(bs => bs.id === s.id)
-                                return (
-                                  <label key={s.id} className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={isSelected}
-                                      onChange={(e) => {
-                                        const current = newEvent.backcharge_suppliers || []
-                                        if (e.target.checked) {
-                                          setNewEvent({ ...newEvent, backcharge_suppliers: [...current, { id: s.id, nome: s.nome }] })
-                                        } else {
-                                          setNewEvent({ ...newEvent, backcharge_suppliers: current.filter(bs => bs.id !== s.id) })
-                                        }
-                                      }}
-                                      className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                                    />
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">{s.nome}</span>
-                                  </label>
-                                )
-                              })}
-                              {maintenanceSuppliers.length === 0 && (
-                                <p className="text-xs text-gray-400 italic">Nenhum fornecedor de manutenção disponível</p>
-                              )}
-                            </div>
-                            {/* Selected badges */}
+                            <input
+                              type="text"
+                              value={backchargeInput}
+                              onChange={e => setBackchargeInput(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  const nome = backchargeInput.trim()
+                                  if (!nome) return
+                                  const current = newEvent.backcharge_suppliers || []
+                                  if (current.some(bs => bs.nome.toLowerCase() === nome.toLowerCase())) {
+                                    setBackchargeInput('')
+                                    return
+                                  }
+                                  setNewEvent({ ...newEvent, backcharge_suppliers: [...current, { id: Date.now().toString(), nome }] })
+                                  setBackchargeInput('')
+                                }
+                              }}
+                              placeholder="Nome do subcontratado — pressione Enter"
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            />
                             {(newEvent.backcharge_suppliers || []).length > 0 && (
                               <div className="flex flex-wrap gap-2 mt-2">
                                 {(newEvent.backcharge_suppliers || []).map(bs => (
                                   <span key={bs.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300">
                                     {bs.nome}
                                     <button
+                                      type="button"
                                       onClick={() => setNewEvent({ ...newEvent, backcharge_suppliers: (newEvent.backcharge_suppliers || []).filter(b => b.id !== bs.id) })}
                                       className="ml-1 hover:text-amber-600"
                                     >
@@ -1031,21 +1026,25 @@ export default function CreateEventModal({
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                               Documento de recebimento pelo subcontratado
                             </label>
-                            <input
-                              type="file"
-                              accept="image/*,application/pdf"
-                              onChange={(e) => {
-                                const selectedFiles = Array.from(e.target.files || [])
-                                setSubcontractorReceiptFiles(prev => [...prev, ...selectedFiles])
-                              }}
-                              className="w-full text-sm text-gray-600 dark:text-gray-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
-                            />
+                            <label className="inline-flex items-center gap-2 cursor-pointer px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
+                              Escolher arquivo
+                              <input
+                                type="file"
+                                accept="image/*,application/pdf"
+                                className="sr-only"
+                                onChange={(e) => {
+                                  const selectedFiles = Array.from(e.target.files || [])
+                                  setSubcontractorReceiptFiles(prev => [...prev, ...selectedFiles])
+                                  e.target.value = ''
+                                }}
+                              />
+                            </label>
                             {subcontractorReceiptFiles.length > 0 && (
                               <ul className="mt-2 space-y-1">
                                 {subcontractorReceiptFiles.map((f, i) => (
                                   <li key={i} className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/20 px-2 py-1 rounded">
                                     <span className="truncate">{f.name}</span>
-                                    <button onClick={() => setSubcontractorReceiptFiles(prev => prev.filter((_, idx) => idx !== i))} className="ml-2 text-red-400 hover:text-red-600">
+                                    <button type="button" onClick={() => setSubcontractorReceiptFiles(prev => prev.filter((_, idx) => idx !== i))} className="ml-2 text-red-400 hover:text-red-600">
                                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                       </svg>
@@ -1065,6 +1064,7 @@ export default function CreateEventModal({
                               </div>
                             )}
                           </div>
+
                         </>
                       )}
                     </div>

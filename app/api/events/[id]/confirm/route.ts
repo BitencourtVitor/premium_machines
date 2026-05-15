@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
-import { supabase } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +33,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const ext = file.name.split('.').pop()
     const path = `event-confirmations/${params.id}/${Date.now()}.${ext}`
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabaseServer.storage
       .from('Allocation Documents')
       .upload(path, file, { upsert: true })
     if (uploadError) {
@@ -42,7 +41,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ success: false, message: 'Erro no upload' }, { status: 500 })
     }
 
-    const { data: urlData } = supabase.storage.from('Allocation Documents').getPublicUrl(path)
+    const { data: urlData } = supabaseServer.storage.from('Allocation Documents').getPublicUrl(path)
 
     const { error: insertError } = await supabaseServer
       .from('allocation_event_confirmations')

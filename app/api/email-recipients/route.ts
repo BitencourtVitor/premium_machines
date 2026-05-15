@@ -28,17 +28,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, nome, lista } = body
-    if (!email || !nome || !lista) {
-      return NextResponse.json({ success: false, message: 'email, nome e lista são obrigatórios' }, { status: 400 })
+    const { email, lista } = body
+    if (!email || !lista) {
+      return NextResponse.json({ success: false, message: 'email e lista são obrigatórios' }, { status: 400 })
     }
     if (!['geral', 'manutencao_corretiva'].includes(lista)) {
       return NextResponse.json({ success: false, message: 'lista inválida' }, { status: 400 })
     }
 
+    const cleanEmail = email.trim().toLowerCase()
     const { data, error } = await supabaseServer
       .from('email_recipients')
-      .insert({ email: email.trim(), nome: nome.trim(), lista })
+      .insert({ email: cleanEmail, nome: cleanEmail, lista })
       .select()
       .single()
 

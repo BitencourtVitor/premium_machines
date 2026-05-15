@@ -11,7 +11,6 @@ import UserModal from './components/UserModal'
 import SupplierModal from './components/SupplierModal'
 import UsersTab from './components/UsersTab'
 import SuppliersTab from './components/SuppliersTab'
-import EmailRecipientsTab from './components/EmailRecipientsTab'
 import { useUsersPage } from './hooks/useUsersPage'
 
 export default function UsuariosPage() {
@@ -92,11 +91,10 @@ export default function UsuariosPage() {
                 tabs={[
                   { id: 'users', label: 'Funcionários' },
                   { id: 'suppliers', label: 'Fornecedores' },
-                  ...(isAdmin ? [{ id: 'email-recipients', label: 'E-mail' }] : []),
                 ]}
                 activeId={activeTab}
                 onChange={(id) => {
-                  setActiveTab(id as 'users' | 'suppliers' | 'email-recipients')
+                  setActiveTab(id as 'users' | 'suppliers')
                   if (id === 'suppliers') {
                     loadSuppliers()
                   }
@@ -114,11 +112,6 @@ export default function UsuariosPage() {
                 onValidate={handleValidate}
                 onDelete={openDeleteConfirm}
               />
-            )}
-
-            {/* Email Recipients Tab */}
-            {activeTab === 'email-recipients' && (
-              <EmailRecipientsTab />
             )}
 
             {/* Suppliers Tab */}

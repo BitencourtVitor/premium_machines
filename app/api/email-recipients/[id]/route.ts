@@ -6,10 +6,15 @@ export const dynamic = 'force-dynamic'
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await request.json()
-    const allowed = ['email', 'nome', 'lista', 'active']
+    const allowed = ['email', 'lista', 'active']
     const updates: Record<string, any> = {}
     for (const key of allowed) {
       if (key in body) updates[key] = body[key]
+    }
+    // Mantém nome espelhando email (coluna NOT NULL no banco)
+    if ('email' in updates && typeof updates.email === 'string') {
+      updates.email = updates.email.trim().toLowerCase()
+      updates.nome = updates.email
     }
 
     const { data, error } = await supabaseServer

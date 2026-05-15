@@ -10,17 +10,15 @@ import CustomDropdown from '../components/CustomDropdown'
 import { useSidebar } from '@/lib/useSidebar'
 import { HiCheck, HiChevronLeft, HiChevronRight, HiOutlineCalendarDays } from 'react-icons/hi2'
 import { BsFileEarmarkPdf, BsFileEarmarkExcel } from 'react-icons/bs'
-import { 
-  generateAllocationStatusPDF, 
-  generateRentExpirationPDF,
+import {
+  generateAllocationStatusPDF,
   generateMachineHistoryPDF,
   generateRefuelingControlPDF,
   generateMaintenanceTimePDF,
   generateAllocationCreditsPDF
 } from '@/lib/reportGenerator'
-import { 
-  generateAllocationStatusExcel, 
-  generateRentExpirationExcel,
+import {
+  generateAllocationStatusExcel,
   generateMachineHistoryExcel,
   generateRefuelingControlExcel,
   generateMaintenanceTimeExcel,
@@ -166,11 +164,6 @@ export default function ReportsPage() {
       subtitle: 'Quais máquinas estão alocadas, aonde estão e qual a condição de cada uma',
     },
     {
-      id: 'vencimento',
-      title: 'Vencimento de Aluguéis',
-      subtitle: 'Quais máquinas vão vencer, quando e aonde estão',
-    },
-    {
       id: 'historico',
       title: 'Histórico do Equipamento',
       subtitle: 'Tudo o que aconteceu com a máquina ou extensão escolhida',
@@ -196,7 +189,7 @@ export default function ReportsPage() {
     if (reportId === 'allocation-credits') return true
     if (reportId === 'historico') return !!selectedEquipmentId
     if (reportId === 'abastecimento') return true
-    if (reportId === 'alocacoes' || reportId === 'vencimento') return allPeriod || (!!dateFrom && !!dateTo)
+    if (reportId === 'alocacoes') return allPeriod || (!!dateFrom && !!dateTo)
     if (reportId === 'manutencao') {
       const periodSelected = allPeriod || (!!dateFrom && !!dateTo)
       if (!periodSelected) return false
@@ -229,28 +222,6 @@ export default function ReportsPage() {
             ? 'Atualmente' 
             : `Até ${formatDateOnly(dateTo)}`
           await generateAllocationStatusPDF(data.allocations, periodLabel)
-        } else {
-          alert('Erro ao gerar relatório: ' + data.message)
-        }
-      } else if (reportId === 'vencimento') {
-        const queryParams = new URLSearchParams()
-        if (allPeriod) {
-          queryParams.append('allPeriod', 'true')
-        } else if (dateTo) {
-          queryParams.append('dateTo', dateTo)
-        }
-        if (providerFilter !== 'all') {
-          queryParams.append('provider', providerFilter)
-        }
-
-        const res = await fetch(`/api/reports/rent-expiration?${queryParams.toString()}`, { cache: 'no-store' })
-        const data = await res.json()
-
-        if (data.success) {
-          const periodLabel = allPeriod 
-            ? 'Atualmente' 
-            : `Até ${formatDateOnly(dateTo)}`
-          await generateRentExpirationPDF(data.expirations, periodLabel)
         } else {
           alert('Erro ao gerar relatório: ' + data.message)
         }
@@ -353,25 +324,6 @@ export default function ReportsPage() {
 
         if (data.success) {
           generateAllocationStatusExcel(data.allocations)
-        } else {
-          alert('Erro ao gerar relatório Excel: ' + data.message)
-        }
-      } else if (reportId === 'vencimento') {
-        const queryParams = new URLSearchParams()
-        if (allPeriod) {
-          queryParams.append('allPeriod', 'true')
-        } else if (dateTo) {
-          queryParams.append('dateTo', dateTo)
-        }
-        if (providerFilter !== 'all') {
-          queryParams.append('provider', providerFilter)
-        }
-
-        const res = await fetch(`/api/reports/rent-expiration?${queryParams.toString()}`, { cache: 'no-store' })
-        const data = await res.json()
-
-        if (data.success) {
-          generateRentExpirationExcel(data.expirations)
         } else {
           alert('Erro ao gerar relatório Excel: ' + data.message)
         }
@@ -514,7 +466,7 @@ export default function ReportsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {(report.id === 'alocacoes' || report.id === 'vencimento') && (
+          {report.id === 'alocacoes' && (
             <div className="mr-2 flex items-center">
               <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                 {!isReportReady(report.id) ? 'Defina o período para gerar o relatório' : 'Período definido'}

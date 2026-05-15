@@ -36,7 +36,9 @@ export default function SiteDetailsModal({
 
   const filteredAllocations = useMemo(() => {
     if (!onlyActive) return allocations
-    return allocations.filter(a => ['allocated', 'in_transit'].includes(a.status))
+    return allocations.filter(a =>
+      ['allocated', 'in_transit'].includes(a.status) && a.is_currently_at_site !== false
+    )
   }, [allocations, onlyActive])
 
   // Memo para a alocação selecionada e seu intervalo de meses

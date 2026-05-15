@@ -21,19 +21,6 @@ interface AllocationData {
   days_remaining?: number | null
 }
 
-interface RentExpirationData {
-  machine_unit_number: string
-  machine_description: string
-  machine_type: string
-  site_title: string
-  site_address: string
-  construction_type: 'house' | 'building' | null
-  lot_building_number: string | null
-  allocation_start: string
-  expiration_date: string | null
-  billing_type: string
-  status: string
-}
 
 interface RefuelingControlData {
   events: any[]
@@ -133,9 +120,11 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
   
   data.forEach(item => {
     const site = item.site_title || 'Sem Localização'
-    const lot = item.lot_building_number 
-      ? `${item.construction_type === 'house' ? 'House' : 'Building'} ${item.lot_building_number}`
-      : 'Geral / Sem Localização'
+    const lot = item.construction_type === 'house'
+      ? (item.lot_building_number ? `House ${item.lot_building_number}` : 'House')
+      : item.construction_type === 'building' && item.lot_building_number
+        ? `Building ${item.lot_building_number}`
+        : 'Geral / Sem Localização'
       
     if (!groupedBySite.has(site)) {
       groupedBySite.set(site, new Map<string, AllocationData[]>())
@@ -305,100 +294,6 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
   doc.save(`relatorio_alocacoes_${new Date().getTime()}.pdf`)
 }
 
-export const generateRentExpirationPDF = async (data: RentExpirationData[], periodLabel: string) => {
-  const doc = new jsPDF()
-  const pageWidth = doc.internal.pageSize.width
-  const margin = 15
-
-  await drawHeader(doc, margin)
-
-  // Report Title
-  doc.setFontSize(12)
-  doc.setTextColor(40)
-  doc.text('Relatório de Vencimento de Aluguéis', margin, 35)
-  
-  doc.setFontSize(10)
-  doc.setTextColor(100, 100, 100)
-  doc.text(`Gerado em: ${formatWithSystemTimezone(new Date().toISOString())}`, margin, 42)
-
-  let currentY = 60
-
-  data.forEach((item, index) => {
-    if (currentY > 260) {
-      doc.addPage()
-      currentY = 20
-    }
-
-    // Title: Machine
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.setTextColor(30)
-    const machineTitle = `${item.machine_unit_number} - ${item.machine_description || item.machine_type}`
-    doc.text(machineTitle, margin, currentY)
-
-    // Expiration Date (Opposite side)
-    if (item.expiration_date) {
-      const expDateStr = item.expiration_date?.split('T')[0]
-      const todayStr = new Date().toISOString().split('T')[0]
-      const isExpired = expDateStr && todayStr > expDateStr
-      
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(10)
-      if (isExpired) {
-        doc.setTextColor(220, 38, 38) // Red
-      } else {
-        doc.setTextColor(22, 163, 74) // Green
-      }
-      
-      const expLabel = `Vence em: ${formatDateNoTimezone(item.expiration_date)}`
-      const expWidth = doc.getTextWidth(expLabel)
-      doc.text(expLabel, pageWidth - margin - expWidth, currentY)
-    }
-
-    currentY += 6
-
-    // Subtitle: Site Address
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.setTextColor(100, 100, 100)
-    const location = `${item.site_title}${item.site_address ? ` - ${item.site_address}` : ''}`
-    const splitAddress = doc.splitTextToSize(location, pageWidth - margin * 2)
-    doc.text(splitAddress, margin, currentY)
-    currentY += (splitAddress.length * 5)
-
-    // Details: Job Site / Lot
-    doc.setFontSize(9)
-    doc.setTextColor(120, 120, 120)
-    let details = ''
-    if (item.construction_type && item.lot_building_number) {
-      const typeLabel = item.construction_type === 'house' ? 'House' : 'Building'
-      details = `${typeLabel} ${item.lot_building_number}`
-    }
-    
-    if (item.allocation_start) {
-      const startDate = formatDateNoTimezone(item.allocation_start)
-      details += details ? ` | Início: ${startDate}` : `Início: ${startDate}`
-    }
-
-    if (item.billing_type) {
-      const billingLabel = item.billing_type === 'monthly' ? 'Mensal' : item.billing_type === 'weekly' ? 'Semanal' : 'Diário'
-      details += details ? ` | Cobrança: ${billingLabel}` : `Cobrança: ${billingLabel}`
-    }
-
-    if (details) {
-      doc.text(details, margin, currentY)
-      currentY += 6
-    }
-
-    // Divider line
-    doc.setDrawColor(240, 240, 240)
-    doc.line(margin, currentY, pageWidth - margin, currentY)
-    currentY += 10
-  })
-
-  doc.save(`relatorio_vencimentos_${new Date().toISOString().split('T')[0]}.pdf`)
-}
-
 export const generateMachineHistoryPDF = async (machine: any, events: any[], periodLabel: string) => {
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.width
@@ -494,9 +389,11 @@ export const generateMachineHistoryPDF = async (machine: any, events: any[], per
       let detailText = ''
       if (event.site) detailText += `Local: ${event.site.title}`
       
-      if (event.construction_type) {
-        const type = event.construction_type === 'house' ? 'House' : 'Building'
-        detailText += `${detailText ? ' | ' : ''}${type} ${event.lot_building_number}`
+      if (event.construction_type === 'house') {
+        const label = event.lot_building_number ? `House ${event.lot_building_number}` : 'House'
+        detailText += `${detailText ? ' | ' : ''}${label}`
+      } else if (event.construction_type === 'building' && event.lot_building_number) {
+        detailText += `${detailText ? ' | ' : ''}Building ${event.lot_building_number}`
       }
       
       if (detailText) {
