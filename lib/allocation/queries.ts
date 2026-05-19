@@ -84,7 +84,7 @@ export async function getActiveAllocations(): Promise<ActiveAllocation[]> {
       const state = calculateStateFromEvents(machine.id, machineEvents)
 
       // Se a máquina está alocada, em trânsito, em manutenção OU em uma obra, adicionar à lista
-      if (state.current_allocation_event_id || state.status === 'in_transit' || state.is_in_downtime || state.current_site_id) {
+      if (state.current_allocation_event_id || state.status === 'in_transit' || state.is_in_downtime || (state.current_site_id && state.status !== 'available')) {
         // Objeto base da alocação
         const baseAllocation: ActiveAllocation = {
           allocation_event_id: state.current_allocation_event_id,

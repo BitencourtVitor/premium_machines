@@ -58,12 +58,14 @@ export default function CreateEventModal({
   const [subcontractorInput, setSubcontractorInput] = useState('')
   const [backchargeInput, setBackchargeInput] = useState('')
   const [usedByError, setUsedByError] = useState<string | null>(null)
+  const [machineAvailabilityError, setMachineAvailabilityError] = useState<string | null>(null)
 
   // Reset step when modal closes or editing changes
   useEffect(() => {
     if (!showCreateModal) {
       setStep('selection')
       setValidationError(null)
+      setMachineAvailabilityError(null)
       setFiles([])
       setExistingFiles([])
     } else if (editingEventId) {
@@ -213,6 +215,25 @@ export default function CreateEventModal({
     }
 
     return null
+  }
+
+  const checkMachineAvailability = async (machineId: string, eventType: string) => {
+    if (!machineId) { setMachineAvailabilityError(null); return }
+    if (!['start_allocation', 'extension_attach'].includes(eventType)) { setMachineAvailabilityError(null); return }
+
+    try {
+      const res = await fetch(`/api/machines/${machineId}/state`)
+      const data = await res.json()
+      if (data.success && data.state.status !== 'available') {
+        setMachineAvailabilityError(
+          `Já alocada em ${data.state.current_site_title || data.state.current_site_id}. Finalize a alocação atual primeiro.`
+        )
+      } else {
+        setMachineAvailabilityError(null)
+      }
+    } catch {
+      setMachineAvailabilityError(null)
+    }
   }
 
   const handleSave = async () => {
@@ -591,6 +612,7 @@ export default function CreateEventModal({
                       setNewEvent({ ...newEvent, machine_type_id: value, machine_id: '' })
                     } else {
                       setNewEvent({ ...newEvent, machine_id: value, machine_type_id: '' })
+                      checkMachineAvailability(value, newEvent.event_type)
                     }
                   }}
                   options={[
@@ -604,11 +626,14 @@ export default function CreateEventModal({
                   ]}
                   placeholder={
                     newEvent.event_type === 'request_allocation' ? "Selecione o tipo" :
-                    newEvent.event_type === 'extension_attach' ? "Selecione uma extensão" : 
+                    newEvent.event_type === 'extension_attach' ? "Selecione uma extensão" :
                     ['transport_start', 'transport_arrival'].includes(newEvent.event_type) ? "Selecione máquina ou extensão" : "Selecione uma máquina"
                   }
                   required
                 />
+                {machineAvailabilityError && (
+                  <p className="text-sm text-red-500 -mt-2">{machineAvailabilityError}</p>
+                )}
 
                 {['start_allocation', 'request_allocation', 'transport_arrival'].includes(newEvent.event_type) && (
                   <CustomDropdown

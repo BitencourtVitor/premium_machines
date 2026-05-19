@@ -53,7 +53,7 @@ export async function validateEvent(event: Partial<AllocationEvent>): Promise<{
       if (!state) {
         return { valid: false, reason: 'Estado da máquina não pôde ser calculado' }
       }
-      if (state.current_site_id) {
+      if (state.status !== 'available') {
         return {
           valid: false,
           reason: `Máquina já está alocada em ${state.current_site_title || state.current_site_id}. Finalize a alocação atual primeiro.`
@@ -135,7 +135,7 @@ export async function validateEvent(event: Partial<AllocationEvent>): Promise<{
         }
         
         // Verificar se a extensão (machine_id) já está alocada
-        if (state && state.current_site_id) {
+        if (state && state.status !== 'available') {
            return {
             valid: false,
             reason: `Extensão já está alocada em ${state.current_site_title || state.current_site_id}. Finalize a alocação atual primeiro.`
