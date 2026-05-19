@@ -27,7 +27,7 @@ export async function getActiveAllocations(): Promise<ActiveAllocation[]> {
     return []
   }
 
-  // 2. Buscar TODOS os eventos de uma vez (aprovados ou não-abastecimento)
+  // 2. Buscar TODOS os eventos aprovados de uma vez (exceto abastecimento)
   // Isso evita o problema de N+1 queries que causava timeout
   const { data: allEvents, error: eventsError } = await supabaseServer
     .from('allocation_events')
@@ -36,7 +36,8 @@ export async function getActiveAllocations(): Promise<ActiveAllocation[]> {
       site:sites(id, title),
       extension:machines!extension_id(id, unit_number, machine_type:machine_types(id, nome, icon, is_attachment))
     `)
-    .or('status.eq.approved,event_type.neq.refueling')
+    .neq('status', 'rejected')
+    .neq('event_type', 'refueling')
     .order('event_date', { ascending: true })
     .order('created_at', { ascending: true })
 
@@ -204,7 +205,8 @@ export async function getHistoricalSiteAllocations(siteId: string): Promise<Acti
     .from('allocation_events')
     .select('machine_id, extension_id')
     .eq('site_id', siteId)
-    .or('status.eq.approved,event_type.neq.refueling')
+    .neq('status', 'rejected')
+    .neq('event_type', 'refueling')
 
   if (refsError) {
     throw new Error(`Erro ao buscar referências de máquinas: ${refsError.message}`)
@@ -226,7 +228,8 @@ export async function getHistoricalSiteAllocations(siteId: string): Promise<Acti
       site:sites(id, title)
     `)
     .or(`machine_id.in.(${Array.from(machineIds).join(',')}),extension_id.in.(${Array.from(machineIds).join(',')})`)
-    .or('status.eq.approved,event_type.neq.refueling')
+    .neq('status', 'rejected')
+    .neq('event_type', 'refueling')
     .order('event_date', { ascending: true })
     .order('created_at', { ascending: true })
 

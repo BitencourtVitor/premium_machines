@@ -253,7 +253,7 @@ export async function calculateMachineAllocationState(machineId: string, referen
       extension:machines!extension_id(id, unit_number, machine_type:machine_types(id, nome, is_attachment))
     `)
     .or(`machine_id.eq.${machineId},extension_id.eq.${machineId}`)
-    .eq('status', 'approved')
+    .neq('status', 'rejected')
     .neq('event_type', 'refueling')
     .order('event_date', { ascending: true })
     .order('created_at', { ascending: true }) // Ordem determinística para eventos no mesmo dia
@@ -276,7 +276,7 @@ export async function calculateExtensionState(extensionId: string): Promise<Exte
       machine:machines!machine_id(id, unit_number)
     `)
     .eq('extension_id', extensionId)
-    .eq('status', 'approved')
+    .neq('status', 'rejected')
     .neq('event_type', 'refueling')
     .in('event_type', ['extension_attach', 'extension_detach', 'end_allocation'])
     .order('event_date', { ascending: true })

@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
         site:sites(id, title),
         extension:machines!extension_id(id, unit_number, machine_type:machine_types(id, nome, icon, is_attachment))
       `)
-      .or('status.eq.approved,event_type.neq.refueling')
+      .neq('status', 'rejected')
+      .neq('event_type', 'refueling')
       .order('event_date', { ascending: true })
       .order('created_at', { ascending: true })
 
