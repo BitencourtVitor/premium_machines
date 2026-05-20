@@ -4,6 +4,7 @@ import { supabaseServer } from '@/lib/supabase-server'
 export const dynamic = 'force-dynamic'
 import { processEventApproval } from '@/lib/eventProcessor'
 import { createAuditLog } from '@/lib/auditLog'
+import { sendEventNotification } from '@/lib/email/sendEventNotification'
 
 export async function POST(
   request: NextRequest,
@@ -90,6 +91,9 @@ export async function POST(
       dados_depois: updatedEvent,
       usuario_id: approved_by,
     })
+
+    // Fire-and-forget email notification (on approval, not on creation)
+    void sendEventNotification(params.id)
 
     // Gerar mensagem apropriada baseada no tipo de evento
     let message = 'Evento aprovado com sucesso'

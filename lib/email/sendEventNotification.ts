@@ -21,8 +21,13 @@ const DOWNTIME_REASON_LABELS: Record<string, string> = {
 }
 
 async function buildTransporter() {
-  const nodemailer = await import('nodemailer' as any)
-  return nodemailer.default.createTransport({
+  // nodemailer is a CommonJS module — `createTransport` lives at the root, NOT at `.default`
+  const nm = await import('nodemailer' as any)
+  const createTransport: Function = nm.createTransport ?? nm.default?.createTransport
+  if (typeof createTransport !== 'function') {
+    throw new Error('[sendEventNotification] nodemailer.createTransport is not a function — check nodemailer installation')
+  }
+  return createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: Number(process.env.SMTP_PORT || 587),
     secure: false,
