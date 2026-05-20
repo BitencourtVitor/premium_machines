@@ -92,8 +92,8 @@ export async function POST(
       usuario_id: approved_by,
     })
 
-    // Fire-and-forget email notification (on approval, not on creation)
-    void sendEventNotification(params.id)
+    // Aguarda envio antes de retornar (void não funciona em Vercel — função é terminada após return)
+    await sendEventNotification(params.id)
 
     // Gerar mensagem apropriada baseada no tipo de evento
     let message = 'Evento aprovado com sucesso'

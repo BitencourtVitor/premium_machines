@@ -205,10 +205,9 @@ export async function POST(request: NextRequest) {
     // Update notifications if applicable
     await updateAllocationNotification(event)
 
-    // Email: dispara imediatamente para eventos já aprovados (todos exceto refueling)
-    // Para refueling (pending), o email é disparado no approve route
+    // Email: aguarda envio antes de retornar (void não funciona em Vercel — função é terminada após return)
     if (event.status === 'approved') {
-      void sendEventNotification(event.id)
+      await sendEventNotification(event.id)
     }
 
     return NextResponse.json({ success: true, event })
