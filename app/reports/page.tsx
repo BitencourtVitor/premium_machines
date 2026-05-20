@@ -77,9 +77,9 @@ function SiteMultiSelect({
         ref={btnRef}
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between cursor-pointer"
+        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center gap-2 cursor-pointer whitespace-nowrap"
       >
-        <span className="text-sm truncate">{label}</span>
+        <span className="text-sm">{label}</span>
         <svg className={`w-4 h-4 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -88,7 +88,7 @@ function SiteMultiSelect({
         <div
           ref={menuRef}
           className="fixed z-[9999] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-64 overflow-y-auto py-1"
-          style={{ top: pos.top, left: pos.left, width: pos.width }}
+          style={{ top: pos.top, left: pos.left, minWidth: pos.width, width: 'max-content' }}
         >
           <label className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors border-b border-gray-200 dark:border-gray-600">
             <input
@@ -795,7 +795,7 @@ export default function ReportsPage() {
           )}
 
           {report.id === 'events-by-site' && (allPeriod || (!!dateFrom && !!dateTo)) && (
-            <div className="w-44 mr-2 transition-all duration-300">
+            <div className="mr-2">
               <SiteMultiSelect
                 sites={availableSites}
                 selected={selectedSiteIds}
