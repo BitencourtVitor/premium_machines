@@ -3,6 +3,7 @@ import { supabaseServer } from '@/lib/supabase-server'
 import { validateEvent, getActiveDowntimeByMachine, getActiveTransportByMachine } from '@/lib/allocationService'
 import { createAuditLog } from '@/lib/auditLog'
 import { updateAllocationNotification } from '@/lib/notificationService'
+import { sendEventNotification } from '@/lib/email/sendEventNotification'
 
 export const dynamic = 'force-dynamic'
 
@@ -203,6 +204,12 @@ export async function POST(request: NextRequest) {
 
     // Update notifications if applicable
     await updateAllocationNotification(event)
+
+    // Email: dispara imediatamente para eventos já aprovados (todos exceto refueling)
+    // Para refueling (pending), o email é disparado no approve route
+    if (event.status === 'approved') {
+      void sendEventNotification(event.id)
+    }
 
     return NextResponse.json({ success: true, event })
   } catch (error) {
