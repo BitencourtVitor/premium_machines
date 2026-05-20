@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
 import BottomNavigation from '../components/BottomNavigation'
@@ -28,6 +29,98 @@ import {
   generateBackchargesExcel
 } from '@/lib/excelGenerator'
 import { adjustDateToSystemTimezone, formatDateOnly } from '@/lib/timezone'
+
+// ── Multi-select de obras (portal para evitar overflow cortado) ────────────────
+function SiteMultiSelect({
+  sites,
+  selected,
+  onChange,
+  loading,
+}: {
+  sites: { id: string; title: string }[]
+  selected: string[]
+  onChange: (ids: string[]) => void
+  loading: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 })
+
+  useEffect(() => {
+    if (open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 4, left: r.left, width: r.width })
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const handle = (e: MouseEvent) => {
+      if (
+        btnRef.current && !btnRef.current.contains(e.target as Node) &&
+        menuRef.current && !menuRef.current.contains(e.target as Node)
+      ) setOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [open])
+
+  const label = loading ? 'Carregando...' :
+    selected.length === 0 ? 'Todas as obras' :
+    selected.length === 1 ? (sites.find(s => s.id === selected[0])?.title ?? '1 obra') :
+    `${selected.length} obras`
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-left flex items-center justify-between cursor-pointer"
+      >
+        <span className="text-sm truncate">{label}</span>
+        <svg className={`w-4 h-4 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && typeof window !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[9999] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-64 overflow-y-auto py-1"
+          style={{ top: pos.top, left: pos.left, width: pos.width }}
+        >
+          <label className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors border-b border-gray-200 dark:border-gray-600">
+            <input
+              type="checkbox"
+              checked={selected.length === 0}
+              onChange={() => onChange([])}
+              className="w-3.5 h-3.5 rounded accent-blue-600 flex-shrink-0"
+            />
+            <span className="text-sm font-semibold text-gray-700 dark:text-white">Todas as obras</span>
+          </label>
+          {sites.map(site => (
+            <label key={site.id} className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+              <input
+                type="checkbox"
+                checked={selected.includes(site.id)}
+                onChange={() => onChange(
+                  selected.includes(site.id)
+                    ? selected.filter(id => id !== site.id)
+                    : [...selected, site.id]
+                )}
+                className="w-3.5 h-3.5 rounded accent-blue-600 flex-shrink-0"
+              />
+              <span className="text-sm text-gray-700 dark:text-white truncate">{site.title}</span>
+            </label>
+          ))}
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
+// ──────────────────────────────────────────────────────────────────────────────
 
 interface ReportItem {
   id: string
@@ -67,7 +160,6 @@ export default function ReportsPage() {
   const [availableSites, setAvailableSites] = useState<{ id: string; title: string }[]>([])
   const [loadingSites, setLoadingSites] = useState(false)
   const [selectedSiteIds, setSelectedSiteIds] = useState<string[]>([])
-  const [siteFilterOpen, setSiteFilterOpen] = useState(false)
 
   // Backcharges — checar disponibilidade quando o período muda
   useEffect(() => {
@@ -703,50 +795,13 @@ export default function ReportsPage() {
           )}
 
           {report.id === 'events-by-site' && (allPeriod || (!!dateFrom && !!dateTo)) && (
-            <div className="relative mr-2">
-              <button
-                onClick={() => setSiteFilterOpen(o => !o)}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors min-w-[160px] justify-between"
-              >
-                <span className="truncate text-xs">
-                  {loadingSites ? 'Carregando...' :
-                    selectedSiteIds.length === 0 ? 'Todas as obras' :
-                    selectedSiteIds.length === 1 ? (availableSites.find(s => s.id === selectedSiteIds[0])?.title ?? '1 obra') :
-                    `${selectedSiteIds.length} obras selecionadas`}
-                </span>
-                <svg className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${siteFilterOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              {siteFilterOpen && (
-                <div className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 shadow-lg z-20 py-1 max-h-60 overflow-y-auto">
-                  {/* Todas */}
-                  <label className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={selectedSiteIds.length === 0}
-                      onChange={() => setSelectedSiteIds([])}
-                      className="w-3.5 h-3.5 rounded accent-blue-600 flex-shrink-0"
-                    />
-                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Todas as obras</span>
-                  </label>
-                  {availableSites.map(site => (
-                    <label key={site.id} className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={selectedSiteIds.includes(site.id)}
-                        onChange={() => {
-                          setSelectedSiteIds(prev =>
-                            prev.includes(site.id) ? prev.filter(id => id !== site.id) : [...prev, site.id]
-                          )
-                        }}
-                        className="w-3.5 h-3.5 rounded accent-blue-600 flex-shrink-0"
-                      />
-                      <span className="text-xs text-gray-700 dark:text-gray-300 truncate">{site.title}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
+            <div className="w-44 mr-2 transition-all duration-300">
+              <SiteMultiSelect
+                sites={availableSites}
+                selected={selectedSiteIds}
+                onChange={setSelectedSiteIds}
+                loading={loadingSites}
+              />
             </div>
           )}
 
