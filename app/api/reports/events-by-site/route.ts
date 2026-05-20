@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get('dateFrom')
     const dateTo = searchParams.get('dateTo')
     const allPeriod = searchParams.get('allPeriod') === 'true'
+    const siteIdsParam = searchParams.get('siteIds')
+    const siteIds = siteIdsParam ? siteIdsParam.split(',').filter(Boolean) : []
 
     let query = supabaseServer
       .from('allocation_events')
@@ -41,6 +43,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    if (siteIds.length > 0) {
+      query = query.in('site_id', siteIds)
+    }
+
     const { data: events, error } = await query
     if (error) throw error
 
@@ -58,7 +64,7 @@ export async function GET(request: NextRequest) {
 
     // Sort events within each site by date desc and sort sites by event count desc
     const sites = Array.from(siteMap.values())
-      .map(s => ({ ...s, events: s.events.sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime()) }))
+      .map(s => ({ ...s, events: s.events.sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime()) }))
       .sort((a, b) => b.events.length - a.events.length)
 
     return NextResponse.json({ success: true, sites })

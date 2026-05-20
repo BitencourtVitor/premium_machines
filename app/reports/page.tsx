@@ -59,6 +59,56 @@ export default function ReportsPage() {
   const [generatingExcel, setGeneratingExcel] = useState<string | null>(null)
   const [providerFilter, setProviderFilter] = useState('all') // 'all', 'owned', 'rented'
 
+  // Backcharges — verificar se há dados no período
+  const [hasBackchargeData, setHasBackchargeData] = useState<boolean | null>(null)
+  const [checkingBackchargeData, setCheckingBackchargeData] = useState(false)
+
+  // Events by site — lista de obras disponíveis e seleção
+  const [availableSites, setAvailableSites] = useState<{ id: string; title: string }[]>([])
+  const [loadingSites, setLoadingSites] = useState(false)
+  const [selectedSiteIds, setSelectedSiteIds] = useState<string[]>([])
+  const [siteFilterOpen, setSiteFilterOpen] = useState(false)
+
+  // Backcharges — checar disponibilidade quando o período muda
+  useEffect(() => {
+    if (!allPeriod && (!dateFrom || !dateTo)) {
+      setHasBackchargeData(null)
+      return
+    }
+    async function checkBackchargeData() {
+      setCheckingBackchargeData(true)
+      try {
+        const q = new URLSearchParams()
+        if (allPeriod) q.append('allPeriod', 'true')
+        else {
+          if (dateFrom) q.append('dateFrom', dateFrom)
+          if (dateTo) q.append('dateTo', dateTo)
+        }
+        const res = await fetch(`/api/reports/backcharges?${q.toString()}`, { cache: 'no-store' })
+        const data = await res.json()
+        setHasBackchargeData(data.success && (data.backcharges?.length ?? 0) > 0)
+      } catch { setHasBackchargeData(null) }
+      finally { setCheckingBackchargeData(false) }
+    }
+    checkBackchargeData()
+  }, [dateFrom, dateTo, allPeriod])
+
+  // Events by site — buscar obras disponíveis
+  useEffect(() => {
+    async function fetchSites() {
+      setLoadingSites(true)
+      try {
+        const res = await fetch('/api/sites')
+        const data = await res.json()
+        const sites = (data.sites || [])
+          .map((s: any) => ({ id: s.id, title: s.title }))
+          .sort((a: any, b: any) => a.title.localeCompare(b.title))
+        setAvailableSites(sites)
+      } catch {} finally { setLoadingSites(false) }
+    }
+    fetchSites()
+  }, [])
+
   // Persist week offset
   useEffect(() => {
     const saved = localStorage.getItem('reports_week_offset')
@@ -208,7 +258,11 @@ export default function ReportsPage() {
       if (!periodSelected) return false
       return !!providerFilter
     }
-    if (reportId === 'backcharges') return allPeriod || (!!dateFrom && !!dateTo)
+    if (reportId === 'backcharges') {
+      if (!(allPeriod || (!!dateFrom && !!dateTo))) return false
+      if (checkingBackchargeData) return false
+      return hasBackchargeData === true
+    }
     if (reportId === 'events-by-site') return allPeriod || (!!dateFrom && !!dateTo)
     return false
   }
@@ -329,6 +383,7 @@ export default function ReportsPage() {
           if (dateFrom) queryParams.append('dateFrom', dateFrom)
           if (dateTo) queryParams.append('dateTo', dateTo)
         }
+        if (selectedSiteIds.length > 0) queryParams.append('siteIds', selectedSiteIds.join(','))
         const res = await fetch(`/api/reports/events-by-site?${queryParams.toString()}`, { cache: 'no-store' })
         const data = await res.json()
         if (data.success) {
@@ -628,6 +683,70 @@ export default function ReportsPage() {
                   <HiCheck className="w-3.5 h-3.5 stroke-[0.5]" />
                 </div>
               </div>
+            </div>
+          )}
+
+          {report.id === 'backcharges' && (allPeriod || (!!dateFrom && !!dateTo)) && (
+            <div className="mr-2 flex items-center">
+              {checkingBackchargeData ? (
+                <div className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+              ) : hasBackchargeData === false ? (
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  Nenhum backcharge no período
+                </span>
+              ) : hasBackchargeData === true ? (
+                <div className="w-6 h-6 flex items-center justify-center bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-md border border-green-100 dark:border-green-900/30 shadow-sm">
+                  <HiCheck className="w-3.5 h-3.5 stroke-[0.5]" />
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {report.id === 'events-by-site' && (allPeriod || (!!dateFrom && !!dateTo)) && (
+            <div className="relative mr-2">
+              <button
+                onClick={() => setSiteFilterOpen(o => !o)}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors min-w-[160px] justify-between"
+              >
+                <span className="truncate text-xs">
+                  {loadingSites ? 'Carregando...' :
+                    selectedSiteIds.length === 0 ? 'Todas as obras' :
+                    selectedSiteIds.length === 1 ? (availableSites.find(s => s.id === selectedSiteIds[0])?.title ?? '1 obra') :
+                    `${selectedSiteIds.length} obras selecionadas`}
+                </span>
+                <svg className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${siteFilterOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {siteFilterOpen && (
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 shadow-lg z-20 py-1 max-h-60 overflow-y-auto">
+                  {/* Todas */}
+                  <label className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={selectedSiteIds.length === 0}
+                      onChange={() => setSelectedSiteIds([])}
+                      className="w-3.5 h-3.5 rounded accent-blue-600 flex-shrink-0"
+                    />
+                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Todas as obras</span>
+                  </label>
+                  {availableSites.map(site => (
+                    <label key={site.id} className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={selectedSiteIds.includes(site.id)}
+                        onChange={() => {
+                          setSelectedSiteIds(prev =>
+                            prev.includes(site.id) ? prev.filter(id => id !== site.id) : [...prev, site.id]
+                          )
+                        }}
+                        className="w-3.5 h-3.5 rounded accent-blue-600 flex-shrink-0"
+                      />
+                      <span className="text-xs text-gray-700 dark:text-gray-300 truncate">{site.title}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
