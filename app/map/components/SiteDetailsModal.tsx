@@ -32,7 +32,7 @@ export default function SiteDetailsModal({
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [activeTab, setActiveTab] = useState<'calendar' | 'history'>('calendar')
   const [, setTimezoneTick] = useState(0)
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set(['Ativa', 'Manutenção']))
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set(['Ativa', 'Ativa Excedida', 'Manutenção']))
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
 
   const filteredAllocations = useMemo(() => allocations, [allocations])
