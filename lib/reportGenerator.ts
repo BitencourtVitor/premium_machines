@@ -1055,3 +1055,173 @@ export const generateAllocationCreditsPDF = async (
 
   doc.save(`creditos_alocacao_${new Date().getTime()}.pdf`)
 }
+
+// ── Backcharges ────────────────────────────────────────────────────────────────
+
+export const generateBackchargesPDF = async (backcharges: any[], periodLabel: string) => {
+  const doc = new jsPDF()
+  const pageWidth = doc.internal.pageSize.width
+  const margin = 15
+
+  await drawHeader(doc, margin)
+
+  doc.setFontSize(12)
+  doc.setTextColor(40)
+  doc.text('Relatório de Backcharges', margin, 35)
+
+  doc.setFontSize(10)
+  doc.setTextColor(100, 100, 100)
+  doc.text(`Período: ${periodLabel}`, margin, 42)
+  doc.text(`Gerado em: ${formatWithSystemTimezone(new Date().toISOString())}`, margin, 48)
+  doc.text(`Total: ${backcharges.length} backcharge(s)`, pageWidth - margin - 60, 42)
+
+  const rows = backcharges.map(b => {
+    const date = formatDateOnly(b.event_date)
+    const machine = b.machine?.unit_number || '—'
+    const site = b.site?.title || '—'
+    const subs = (b.backcharge_suppliers || [])
+      .map((s: any) => s.nome || String(s))
+      .filter(Boolean)
+      .join(', ') || '—'
+    const description = b.downtime_description || '—'
+    return [date, machine, site, subs, description]
+  })
+
+  autoTable(doc, {
+    startY: 58,
+    head: [['Data', 'Máquina', 'Obra', 'Subcontratados', 'Descrição']],
+    body: rows,
+    margin: { left: margin, right: margin },
+    styles: { fontSize: 8.5, cellPadding: 3 },
+    headStyles: { fillColor: [245, 158, 11], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [255, 251, 235] },
+    columnStyles: {
+      0: { cellWidth: 22 },
+      1: { cellWidth: 22 },
+      2: { cellWidth: 38 },
+      3: { cellWidth: 45 },
+      4: { cellWidth: 'auto' },
+    },
+  })
+
+  doc.save(`backcharges_${new Date().getTime()}.pdf`)
+}
+
+// ── Events by site ─────────────────────────────────────────────────────────────
+
+const EVENT_COLORS: Record<string, [number, number, number]> = {
+  start_allocation:  [46, 134, 193],
+  end_allocation:    [220, 38, 38],
+  downtime_start:    [234, 88, 12],
+  downtime_end:      [22, 163, 74],
+  transport_start:   [13, 148, 136],
+  transport_arrival: [6, 182, 212],
+  request_allocation:[147, 51, 234],
+  extension_attach:  [243, 156, 18],
+  extension_detach:  [230, 126, 34],
+  refueling:         [202, 138, 4],
+}
+
+const EVENT_LABELS_PT: Record<string, string> = {
+  start_allocation:   'Alocação de Máquina',
+  end_allocation:     'Fim de Alocação',
+  downtime_start:     'Início de Manutenção',
+  downtime_end:       'Fim de Manutenção',
+  transport_start:    'Início de Transporte',
+  transport_arrival:  'Chegada em Obra',
+  request_allocation: 'Solicitação de Alocação',
+  extension_attach:   'Alocação de Extensão',
+  extension_detach:   'Fim de Alocação de Extensão',
+  refueling:          'Abastecimento',
+}
+
+export const generateEventsBySitePDF = async (sites: { site: any; events: any[] }[], periodLabel: string) => {
+  const doc = new jsPDF()
+  const pageWidth = doc.internal.pageSize.width
+  const margin = 15
+
+  await drawHeader(doc, margin)
+
+  doc.setFontSize(12)
+  doc.setTextColor(40)
+  doc.text('Eventos por Obra', margin, 35)
+
+  doc.setFontSize(10)
+  doc.setTextColor(100, 100, 100)
+  doc.text(`Período: ${periodLabel}`, margin, 42)
+  doc.text(`Gerado em: ${formatWithSystemTimezone(new Date().toISOString())}`, margin, 48)
+
+  let currentY = 58
+
+  const addPageIfNeeded = (needed: number) => {
+    if (currentY + needed > doc.internal.pageSize.height - 15) {
+      doc.addPage()
+      currentY = 20
+    }
+  }
+
+  for (const { site, events } of sites) {
+    addPageIfNeeded(20)
+
+    // Site header block
+    doc.setFillColor(240, 240, 240)
+    doc.roundedRect(margin, currentY - 4, pageWidth - margin * 2, 14, 2, 2, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(40, 40, 40)
+    doc.text(site.title?.toUpperCase() || 'SEM NOME', margin + 4, currentY + 4)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(100, 100, 100)
+    const siteSubtitle = [site.address, site.city].filter(Boolean).join(' · ')
+    if (siteSubtitle) doc.text(siteSubtitle, margin + 4, currentY + 9)
+    const countText = `${events.length} evento(s)`
+    doc.text(countText, pageWidth - margin - doc.getTextWidth(countText) - 4, currentY + 4)
+    currentY += 18
+
+    // Events list
+    for (const event of events) {
+      addPageIfNeeded(8)
+
+      const color = EVENT_COLORS[event.event_type] || [100, 100, 100]
+      const label = EVENT_LABELS_PT[event.event_type] || event.event_type
+      const machine = event.machine?.unit_number || event.extension?.unit_number || '—'
+      const date = formatDateOnly(event.event_date)
+
+      // Color dot
+      doc.setFillColor(color[0], color[1], color[2])
+      doc.circle(margin + 3, currentY + 1.5, 1.5, 'F')
+
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8.5)
+      doc.setTextColor(50, 50, 50)
+      doc.text(label, margin + 8, currentY + 3)
+
+      doc.setTextColor(80, 80, 80)
+      const machineX = margin + 8 + doc.getTextWidth(label) + 4
+      doc.setFont('helvetica', 'bold')
+      doc.text(machine, machineX, currentY + 3)
+
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(130, 130, 130)
+      doc.text(date, pageWidth - margin - doc.getTextWidth(date), currentY + 3)
+
+      // Backcharge badge
+      if (event.gera_backcharge) {
+        doc.setFillColor(254, 243, 199)
+        doc.setTextColor(146, 64, 14)
+        doc.setFontSize(7)
+        const bcLabel = 'BACKCHARGE'
+        const bcW = doc.getTextWidth(bcLabel) + 4
+        doc.roundedRect(pageWidth - margin - doc.getTextWidth(date) - bcW - 6, currentY - 0.5, bcW, 5, 1, 1, 'F')
+        doc.text(bcLabel, pageWidth - margin - doc.getTextWidth(date) - bcW - 4, currentY + 3)
+      }
+
+      currentY += 7
+    }
+
+    currentY += 6
+  }
+
+  doc.save(`eventos_por_obra_${new Date().getTime()}.pdf`)
+}

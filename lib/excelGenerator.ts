@@ -305,3 +305,29 @@ export const generateAllocationCreditsExcel = (
   XLSX.writeFile(wb, `creditos_alocacao_${new Date().toISOString().split('T')[0]}.xlsx`)
 }
 
+// ── Backcharges ────────────────────────────────────────────────────────────────
+
+export const generateBackchargesExcel = (backcharges: any[], periodLabel: string) => {
+  const wb = XLSX.utils.book_new()
+
+  const rows = backcharges.map(b => ({
+    'Data': formatDateOnly(b.event_date),
+    'Máquina': b.machine?.unit_number || '—',
+    'Tipo de Máquina': b.machine?.machine_type?.nome || '—',
+    'Obra': b.site?.title || '—',
+    'Endereço': b.site?.address || '—',
+    'Subcontratados': (b.backcharge_suppliers || []).map((s: any) => s.nome || String(s)).filter(Boolean).join(', ') || '—',
+    'Descrição do Problema': b.downtime_description || '—',
+    'Descrição da Correção': b.correction_description || '—',
+    'Notas': b.notas || '—',
+    'Registrado por': b.created_by_user?.nome || '—',
+    'Criado em': formatWithSystemTimezone(b.created_at),
+  }))
+
+  const ws = XLSX.utils.json_to_sheet(rows)
+  ws['!cols'] = [22, 14, 18, 30, 35, 35, 40, 40, 25, 20, 22].map(w => ({ wch: w }))
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Backcharges')
+  XLSX.writeFile(wb, `backcharges_${new Date().toISOString().split('T')[0]}.xlsx`)
+}
+

@@ -310,8 +310,16 @@ export default function MachineDetailsModal({
                                   )}
                                   {event.site?.address && (
                                       <p className="flex items-start gap-2 text-xs">
-                                        <span className="font-semibold text-gray-900 dark:text-white min-w-[60px]">Endereço:</span> 
+                                        <span className="font-semibold text-gray-900 dark:text-white min-w-[60px]">Endereço:</span>
                                         <span className="text-gray-500 dark:text-gray-400 italic">{event.site.address}</span>
+                                      </p>
+                                  )}
+                                  {event.event_type === 'start_allocation' && event.end_date && (
+                                      <p className="flex items-start gap-2">
+                                        <span className="font-semibold text-gray-900 dark:text-white min-w-[80px]">Vencimento:</span>
+                                        <span className="text-orange-600 dark:text-orange-400 font-medium">
+                                          {formatDateOnly(event.end_date)}
+                                        </span>
                                       </p>
                                   )}
                                   {event.downtime_reason && (

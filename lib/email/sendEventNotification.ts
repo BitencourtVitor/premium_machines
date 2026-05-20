@@ -263,7 +263,8 @@ export async function sendEventNotification(eventId: string): Promise<void> {
 
     const uniqueEmails = Array.from(new Set((recipients || []).map((r: any) => r.email)))
     await sendToEmails(uniqueEmails, subject, html, text)
-  } catch (err) {
-    console.error('[sendEventNotification] failed:', err)
+  } catch (err: any) {
+    console.error('[sendEventNotification] failed:', err?.message || err)
+    console.error('[sendEventNotification] smtp_user set:', !!process.env.SMTP_USER, '| code:', err?.code, '| response:', err?.response)
   }
 }

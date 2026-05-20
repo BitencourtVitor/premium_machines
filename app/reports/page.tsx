@@ -15,14 +15,17 @@ import {
   generateMachineHistoryPDF,
   generateRefuelingControlPDF,
   generateMaintenanceTimePDF,
-  generateAllocationCreditsPDF
+  generateAllocationCreditsPDF,
+  generateBackchargesPDF,
+  generateEventsBySitePDF
 } from '@/lib/reportGenerator'
 import {
   generateAllocationStatusExcel,
   generateMachineHistoryExcel,
   generateRefuelingControlExcel,
   generateMaintenanceTimeExcel,
-  generateAllocationCreditsExcel
+  generateAllocationCreditsExcel,
+  generateBackchargesExcel
 } from '@/lib/excelGenerator'
 import { adjustDateToSystemTimezone, formatDateOnly } from '@/lib/timezone'
 
@@ -183,6 +186,16 @@ export default function ReportsPage() {
       title: 'Créditos de alocação',
       subtitle: 'Créditos (dias) gerados por alocações finalizadas, agrupados por fornecedor',
     },
+    {
+      id: 'backcharges',
+      title: 'Backcharges',
+      subtitle: 'Lista de cobranças retroativas registradas no período selecionado',
+    },
+    {
+      id: 'events-by-site',
+      title: 'Eventos por Obra',
+      subtitle: 'Histórico completo de todos os eventos agrupados por obra no período',
+    },
   ]
 
   const isReportReady = (reportId: string) => {
@@ -195,6 +208,8 @@ export default function ReportsPage() {
       if (!periodSelected) return false
       return !!providerFilter
     }
+    if (reportId === 'backcharges') return allPeriod || (!!dateFrom && !!dateTo)
+    if (reportId === 'events-by-site') return allPeriod || (!!dateFrom && !!dateTo)
     return false
   }
 
@@ -292,8 +307,36 @@ export default function ReportsPage() {
         } else {
           alert('Erro ao gerar relatório: ' + data.message)
         }
-      } else {
-        console.log(`Gerando PDF para ${reportId}`, reportId === 'abastecimento' ? weekRange : { dateFrom, dateTo, allPeriod })
+      } else if (reportId === 'backcharges') {
+        const queryParams = new URLSearchParams()
+        if (allPeriod) queryParams.append('allPeriod', 'true')
+        else {
+          if (dateFrom) queryParams.append('dateFrom', dateFrom)
+          if (dateTo) queryParams.append('dateTo', dateTo)
+        }
+        const res = await fetch(`/api/reports/backcharges?${queryParams.toString()}`, { cache: 'no-store' })
+        const data = await res.json()
+        if (data.success) {
+          const periodLabel = allPeriod ? 'Todo o período' : `${dateFrom ? `De ${formatDateOnly(dateFrom)} ` : ''}Até ${formatDateOnly(dateTo)}`
+          await generateBackchargesPDF(data.backcharges, periodLabel)
+        } else {
+          alert('Erro ao gerar relatório: ' + data.message)
+        }
+      } else if (reportId === 'events-by-site') {
+        const queryParams = new URLSearchParams()
+        if (allPeriod) queryParams.append('allPeriod', 'true')
+        else {
+          if (dateFrom) queryParams.append('dateFrom', dateFrom)
+          if (dateTo) queryParams.append('dateTo', dateTo)
+        }
+        const res = await fetch(`/api/reports/events-by-site?${queryParams.toString()}`, { cache: 'no-store' })
+        const data = await res.json()
+        if (data.success) {
+          const periodLabel = allPeriod ? 'Todo o período' : `${dateFrom ? `De ${formatDateOnly(dateFrom)} ` : ''}Até ${formatDateOnly(dateTo)}`
+          await generateEventsBySitePDF(data.sites, periodLabel)
+        } else {
+          alert('Erro ao gerar relatório: ' + data.message)
+        }
       }
     } catch (error) {
       console.error('Error generating PDF:', error)
@@ -391,8 +434,21 @@ export default function ReportsPage() {
         } else {
           alert('Erro ao gerar relatório Excel: ' + data.message)
         }
-      } else {
-        console.log(`Gerando Excel para ${reportId}`, reportId === 'abastecimento' ? weekRange : { dateFrom, dateTo, allPeriod })
+      } else if (reportId === 'backcharges') {
+        const queryParams = new URLSearchParams()
+        if (allPeriod) queryParams.append('allPeriod', 'true')
+        else {
+          if (dateFrom) queryParams.append('dateFrom', dateFrom)
+          if (dateTo) queryParams.append('dateTo', dateTo)
+        }
+        const res = await fetch(`/api/reports/backcharges?${queryParams.toString()}`, { cache: 'no-store' })
+        const data = await res.json()
+        if (data.success) {
+          const periodLabel = allPeriod ? 'Todo o período' : `${dateFrom ? `De ${formatDateOnly(dateFrom)} ` : ''}Até ${formatDateOnly(dateTo)}`
+          generateBackchargesExcel(data.backcharges, periodLabel)
+        } else {
+          alert('Erro ao gerar relatório Excel: ' + data.message)
+        }
       }
     } catch (error) {
       console.error('Error generating Excel:', error)
