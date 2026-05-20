@@ -47,10 +47,11 @@ export async function GET(request: NextRequest) {
     // Group by site
     const siteMap = new Map<string, { site: any; events: any[] }>()
     for (const event of events || []) {
-      if (!event.site) continue
-      const siteId = event.site.id
+      const siteObj = Array.isArray(event.site) ? event.site[0] : event.site
+      if (!siteObj) continue
+      const siteId = siteObj.id
       if (!siteMap.has(siteId)) {
-        siteMap.set(siteId, { site: event.site, events: [] })
+        siteMap.set(siteId, { site: siteObj, events: [] })
       }
       siteMap.get(siteId)!.events.push(event)
     }
