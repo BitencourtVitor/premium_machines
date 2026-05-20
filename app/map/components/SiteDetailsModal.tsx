@@ -575,6 +575,23 @@ export default function SiteDetailsModal({
                     </button>
                     {statusDropdownOpen && (
                       <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 shadow-lg z-10 py-1">
+                        {/* Todos */}
+                        <label className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700 mb-0.5">
+                          <input
+                            type="checkbox"
+                            checked={selectedStatuses.size === STATUS_OPTIONS.length}
+                            ref={el => { if (el) el.indeterminate = selectedStatuses.size > 0 && selectedStatuses.size < STATUS_OPTIONS.length }}
+                            onChange={() => {
+                              setSelectedStatuses(
+                                selectedStatuses.size === STATUS_OPTIONS.length
+                                  ? new Set()
+                                  : new Set(STATUS_OPTIONS.map(o => o.label))
+                              )
+                            }}
+                            className="w-3.5 h-3.5 rounded accent-blue-600 flex-shrink-0"
+                          />
+                          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Todos</span>
+                        </label>
                         {STATUS_OPTIONS.map(opt => (
                           <label key={opt.label} className="flex items-center gap-2.5 px-3 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                             <input
