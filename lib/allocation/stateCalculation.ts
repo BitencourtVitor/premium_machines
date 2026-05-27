@@ -89,6 +89,12 @@ export function calculateStateFromEvents(machineId: string, events: any[], refer
             state.allocation_start = null
             state.end_date = null
             state.planned_end_date = null
+            // Ao encerrar a alocação, qualquer downtime em aberto também é encerrado
+            state.is_in_downtime = false
+            state.current_downtime_event_id = null
+            state.downtime_start = null
+            state.current_downtime_start = null
+            state.current_downtime_reason = null
           } else {
             // No dia do evento de fim, ela ainda é considerada 'allocated' (ou 'exceeded' se passar da data)
             // A menos que já tenha iniciado um transporte

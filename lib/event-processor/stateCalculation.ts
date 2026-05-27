@@ -48,8 +48,11 @@ export async function calculateMachineState(machineId: string): Promise<MachineS
           // Mantemos o current_site_id pois a máquina continua fisicamente no local
           // até que um transporte seja registrado.
           // state.current_site_id = null
-          state.status = state.is_in_downtime ? 'maintenance' : 'available'
+          state.status = 'available'
           state.last_allocation_event_id = null
+          // Ao encerrar a alocação, qualquer downtime em aberto também é encerrado
+          state.is_in_downtime = false
+          state.current_downtime_event_id = null
         }
         break
 
