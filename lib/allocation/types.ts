@@ -138,3 +138,19 @@ export interface AllocationDaysCalculation {
   daily_rate: number
   estimated_cost: number
 }
+
+export interface MaintenancePeriod {
+  start_date: string
+  end_date: string
+  days: number
+  description: string
+}
+
+export interface AllocationDayBreakdown {
+  start_date: string
+  end_date: string
+  total_days: number
+  valid_days: number
+  invalid_days: number
+  maintenance_periods: MaintenancePeriod[]
+}

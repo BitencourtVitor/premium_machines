@@ -325,8 +325,8 @@ export default function ReportsPage() {
     },
     {
       id: 'allocation-credits',
-      title: 'Créditos de alocação',
-      subtitle: 'Créditos (dias) gerados por alocações finalizadas, agrupados por fornecedor',
+      title: 'Pagamentos por Alocação',
+      subtitle: 'Dias ativos e inativos (manutenção) por alocação no período, para apuração do que deve ser pago a cada fornecedor',
     },
     {
       id: 'backcharges',
@@ -341,7 +341,7 @@ export default function ReportsPage() {
   ]
 
   const isReportReady = (reportId: string) => {
-    if (reportId === 'allocation-credits') return true
+    if (reportId === 'allocation-credits') return allPeriod || (!!dateFrom && !!dateTo)
     if (reportId === 'historico') return !!selectedEquipmentId
     if (reportId === 'abastecimento') return true
     if (reportId === 'alocacoes') return allPeriod || (!!dateFrom && !!dateTo)
@@ -445,7 +445,13 @@ export default function ReportsPage() {
           alert('Erro ao gerar relatório: ' + data.message)
         }
       } else if (reportId === 'allocation-credits') {
-        const res = await fetch(`/api/reports/allocation-credits`, { cache: 'no-store' })
+        const queryParams = new URLSearchParams()
+        if (allPeriod) queryParams.append('allPeriod', 'true')
+        else {
+          if (dateFrom) queryParams.append('dateFrom', dateFrom)
+          if (dateTo) queryParams.append('dateTo', dateTo)
+        }
+        const res = await fetch(`/api/reports/allocation-credits?${queryParams.toString()}`, { cache: 'no-store' })
         const data = await res.json()
 
         if (data.success) {
@@ -573,7 +579,13 @@ export default function ReportsPage() {
           alert('Erro ao gerar relatório Excel: ' + data.message)
         }
       } else if (reportId === 'allocation-credits') {
-        const res = await fetch(`/api/reports/allocation-credits`, { cache: 'no-store' })
+        const queryParams = new URLSearchParams()
+        if (allPeriod) queryParams.append('allPeriod', 'true')
+        else {
+          if (dateFrom) queryParams.append('dateFrom', dateFrom)
+          if (dateTo) queryParams.append('dateTo', dateTo)
+        }
+        const res = await fetch(`/api/reports/allocation-credits?${queryParams.toString()}`, { cache: 'no-store' })
         const data = await res.json()
 
         if (data.success) {

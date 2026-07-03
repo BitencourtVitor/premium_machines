@@ -1,5 +1,133 @@
 import { supabaseServer } from '../supabase-server'
-import { AllocationDaysCalculation } from './types'
+import { AllocationDayBreakdown, AllocationDaysCalculation, MaintenancePeriod } from './types'
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+export const toUtcMidnightMs = (iso: string): number => {
+  const d = iso.split('T')[0]
+  return new Date(`${d}T00:00:00.000Z`).getTime()
+}
+
+export const diffDays = (aIso: string, bIso: string): number => {
+  return Math.trunc((toUtcMidnightMs(aIso) - toUtcMidnightMs(bIso)) / MS_PER_DAY)
+}
+
+const maintenanceReasons = ['maintenance', 'preventive', 'corrective', 'defect']
+
+const getDowntimeDescription = (event: any): string => {
+  if (event.downtime_description) return event.downtime_description
+  if (event.downtime_reason === 'preventive' || event.downtime_reason === 'maintenance') return 'Manutenção Preventiva'
+  if (event.downtime_reason === 'corrective' || event.downtime_reason === 'defect') return 'Manutenção Corretiva'
+  return 'N/A'
+}
+
+export const maintenanceCreditDaysFromDurationMs = (durationMs: number): number => {
+  return durationMs > MS_PER_DAY ? Math.floor(durationMs / MS_PER_DAY) : 0
+}
+
+/**
+ * Agrupa eventos downtime_start/downtime_end (ordenados por event_date) de UMA máquina em
+ * períodos de manutenção. Um período ainda em aberto (sem downtime_end correspondente) sai
+ * com end_date null — quem consome (overlapDays) decide onde clampar.
+ */
+export function buildMaintenancePeriods(downtimeEvents: any[]): Array<{ start_date: string; end_date: string | null; description: string }> {
+  const periods: Array<{ start_date: string; end_date: string | null; description: string }> = []
+  let currentStart: any | null = null
+
+  for (const ev of downtimeEvents) {
+    if (ev.event_type === 'downtime_start' && maintenanceReasons.includes(ev.downtime_reason)) {
+      if (currentStart) {
+        periods.push({ start_date: currentStart.event_date, end_date: null, description: getDowntimeDescription(currentStart) })
+      }
+      currentStart = ev
+      continue
+    }
+    if (ev.event_type === 'downtime_end' && currentStart) {
+      periods.push({ start_date: currentStart.event_date, end_date: ev.event_date, description: getDowntimeDescription(currentStart) })
+      currentStart = null
+    }
+  }
+
+  if (currentStart) {
+    periods.push({ start_date: currentStart.event_date, end_date: null, description: getDowntimeDescription(currentStart) })
+  }
+
+  return periods
+}
+
+/**
+ * Soma os dias de manutenção sobrepostos à janela [windowStartIso, windowEndIso], clampando
+ * períodos ainda em aberto (end_date null) no fim da janela.
+ */
+export function overlapDays(
+  windowStartIso: string,
+  windowEndIso: string,
+  periods: Array<{ start_date: string; end_date: string | null; description: string }>
+): { totalOverlapDays: number; overlappingPeriods: MaintenancePeriod[] } {
+  const windowStartMs = new Date(windowStartIso).getTime()
+  const windowEndMs = new Date(windowEndIso).getTime()
+
+  const overlappingPeriods: MaintenancePeriod[] = []
+  let totalOverlapDays = 0
+
+  for (const p of periods) {
+    const maintStartMs = new Date(p.start_date).getTime()
+    const maintEndMs = new Date(p.end_date || windowEndIso).getTime()
+
+    const overlapStartMs = Math.max(windowStartMs, maintStartMs)
+    const overlapEndMs = Math.min(windowEndMs, maintEndMs)
+    if (overlapEndMs <= overlapStartMs) continue
+
+    const durationMs = overlapEndMs - overlapStartMs
+    const days = maintenanceCreditDaysFromDurationMs(durationMs)
+    if (days > 0) totalOverlapDays += days
+
+    overlappingPeriods.push({
+      start_date: new Date(overlapStartMs).toISOString(),
+      end_date: new Date(overlapEndMs).toISOString(),
+      days,
+      description: p.description,
+    })
+  }
+
+  return { totalOverlapDays, overlappingPeriods }
+}
+
+/**
+ * Quebra de dias válidos (cobrados) vs. inválidos (crédito por manutenção, dia sem uso) de
+ * UMA alocação específica (par start_allocation/end_allocation), não de um período genérico.
+ */
+export async function calculateAllocationDayBreakdown(
+  machineId: string,
+  startDate: string,
+  endDate: string
+): Promise<AllocationDayBreakdown> {
+  const { data: downtimeEvents } = await supabaseServer
+    .from('allocation_events')
+    .select('id, event_type, event_date, downtime_reason, downtime_description')
+    .eq('machine_id', machineId)
+    .eq('status', 'approved')
+    .in('event_type', ['downtime_start', 'downtime_end'])
+    .lte('event_date', endDate)
+    .order('event_date', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  const periods = buildMaintenancePeriods(downtimeEvents || [])
+  const { totalOverlapDays, overlappingPeriods } = overlapDays(startDate, endDate, periods)
+
+  const total_days = diffDays(endDate, startDate)
+  const invalid_days = totalOverlapDays
+  const valid_days = Math.max(0, total_days - invalid_days)
+
+  return {
+    start_date: startDate,
+    end_date: endDate,
+    total_days,
+    valid_days,
+    invalid_days,
+    maintenance_periods: overlappingPeriods,
+  }
+}
 
 /**
  * Calcula os dias de alocação de uma máquina em um período

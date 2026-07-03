@@ -649,11 +649,7 @@ export const generateMaintenanceTimePDF = async (data: any[], periodLabel: strin
 }
 
 export const generateAllocationCreditsPDF = async (
-  summaryBySupplier: Array<{
-    supplier_id: string
-    supplier_name: string
-    machine_types: Array<{ machine_type: string; credit_days: number; base_credit_days: number; maintenance_credit_days: number }>
-  }>,
+  _summaryBySupplier: unknown,
   allocations: Array<{
     unit_number: string
     supplier_name: string
@@ -662,11 +658,12 @@ export const generateAllocationCreditsPDF = async (
     site_address: string
     start_date: string
     due_date: string
-    end_date: string
-    base_credit_days: number
-    maintenance_credit_days: number
+    end_date: string | null
+    is_ongoing?: boolean
     maintenance_periods: Array<{ start_date: string; end_date: string; days: number; description: string }>
-    credit_days: number
+    total_days?: number
+    valid_days?: number
+    invalid_days?: number
   }>
 ) => {
   const doc = new jsPDF()
@@ -678,7 +675,7 @@ export const generateAllocationCreditsPDF = async (
   doc.setFontSize(12)
   doc.setTextColor(40)
   doc.setFont('helvetica', 'bold')
-  doc.text('Créditos de alocação', margin, 35)
+  doc.text('Pagamentos por Alocação', margin, 35)
 
   doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
@@ -693,115 +690,32 @@ export const generateAllocationCreditsPDF = async (
     currentY = 20
   }
 
-  const formatCredits = (creditDays: number) => {
-    const sign = creditDays > 0 ? '+' : ''
-    return `${sign}${creditDays} dias`
-  }
-
-  const getCreditColor = (creditDays: number) => {
-    if (creditDays > 0) return [22, 163, 74] as const
-    if (creditDays < 0) return [220, 38, 38] as const
-    return [100, 100, 100] as const
-  }
-
-  const drawSupplierSummaryCard = (supplier: any) => {
-    const types = supplier.machine_types || []
-    const headerHeight = 10
-    const rowHeight = 6
-    const padding = 6
-    const cardHeight = headerHeight + Math.max(1, types.length) * rowHeight + padding + 2
-
-    ensurePage(cardHeight + 4)
-
-    doc.setFillColor(252, 252, 252)
-    doc.setDrawColor(210, 210, 210)
-    doc.roundedRect(margin, currentY, pageWidth - margin * 2, cardHeight, 2, 2, 'FD')
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.setTextColor(40, 40, 40)
-    doc.text((supplier.supplier_name || 'Fornecedor desconhecido').toUpperCase(), margin + 5, currentY + 8)
-
-    let y = currentY + headerHeight + 2
-    if (!types.length) {
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      doc.setTextColor(110, 110, 110)
-      doc.text('Nenhum crédito encontrado.', margin + 5, y + 4)
-      currentY += cardHeight + 8
-      return
-    }
-
-    for (const t of types) {
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      doc.setTextColor(60, 60, 60)
-      doc.text(`${t.machine_type}:`, margin + 5, y + 4)
-
-      doc.setFont('helvetica', 'bold')
-      const c = getCreditColor(t.credit_days)
-      doc.setTextColor(c[0], c[1], c[2])
-      doc.text(formatCredits(t.credit_days), pageWidth - margin - 5, y + 4, { align: 'right' })
-      y += rowHeight
-    }
-
-    currentY += cardHeight + 8
-  }
-
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(60, 60, 60)
-  doc.text('Saldo de créditos por fornecedor e tipo de máquina', margin, currentY)
-  currentY += 10
+  doc.text('Alocações no período', margin, currentY)
+  currentY += 6
 
-  for (const supplier of summaryBySupplier || []) {
-    drawSupplierSummaryCard(supplier)
-  }
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setFillColor(34, 197, 94)
+  doc.rect(margin, currentY - 2.8, 3, 3, 'F')
+  doc.setTextColor(90, 90, 90)
+  doc.text('Alocado', margin + 4.5, currentY)
+  doc.setFillColor(249, 115, 22)
+  doc.rect(margin + 26, currentY - 2.8, 3, 3, 'F')
+  doc.text('Manutenção', margin + 30.5, currentY)
+  currentY += 8
 
-  ensurePage(16)
-  doc.setFont('helvetica', 'italic')
-  doc.setFontSize(9)
-  doc.setTextColor(110, 110, 110)
-  doc.text(
-    'Nas páginas a seguir, você verá o descritivo de cada alocação já encerrada. Role para baixo para continuar.',
-    margin,
-    currentY
-  )
-
-  doc.addPage()
-  currentY = 20
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(60, 60, 60)
-  doc.text('Alocações encerradas', margin, currentY)
-  currentY += 10
-
-  type IconType = 'start' | 'due' | 'end' | 'maint_start' | 'maint_end' | 'credits' | 'base'
-
-  const neutralIconColor = [120, 120, 120] as const
-
-  const iconColors = {
-    start: neutralIconColor,
-    due: neutralIconColor,
-    end: neutralIconColor,
-    maintStart: neutralIconColor,
-    maintEnd: neutralIconColor,
-    base: neutralIconColor,
-  }
+  type IconType = 'active' | 'inactive'
 
   const faFontName = 'FA'
   const faFontFile = 'fa-solid-900.ttf'
   const faFontUrl = '/fontawesome/fa-solid-900.ttf'
 
   const faGlyphs: Record<IconType, string> = {
-    start: String.fromCodePoint(0xf04b),
-    due: String.fromCodePoint(0xf073),
-    end: String.fromCodePoint(0xf11e),
-    maint_start: String.fromCodePoint(0xf7d9),
-    maint_end: String.fromCodePoint(0xf058),
-    credits: String.fromCodePoint(0xf4c0),
-    base: String.fromCodePoint(0xf017),
+    active: String.fromCodePoint(0xf017),   // clock
+    inactive: String.fromCodePoint(0xf7d9), // wrench
   }
 
   let faFontLoaded = false
@@ -885,68 +799,131 @@ export const generateAllocationCreditsPDF = async (
     doc.setFont('helvetica', 'normal')
   }
 
-  const drawCreditsBox = (
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    creditDays: number,
-    baseDays: number,
-    maintenanceDays: number
-  ) => {
-    doc.setFillColor(255, 255, 255)
-    doc.setDrawColor(230, 230, 230)
-    doc.roundedRect(x, y, w, h, 1.5, 1.5, 'FD')
+  type TimelineSegment = { type: 'allocated' | 'maintenance'; days: number }
 
-    const iconSlotW = h
-    const metricsW = Math.min(iconSlotW * 3.0, Math.max(iconSlotW * 2.4, w * 0.48))
-    const dividerX = x + w - metricsW
-    const contentX = x + iconSlotW + 3
+  const TIMELINE_COLORS = {
+    allocated: [34, 197, 94] as const,   // Tailwind green-500
+    maintenance: [249, 115, 22] as const, // Tailwind orange-500
+  }
 
-    doc.setDrawColor(230, 230, 230)
-    doc.line(dividerX, y + 1.5, dividerX, y + h - 1.5)
+  const buildTimelineSegments = (a: any): TimelineSegment[] => {
+    const startMs = new Date(a.start_date).getTime()
+    const endMs = new Date(a.end_date || new Date().toISOString()).getTime()
+    if (!(endMs > startMs)) return []
 
-    const creditColor = getCreditColor(creditDays)
-    drawFaIcon('credits', x, y, iconSlotW, h, creditColor)
+    const dayMs = 24 * 60 * 60 * 1000
+    const periods = (Array.isArray(a.maintenance_periods) ? a.maintenance_periods : [])
+      .map((p: any) => ({ startMs: new Date(p.start_date).getTime(), endMs: new Date(p.end_date).getTime() }))
+      .filter((p: any) => p.endMs > p.startMs && p.endMs > startMs && p.startMs < endMs)
+      .sort((x: any, y: any) => x.startMs - y.startMs)
 
-    doc.setDrawColor(235, 235, 235)
-    doc.line(x + iconSlotW, y + 1.4, x + iconSlotW, y + h - 1.4)
+    const segments: TimelineSegment[] = []
+    let cursor = startMs
 
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
-    doc.setTextColor(120, 120, 120)
-    doc.text('Créditos', contentX, y + 4)
+    for (const p of periods) {
+      const segStart = Math.max(cursor, startMs)
+      const segEnd = Math.min(p.startMs, endMs)
+      if (segEnd > segStart) segments.push({ type: 'allocated', days: (segEnd - segStart) / dayMs })
 
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
-    doc.setTextColor(creditColor[0], creditColor[1], creditColor[2])
-    doc.text(formatCredits(creditDays), contentX, y + 9)
+      const maintStart = Math.max(p.startMs, startMs)
+      const maintEnd = Math.min(p.endMs, endMs)
+      if (maintEnd > maintStart) segments.push({ type: 'maintenance', days: (maintEnd - maintStart) / dayMs })
 
-    const colW = metricsW / 2
-
-    const drawMetric = (cellX: number, type: IconType, color: readonly [number, number, number], value: number) => {
-      const slot = h * 0.55
-      const slotY = y + (h - slot) / 2
-      drawFaIcon(type, cellX + 1.6, slotY, slot, slot, color, Math.max(9, slot * 1.05))
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(9)
-      doc.setTextColor(60, 60, 60)
-      doc.text(String(value), cellX + slot + 4.8, y + h / 2, { baseline: 'middle' })
-      doc.setFont('helvetica', 'normal')
+      cursor = Math.max(cursor, maintEnd)
     }
 
-    drawMetric(dividerX, 'base', iconColors.base, baseDays)
-    drawMetric(dividerX + colW, 'maint_start', iconColors.maintStart, maintenanceDays)
+    if (endMs > cursor) segments.push({ type: 'allocated', days: (endMs - cursor) / dayMs })
+
+    return segments.filter(s => s.days > 0)
+  }
+
+  const drawTimelineBar = (x: number, y: number, w: number, h: number, segments: TimelineSegment[]) => {
+    const totalDays = segments.reduce((sum, s) => sum + s.days, 0)
+    doc.setDrawColor(210, 210, 210)
+    doc.rect(x, y, w, h, 'S')
+    if (totalDays <= 0) return
+
+    let segX = x
+    for (const seg of segments) {
+      const segW = (seg.days / totalDays) * w
+      const color = TIMELINE_COLORS[seg.type]
+      doc.setFillColor(color[0], color[1], color[2])
+      doc.rect(segX, y, Math.max(segW, 0.1), h, 'F')
+      segX += segW
+    }
+  }
+
+  const timelineBlockH = 14 // label + gap + barra
+  const eventRowH = 7
+  const MAX_VISIBLE_MAINT_EVENTS = 4
+
+  type TimelineEvent = { label: string; dateIso: string | null; withTime: boolean; isMaintenance: boolean }
+
+  const buildTimelineEvents = (a: any): { events: TimelineEvent[]; hiddenCount: number } => {
+    const periods = Array.isArray(a.maintenance_periods) ? a.maintenance_periods : []
+    const visible = periods.slice(0, MAX_VISIBLE_MAINT_EVENTS)
+    const hiddenCount = Math.max(0, periods.length - visible.length)
+
+    const middle: TimelineEvent[] = visible.flatMap((p: any) => [
+      { label: `Manutenção — Início${p.description ? ` (${p.description})` : ''}`, dateIso: p.start_date, withTime: true, isMaintenance: true },
+      { label: 'Manutenção — Fim', dateIso: p.end_date, withTime: true, isMaintenance: true },
+    ])
+    middle.sort((x, y) => new Date(x.dateIso as string).getTime() - new Date(y.dateIso as string).getTime())
+
+    const events: TimelineEvent[] = [
+      { label: 'Início da Locação', dateIso: a.start_date, withTime: false, isMaintenance: false },
+      ...middle,
+      { label: a.is_ongoing ? 'Em Andamento' : 'Encerramento da Locação', dateIso: a.end_date, withTime: false, isMaintenance: false },
+    ]
+
+    return { events, hiddenCount }
+  }
+
+  const drawEventTimelineList = (x: number, y: number, w: number, events: TimelineEvent[], hiddenCount: number): number => {
+    const dotR = 1.3
+    const dotX = x + dotR + 0.5
+
+    if (events.length > 1) {
+      doc.setDrawColor(220, 220, 220)
+      doc.setLineWidth(0.3)
+      doc.line(dotX, y + eventRowH / 2, dotX, y + eventRowH * (events.length - 1) + eventRowH / 2)
+    }
+
+    events.forEach((ev, i) => {
+      const rowY = y + i * eventRowH
+      const color = ev.isMaintenance ? TIMELINE_COLORS.maintenance : TIMELINE_COLORS.allocated
+
+      doc.setFillColor(color[0], color[1], color[2])
+      doc.circle(dotX, rowY + eventRowH / 2, dotR, 'F')
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7.5)
+      doc.setTextColor(60, 60, 60)
+      const labelLines = doc.splitTextToSize(ev.label, w - 8)
+      doc.text(labelLines[0], dotX + 5, rowY + eventRowH / 2 - 0.6)
+
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(7)
+      doc.setTextColor(120, 120, 120)
+      const dateLabel = ev.dateIso ? (ev.withTime ? formatWithSystemTimezone(ev.dateIso) : formatDateOnly(ev.dateIso)) : 'Em andamento'
+      doc.text(dateLabel, dotX + 5, rowY + eventRowH / 2 + 3)
+    })
+
+    let consumedH = events.length * eventRowH
+    if (hiddenCount > 0) {
+      doc.setFont('helvetica', 'italic')
+      doc.setFontSize(7)
+      doc.setTextColor(120, 120, 120)
+      doc.text(`+ ${hiddenCount} manutenções`, dotX + 5, y + consumedH + 3)
+      consumedH += 6
+    }
+
+    return consumedH
   }
 
   const drawAllocationCard = (a: any) => {
     const boxGap = 3
     const boxH = 11
-    const flowGap = 2.5
-
-    const maintenancePeriods = Array.isArray(a.maintenance_periods) ? a.maintenance_periods : []
-    const visibleMaintenancePeriods = maintenancePeriods.slice(0, 3)
-    const hiddenMaintenanceCount = Math.max(0, maintenancePeriods.length - visibleMaintenancePeriods.length)
 
     const cardWidth = pageWidth - margin * 2
     const leftX = margin + 5
@@ -965,15 +942,17 @@ export const generateAllocationCreditsPDF = async (
     const supplierName = a.supplier_name || 'Fornecedor desconhecido'
     const supplierLineOffsetY = locationLines.length === 2 ? 24 : 20.5
 
-    const creditBoxOffsetY = supplierLineOffsetY + 2.5
-    const creditBoxW = Math.min(96, leftMaxWidth)
+    const daysBoxOffsetY = supplierLineOffsetY + 2.5
+    const daysBoxW = Math.min(96, leftMaxWidth)
 
-    let flowOffsetY = 7 + boxH + flowGap
-    flowOffsetY += visibleMaintenancePeriods.length * 2 * (boxH + flowGap)
-    if (hiddenMaintenanceCount > 0) flowOffsetY += 8
-    const rightBottomOffsetY = flowOffsetY + boxH
+    const { events: timelineEvents, hiddenCount: hiddenMaintenanceCount } = buildTimelineEvents(a)
 
-    const cardHeight = Math.max(40, rightBottomOffsetY + 6, creditBoxOffsetY + boxH + 6)
+    // Coluna esquerda: identificação + dias + barra de progressão. Coluna direita: só a lista de eventos
+    // (pode crescer bastante quando há muitas manutenções, sem "esticar" o conteúdo da esquerda).
+    const leftColumnH = daysBoxOffsetY + boxH + 6 + timelineBlockH + 6
+    const rightColumnH = 7 + timelineEvents.length * eventRowH + (hiddenMaintenanceCount > 0 ? 6 : 0) + 6
+
+    const cardHeight = Math.max(40, leftColumnH, rightColumnH)
 
     ensurePage(cardHeight + 6)
 
@@ -998,53 +977,39 @@ export const generateAllocationCreditsPDF = async (
     doc.setTextColor(110, 110, 110)
     doc.text(`Fornecedor: ${supplierName}`, leftX, cardY + supplierLineOffsetY)
 
-    const baseDays = Number(a.base_credit_days || 0)
-    const maintDays = Number(a.maintenance_credit_days || 0)
-    drawCreditsBox(leftX, cardY + creditBoxOffsetY, creditBoxW, boxH, Number(a.credit_days || 0), baseDays, maintDays)
+    const metricBoxW = (daysBoxW - boxGap) / 2
+    drawFieldBox(
+      'Dias Ativos',
+      `${Number(a.valid_days || 0)} dias`,
+      leftX,
+      cardY + daysBoxOffsetY,
+      metricBoxW,
+      boxH,
+      TIMELINE_COLORS.allocated,
+      'active',
+      TIMELINE_COLORS.allocated
+    )
+    drawFieldBox(
+      'Dias Inativos (Manut.)',
+      `${Number(a.invalid_days || 0)} dias`,
+      leftX + metricBoxW + boxGap,
+      cardY + daysBoxOffsetY,
+      metricBoxW,
+      boxH,
+      TIMELINE_COLORS.maintenance,
+      'inactive',
+      TIMELINE_COLORS.maintenance
+    )
 
-    const boxW = (rightPanelWidth - boxGap) / 2
+    drawEventTimelineList(rightPanelX, cardY + 7, rightPanelWidth, timelineEvents, hiddenMaintenanceCount)
 
-    let flowY = cardY + 7
-    drawFieldBox('Início', formatDateOnly(a.start_date), rightPanelX, flowY, rightPanelWidth, boxH, undefined, 'start', iconColors.start)
-    flowY += boxH + flowGap
-
-    for (const p of visibleMaintenancePeriods) {
-      drawFieldBox(
-        'Manut. início',
-        formatWithSystemTimezone(p.start_date),
-        rightPanelX,
-        flowY,
-        rightPanelWidth,
-        boxH,
-        undefined,
-        'maint_start',
-        iconColors.maintStart
-      )
-      flowY += boxH + flowGap
-      drawFieldBox(
-        'Manut. fim',
-        formatWithSystemTimezone(p.end_date),
-        rightPanelX,
-        flowY,
-        rightPanelWidth,
-        boxH,
-        undefined,
-        'maint_end',
-        iconColors.maintEnd
-      )
-      flowY += boxH + flowGap
-    }
-
-    if (hiddenMaintenanceCount > 0) {
-      doc.setFont('helvetica', 'italic')
-      doc.setFontSize(7.5)
-      doc.setTextColor(120, 120, 120)
-      doc.text(`+ ${hiddenMaintenanceCount} manutenções`, rightPanelX + 2.5, flowY + 6.5)
-      flowY += 8
-    }
-
-    drawFieldBox('Venc.', formatDateOnly(a.due_date), rightPanelX, flowY, boxW, boxH, undefined, 'due', iconColors.due)
-    drawFieldBox('Término', formatDateOnly(a.end_date), rightPanelX + boxW + boxGap, flowY, boxW, boxH, undefined, 'end', iconColors.end)
+    const timelineY = cardY + daysBoxOffsetY + boxH + 6
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    doc.setTextColor(120, 120, 120)
+    const totalDaysLabel = typeof a.total_days === 'number' ? `${a.total_days} dias` : ''
+    doc.text(`Progressão da locação${totalDaysLabel ? ` — ${totalDaysLabel}` : ''}`, leftX, timelineY)
+    drawTimelineBar(leftX, timelineY + 2, daysBoxW, 6, buildTimelineSegments(a))
 
     currentY += cardHeight + 8
   }
@@ -1053,7 +1018,7 @@ export const generateAllocationCreditsPDF = async (
     drawAllocationCard(a)
   }
 
-  doc.save(`creditos_alocacao_${new Date().getTime()}.pdf`)
+  doc.save(`pagamentos_por_alocacao_${new Date().getTime()}.pdf`)
 }
 
 // ── Backcharges ────────────────────────────────────────────────────────────────

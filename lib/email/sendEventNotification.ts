@@ -1,4 +1,6 @@
 import { supabaseServer } from '@/lib/supabase-server'
+import { calculateAllocationDayBreakdown } from '@/lib/allocation/financial'
+import { AllocationDayBreakdown } from '@/lib/allocation/types'
 
 const EVENT_LABELS: Record<string, string> = {
   start_allocation: 'Início de Locação',
@@ -66,7 +68,7 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function buildEmailContent(event: any): { subject: string; html: string; text: string } {
+function buildEmailContent(event: any, dayBreakdown?: AllocationDayBreakdown | null): { subject: string; html: string; text: string } {
   const label = EVENT_LABELS[event.event_type] || event.event_type
   const machine = event.machine?.unit_number || event.requested_machine_type?.nome || 'N/A'
   const machineType = event.machine?.machine_type?.nome || event.requested_machine_type?.nome || ''
@@ -162,6 +164,10 @@ function buildEmailContent(event: any): { subject: string; html: string; text: s
           ${local ? row('Local', local) : ''}
           ${row('Data do Evento', fmtDate(event.event_date))}
           ${event.event_type === 'start_allocation' && event.end_date ? row('Vencimento previsto', fmtDateOnly(event.end_date)) : ''}
+          ${event.event_type === 'end_allocation' && dayBreakdown ? row('Início da Locação', fmtDateOnly(dayBreakdown.start_date)) : ''}
+          ${event.event_type === 'end_allocation' && dayBreakdown ? row('Saldo de Dias', `${dayBreakdown.total_days} dias`) : ''}
+          ${event.event_type === 'end_allocation' && dayBreakdown ? row('Dias Válidos (cobrados)', `${dayBreakdown.valid_days} dias`) : ''}
+          ${event.event_type === 'end_allocation' && dayBreakdown ? row('Dias Inválidos (manutenção)', `${dayBreakdown.invalid_days} dias`) : ''}
           ${event.event_type === 'start_allocation' && usedByText ? row('Quem vai usar', usedByText) : ''}
           ${event.downtime_reason ? row('Motivo', DOWNTIME_REASON_LABELS[event.downtime_reason] || event.downtime_reason) : ''}
           ${event.downtime_description ? row('Descrição do problema', event.downtime_description) : ''}
@@ -195,6 +201,12 @@ function buildEmailContent(event: any): { subject: string; html: string; text: s
   if (local) lines.push(`Local: ${local}`)
   lines.push(`Data: ${fmtDate(event.event_date)}`)
   if (event.event_type === 'start_allocation' && event.end_date) lines.push(`Vencimento: ${fmtDateOnly(event.end_date)}`)
+  if (event.event_type === 'end_allocation' && dayBreakdown) {
+    lines.push(`Início da Locação: ${fmtDateOnly(dayBreakdown.start_date)}`)
+    lines.push(`Saldo de Dias: ${dayBreakdown.total_days} dias`)
+    lines.push(`Dias Válidos (cobrados): ${dayBreakdown.valid_days} dias`)
+    lines.push(`Dias Inválidos (manutenção): ${dayBreakdown.invalid_days} dias`)
+  }
   if (usedByText) lines.push(`Quem vai usar: ${usedByText}`)
   if (event.downtime_reason) lines.push(`Motivo: ${DOWNTIME_REASON_LABELS[event.downtime_reason] || event.downtime_reason}`)
   if (event.downtime_description) lines.push(`Problema: ${event.downtime_description}`)
@@ -251,7 +263,26 @@ export async function sendEventNotification(eventId: string): Promise<void> {
       .single()
     if (!event) return
 
-    const { subject, html, text } = buildEmailContent(event)
+    let dayBreakdown: AllocationDayBreakdown | null = null
+    if (event.event_type === 'end_allocation' && event.machine_id && event.site_id) {
+      const { data: startEvent } = await supabaseServer
+        .from('allocation_events')
+        .select('event_date')
+        .eq('machine_id', event.machine_id)
+        .eq('site_id', event.site_id)
+        .eq('event_type', 'start_allocation')
+        .eq('status', 'approved')
+        .lte('event_date', event.event_date)
+        .order('event_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (startEvent) {
+        dayBreakdown = await calculateAllocationDayBreakdown(event.machine_id, startEvent.event_date, event.event_date)
+      }
+    }
+
+    const { subject, html, text } = buildEmailContent(event, dayBreakdown)
 
     const isBackcharge =
       event.event_type === 'downtime_start' &&
