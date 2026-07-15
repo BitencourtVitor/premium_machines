@@ -4,6 +4,7 @@ import { MACHINE_STATUS_LABELS, OWNERSHIP_TYPE_LABELS, getMachineStatusLabel } f
 import BaseList from '@/app/components/BaseList'
 import ListActionButton from '@/app/components/ListActionButton'
 import { getMachineIconUrl } from '@/lib/supabase'
+import { formatCurrency } from '@/lib/formatCurrency'
 
 interface MachinesTabProps {
   loadingMachines: boolean
@@ -128,6 +129,14 @@ export default function MachinesTab({
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
                   <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
                     {machine.current_site.title}
+                  </p>
+                </div>
+              )}
+              {machine.allocation_cost?.valid_cost != null && (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600"></div>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    Custo estimado da alocação: <span className="font-semibold text-gray-700 dark:text-gray-300">{formatCurrency(machine.allocation_cost.valid_cost)}</span>
                   </p>
                 </div>
               )}

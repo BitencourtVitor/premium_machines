@@ -63,6 +63,10 @@ export interface ActiveAllocation {
   origin_site_id?: string | null
   destination_site_id?: string | null
   physical_site_id?: string | null
+  valid_cost?: number | null
+  gross_cost?: number | null
+  credit_amount?: number | null
+  rate_source?: 'category' | 'machine' | 'none'
 }
 
 export interface ActiveDowntime {
@@ -146,6 +150,12 @@ export interface MaintenancePeriod {
   description: string
 }
 
+export interface BlockRates {
+  daily: number | null
+  weekly: number | null
+  fourWeek: number | null
+}
+
 export interface AllocationDayBreakdown {
   start_date: string
   end_date: string
@@ -153,4 +163,8 @@ export interface AllocationDayBreakdown {
   valid_days: number
   invalid_days: number
   maintenance_periods: MaintenancePeriod[]
+  valid_cost: number | null
+  gross_cost: number | null
+  credit_amount: number | null
+  rate_source: 'category' | 'machine' | 'none'
 }

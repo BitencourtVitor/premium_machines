@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
+import { calculateAllocationDayBreakdown } from '@/lib/allocation/financial'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,6 +67,45 @@ export async function GET(request: NextRequest) {
     const sites = Array.from(siteMap.values())
       .map(s => ({ ...s, events: s.events.sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime()) }))
       .sort((a, b) => b.events.length - a.events.length)
+
+    // Custo por alocação que começou (e opcionalmente terminou) nesta obra — anexado no evento
+    // start_allocation, pareado com o end_allocation da mesma máquina dentro da mesma lista de
+    // eventos do site (aloc. começou e terminou, ou começou e está em andamento).
+    const today = new Date().toISOString()
+    const costTasks: Promise<void>[] = []
+
+    for (const s of sites) {
+      const openStartByMachine = new Map<string, any>()
+      for (const event of s.events) {
+        const machineId = Array.isArray(event.machine) ? event.machine[0]?.id : event.machine?.id
+        if (!machineId) continue
+
+        if (event.event_type === 'start_allocation') {
+          openStartByMachine.set(machineId, event)
+          ;(event as any).allocation_cost = null
+        } else if (event.event_type === 'end_allocation') {
+          const startEvent = openStartByMachine.get(machineId)
+          if (startEvent) {
+            costTasks.push(
+              calculateAllocationDayBreakdown(machineId, startEvent.event_date, event.event_date)
+                .then(breakdown => { (startEvent as any).allocation_cost = breakdown.valid_cost })
+                .catch(error => console.error(`Erro ao calcular custo da alocação ${startEvent.id}:`, error))
+            )
+            openStartByMachine.delete(machineId)
+          }
+        }
+      }
+      // Alocações ainda em aberto ao final da lista deste site — custo estimado até hoje
+      for (const [machineId, startEvent] of Array.from(openStartByMachine.entries())) {
+        costTasks.push(
+          calculateAllocationDayBreakdown(machineId, startEvent.event_date, today)
+            .then(breakdown => { (startEvent as any).allocation_cost = breakdown.valid_cost })
+            .catch(error => console.error(`Erro ao calcular custo da alocação ${startEvent.id}:`, error))
+        )
+      }
+    }
+
+    await Promise.all(costTasks)
 
     return NextResponse.json({ success: true, sites })
   } catch (error: any) {

@@ -6,6 +6,7 @@ import { adjustDateToSystemTimezone, formatWithSystemTimezone } from '@/lib/time
 import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 import { formatConstruction } from '@/lib/allocation/formatConstruction'
 import { getMachineIconUrl } from '@/lib/supabase'
+import { formatCurrency } from '@/lib/formatCurrency'
 
 interface SiteDetailsModalProps {
   isOpen: boolean
@@ -700,6 +701,14 @@ export default function SiteDetailsModal({
                                   {cycleStart} — {cycleEnd}
                                 </p>
                               </div>
+                              {allocation.machine_ownership === 'rented' && allocation.valid_cost != null && (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600"></span>
+                                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold whitespace-nowrap uppercase">
+                                    {allocation.actual_end_date ? 'Custo final' : 'Custo est.'}: {formatCurrency(allocation.valid_cost)}
+                                  </p>
+                                </div>
+                              )}
                               {vencimento && !allocation.actual_end_date && (
                                 <div className="flex items-center gap-1.5">
                                   <span className={`w-1.5 h-1.5 rounded-full ${

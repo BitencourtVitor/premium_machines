@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
-import { diffDays, buildMaintenancePeriods, maintenanceCreditDaysFromDurationMs } from '@/lib/allocation/financial'
+import { diffDays, buildMaintenancePeriods, maintenanceCreditDaysFromDurationMs, calculateAllocationDayBreakdown } from '@/lib/allocation/financial'
 
 export const dynamic = 'force-dynamic'
 
@@ -133,6 +133,10 @@ export async function GET(request: NextRequest) {
       total_days: number
       valid_days: number
       invalid_days: number
+      valid_cost: number | null
+      gross_cost: number | null
+      credit_amount: number | null
+      rate_source: 'category' | 'machine' | 'none'
     }> = []
 
     for (const [machineId, machineEvents] of Array.from(eventsByMachine.entries())) {
@@ -222,6 +226,10 @@ export async function GET(request: NextRequest) {
           total_days,
           valid_days,
           invalid_days,
+          valid_cost: null,
+          gross_cost: null,
+          credit_amount: null,
+          rate_source: 'none',
         })
       }
 
@@ -249,6 +257,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Custo por alocação (final se já encerrou, estimado até hoje/fim do período se ainda em aberto) —
+    // reaproveita o mesmo motor de cálculo por blocos usado nas outras telas.
+    await Promise.all(
+      allocationCredits.map(async (row) => {
+        try {
+          const windowEnd = row.end_date || ongoingEffectiveEndIso
+          const breakdown = await calculateAllocationDayBreakdown(row.machine_id, row.start_date, windowEnd)
+          row.valid_cost = breakdown.valid_cost
+          row.gross_cost = breakdown.gross_cost
+          row.credit_amount = breakdown.credit_amount
+          row.rate_source = breakdown.rate_source
+        } catch (error) {
+          console.error(`Erro ao calcular custo da alocação ${row.allocation_event_id}:`, error)
+        }
+      })
+    )
+
     const periodFilteredCredits = (startDateFilter || endDateFilter)
       ? allocationCredits.filter(row => {
           const rowStartMs = new Date(row.start_date).getTime()
@@ -272,6 +297,8 @@ export async function GET(request: NextRequest) {
         creditsByType: Map<string, number>
         baseCreditsByType: Map<string, number>
         maintenanceCreditsByType: Map<string, number>
+        costByType: Map<string, number>
+        creditAmountByType: Map<string, number>
       }
     >()
     for (const row of periodFilteredCredits) {
@@ -283,6 +310,8 @@ export async function GET(request: NextRequest) {
           creditsByType: new Map(),
           baseCreditsByType: new Map(),
           maintenanceCreditsByType: new Map(),
+          costByType: new Map(),
+          creditAmountByType: new Map(),
         })
       }
       const bucket = creditsBySupplier.get(key)!
@@ -292,6 +321,12 @@ export async function GET(request: NextRequest) {
         row.machine_type,
         (bucket.maintenanceCreditsByType.get(row.machine_type) || 0) + row.maintenance_credit_days
       )
+      if (row.valid_cost != null) {
+        bucket.costByType.set(row.machine_type, (bucket.costByType.get(row.machine_type) || 0) + row.valid_cost)
+      }
+      if (row.credit_amount != null) {
+        bucket.creditAmountByType.set(row.machine_type, (bucket.creditAmountByType.get(row.machine_type) || 0) + row.credit_amount)
+      }
     }
 
     const summaryBySupplier = Array.from(creditsBySupplier.values())
@@ -304,6 +339,8 @@ export async function GET(request: NextRequest) {
             credit_days,
             base_credit_days: s.baseCreditsByType.get(machine_type) || 0,
             maintenance_credit_days: s.maintenanceCreditsByType.get(machine_type) || 0,
+            total_cost: s.costByType.get(machine_type) ?? null,
+            total_credit_amount: s.creditAmountByType.get(machine_type) ?? null,
           }))
           .sort((a, b) => a.machine_type.localeCompare(b.machine_type, 'en')),
       }))

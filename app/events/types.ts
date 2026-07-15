@@ -47,6 +47,10 @@ export interface ActiveAllocation {
   current_downtime_event_id: string | null
   current_downtime_reason: string | null
   current_downtime_start: string | null
+  valid_cost?: number | null
+  gross_cost?: number | null
+  credit_amount?: number | null
+  rate_source?: 'category' | 'machine' | 'none'
 }
 
 export interface ActiveDowntime {

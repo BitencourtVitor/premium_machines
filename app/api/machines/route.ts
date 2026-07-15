@@ -45,6 +45,14 @@ export async function GET(request: NextRequest) {
 
       let status = 'available'
       let current_site = machine.current_site || null
+      let allocation_cost: {
+        valid_cost: number | null
+        gross_cost: number | null
+        credit_amount: number | null
+        rate_source: 'category' | 'machine' | 'none'
+        allocation_start: string
+        is_open: boolean
+      } | null = null
 
       if (activeAllocation) {
         status = activeAllocation.status
@@ -52,12 +60,23 @@ export async function GET(request: NextRequest) {
           id: activeAllocation.site_id,
           title: activeAllocation.site_title,
         }
+        if (activeAllocation.valid_cost != null) {
+          allocation_cost = {
+            valid_cost: activeAllocation.valid_cost,
+            gross_cost: activeAllocation.gross_cost ?? null,
+            credit_amount: activeAllocation.credit_amount ?? null,
+            rate_source: activeAllocation.rate_source ?? 'none',
+            allocation_start: activeAllocation.allocation_start,
+            is_open: true,
+          }
+        }
       }
 
       return {
         ...machine,
         status,
         current_site,
+        allocation_cost,
       }
     })
 

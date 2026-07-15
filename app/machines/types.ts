@@ -11,6 +11,14 @@ export interface Machine {
   daily_rate?: string
   weekly_rate?: string
   monthly_rate?: string
+  allocation_cost?: {
+    valid_cost: number | null
+    gross_cost: number | null
+    credit_amount: number | null
+    rate_source: 'category' | 'machine' | 'none'
+    allocation_start: string
+    is_open: boolean
+  } | null
 }
 
 export interface MachineType {

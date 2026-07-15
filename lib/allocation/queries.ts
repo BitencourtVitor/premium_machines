@@ -1,6 +1,7 @@
 import { supabaseServer } from '../supabase-server'
 import { ActiveAllocation, ActiveDowntime, ActiveTransport, SiteAllocationSummary, MachineAllocationState } from './types'
 import { calculateMachineAllocationState, calculateStateFromEvents } from './stateCalculation'
+import { calculateAllocationDayBreakdown } from './financial'
 
 /**
  * Retorna todas as alocações ativas no sistema
@@ -157,6 +158,25 @@ export async function getActiveAllocations(): Promise<ActiveAllocation[]> {
       }
     }
   }
+
+  // 6. Custo estimado (aloc. rented ainda em aberto -> janela até hoje) — reaproveita o mesmo
+  // motor de cálculo por blocos usado pra alocação encerrada, só muda a data final da janela.
+  const today = new Date().toISOString()
+  await Promise.all(
+    activeAllocations
+      .filter(a => a.machine_ownership === 'rented' && a.allocation_start)
+      .map(async (allocation) => {
+        try {
+          const breakdown = await calculateAllocationDayBreakdown(allocation.machine_id, allocation.allocation_start, today)
+          allocation.valid_cost = breakdown.valid_cost
+          allocation.gross_cost = breakdown.gross_cost
+          allocation.credit_amount = breakdown.credit_amount
+          allocation.rate_source = breakdown.rate_source
+        } catch (error) {
+          console.error(`Erro ao calcular custo da alocação da máquina ${allocation.machine_id}:`, error)
+        }
+      })
+  )
 
   return activeAllocations
 }
@@ -384,6 +404,26 @@ export async function getHistoricalSiteAllocations(siteId: string): Promise<Acti
       }
     }
   }
+
+  // 4.5 Custo por ciclo de alocação (separado por alocação, nunca agregado) — final se o ciclo já
+  // encerrou (actual_end_date), estimado até hoje se ainda está em aberto.
+  const today = new Date().toISOString()
+  await Promise.all(
+    historicalAllocations
+      .filter(a => a.machine_ownership === 'rented' && a.allocation_start)
+      .map(async (allocation) => {
+        try {
+          const windowEnd = allocation.actual_end_date || today
+          const breakdown = await calculateAllocationDayBreakdown(allocation.machine_id, allocation.allocation_start, windowEnd)
+          allocation.valid_cost = breakdown.valid_cost
+          allocation.gross_cost = breakdown.gross_cost
+          allocation.credit_amount = breakdown.credit_amount
+          allocation.rate_source = breakdown.rate_source
+        } catch (error) {
+          console.error(`Erro ao calcular custo do histórico da máquina ${allocation.machine_id}:`, error)
+        }
+      })
+  )
 
   // 4. Ordenar por data de início decrescente para o UI
   return historicalAllocations.sort((a, b) => {

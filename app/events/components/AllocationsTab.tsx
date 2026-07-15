@@ -4,6 +4,7 @@ import { DOWNTIME_REASON_LABELS } from '@/lib/permissions'
 import { formatDate, formatDateOnly } from '../utils'
 import { FiCalendar, FiMapPin, FiTool, FiAlertTriangle, FiCheckCircle, FiPlay, FiStopCircle, FiXCircle, FiRefreshCw } from 'react-icons/fi'
 import { formatConstruction } from '@/lib/allocation/formatConstruction'
+import { formatCurrency } from '@/lib/formatCurrency'
 
 interface AllocationsTabProps {
   activeAllocations: ActiveAllocation[]
@@ -155,6 +156,16 @@ export default function AllocationsTab({
                       </div>
                     )}
                   </div>
+
+                  {/* Custo estimado (alocação em aberto, recalculado dia a dia) */}
+                  {allocation.machine_ownership === 'rented' && allocation.valid_cost != null && (
+                    <div className="flex items-center justify-between text-sm bg-gray-50 dark:bg-gray-800/60 rounded-lg px-2.5 py-1.5">
+                      <span className="text-gray-500 dark:text-gray-400">Custo estimado</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {formatCurrency(allocation.valid_cost)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
               

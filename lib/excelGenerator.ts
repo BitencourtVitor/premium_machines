@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import { formatDateNoTimezone, formatWithSystemTimezone, formatDateOnly } from './timezone'
 import { getEventConfig } from '@/app/events/utils'
+import { formatCurrency } from './formatCurrency'
 
 export const generateAllocationStatusExcel = (data: any[]) => {
   const worksheetData = data.map(item => {
@@ -27,7 +28,8 @@ export const generateAllocationStatusExcel = (data: any[]) => {
       'Status': status,
       'Início': item.allocation_start ? formatDateNoTimezone(item.allocation_start) : '-',
       'Vencimento': item.end_date ? formatDateNoTimezone(item.end_date) : '-',
-      'Dias Restantes': item.days_remaining !== undefined && item.days_remaining !== null ? item.days_remaining : '-'
+      'Dias Restantes': item.days_remaining !== undefined && item.days_remaining !== null ? item.days_remaining : '-',
+      'Custo estimado': item.valid_cost != null ? formatCurrency(item.valid_cost) : '-',
     }
   })
 
@@ -48,12 +50,24 @@ export const generateAllocationStatusExcel = (data: any[]) => {
   XLSX.writeFile(wb, `status_alocacoes_${new Date().toISOString().split('T')[0]}.xlsx`)
 }
 
-export const generateMachineHistoryExcel = (machine: any, events: any[]) => {
+export const generateMachineHistoryExcel = (
+  machine: any,
+  events: any[],
+  allocationCycles: Array<{
+    start_event_id: string
+    end_event_id: string | null
+    valid_cost: number | null
+    credit_amount: number | null
+  }> = []
+) => {
+  const cycleByStartEventId = new Map(allocationCycles.map(c => [c.start_event_id, c]))
+
   const worksheetData = events.map(event => {
     const config = getEventConfig(event.event_type)
+    const cycle = event.event_type === 'start_allocation' ? cycleByStartEventId.get(event.id) : null
     return {
-      'Data': ['transport_start', 'transport_arrival', 'downtime_start', 'downtime_end'].includes(event.event_type) 
-        ? formatWithSystemTimezone(event.event_date) 
+      'Data': ['transport_start', 'transport_arrival', 'downtime_start', 'downtime_end'].includes(event.event_type)
+        ? formatWithSystemTimezone(event.event_date)
         : formatDateOnly(event.event_date),
       'Evento': config.label,
       'Local': event.site?.title || '-',
@@ -64,6 +78,8 @@ export const generateMachineHistoryExcel = (machine: any, events: any[]) => {
           : '-',
       'Operador': event.user?.nome || '-',
       'Status': event.status === 'approved' ? 'Aprovado' : event.status === 'pending' ? 'Pendente' : 'Rejeitado',
+      'Custo da alocação': cycle?.valid_cost != null ? formatCurrency(cycle.valid_cost) : '-',
+      'Crédito (manutenção)': cycle?.credit_amount != null ? formatCurrency(cycle.credit_amount) : '-',
       'Observações': event.notas || ''
     }
   })
@@ -168,6 +184,8 @@ export const generateAllocationCreditsExcel = (
     total_days?: number
     valid_days?: number
     invalid_days?: number
+    valid_cost?: number | null
+    credit_amount?: number | null
   }>
 ) => {
   const emptyRow = {
@@ -181,6 +199,8 @@ export const generateAllocationCreditsExcel = (
     'Dias Totais': '-',
     'Dias Ativos': '-',
     'Dias Inativos (Manutenção)': '-',
+    'Custo': '-',
+    'Crédito (manutenção)': '-',
     'Períodos de manutenção': '-',
   }
 
@@ -200,6 +220,8 @@ export const generateAllocationCreditsExcel = (
       'Dias Totais': a.total_days ?? '-',
       'Dias Ativos': a.valid_days ?? '-',
       'Dias Inativos (Manutenção)': a.invalid_days ?? '-',
+      'Custo': a.valid_cost != null ? formatCurrency(a.valid_cost) : '-',
+      'Crédito (manutenção)': a.credit_amount != null ? formatCurrency(a.credit_amount) : '-',
       'Períodos de manutenção': periodsText || '-',
     }
   })
@@ -242,10 +264,11 @@ export const generateBackchargesExcel = (backcharges: any[], periodLabel: string
     'Notas': b.notas || '—',
     'Registrado por': b.created_by_user?.nome || '—',
     'Criado em': formatWithSystemTimezone(b.created_at),
+    'Custo da Alocação': b.allocation_cost != null ? formatCurrency(b.allocation_cost) : '—',
   }))
 
   const ws = XLSX.utils.json_to_sheet(rows)
-  ws['!cols'] = [22, 14, 18, 30, 35, 35, 40, 40, 25, 20, 22].map(w => ({ wch: w }))
+  ws['!cols'] = [22, 14, 18, 30, 35, 35, 40, 40, 25, 20, 22, 18].map(w => ({ wch: w }))
 
   XLSX.utils.book_append_sheet(wb, ws, 'Backcharges')
   XLSX.writeFile(wb, `backcharges_${new Date().toISOString().split('T')[0]}.xlsx`)

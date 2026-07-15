@@ -4,6 +4,7 @@ import autoTable from 'jspdf-autotable'
 import { adjustDateToSystemTimezone, formatDateOnly, formatDateNoTimezone, formatWithSystemTimezone } from '@/lib/timezone'
 import { getEventConfig } from '@/app/events/utils'
 import { getMachineStatusLabel } from '@/lib/permissions'
+import { formatCurrency } from '@/lib/formatCurrency'
 
 interface AllocationData {
   machine_unit_number: string
@@ -19,6 +20,8 @@ interface AllocationData {
   allocation_start?: string | null
   ownership_type?: string
   days_remaining?: number | null
+  valid_cost?: number | null
+  credit_amount?: number | null
 }
 
 
@@ -217,6 +220,10 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
           chips.push({ text: `${diffDays} dias no estado`, color: [100, 100, 100] })
         }
 
+        if (item.valid_cost != null) {
+          chips.push({ text: formatCurrency(item.valid_cost), color: [30, 30, 30] })
+        }
+
         // Chip Drawing Function
         const getChipWidth = (text: string) => {
           doc.setFontSize(7.5)
@@ -294,7 +301,19 @@ export const generateAllocationStatusPDF = async (data: AllocationData[], period
   doc.save(`relatorio_alocacoes_${new Date().getTime()}.pdf`)
 }
 
-export const generateMachineHistoryPDF = async (machine: any, events: any[], periodLabel: string) => {
+export const generateMachineHistoryPDF = async (
+  machine: any,
+  events: any[],
+  periodLabel: string,
+  allocationCycles: Array<{
+    start_event_id: string
+    end_event_id: string | null
+    valid_cost: number | null
+    credit_amount: number | null
+    rate_source: 'category' | 'machine' | 'none'
+  }> = []
+) => {
+  const cycleByStartEventId = new Map(allocationCycles.map(c => [c.start_event_id, c]))
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.width
   const margin = 15
@@ -363,14 +382,16 @@ export const generateMachineHistoryPDF = async (machine: any, events: any[], per
 
       const config = getEventConfig(event.event_type)
       const eventDate = formatDateOnly(event.event_date)
+      const cycle = event.event_type === 'start_allocation' ? cycleByStartEventId.get(event.id) : null
+      const cardHeight = cycle && cycle.valid_cost != null ? 31 : 25
 
       // Event background
       doc.setFillColor(252, 252, 252)
-      doc.rect(margin, currentY, pageWidth - margin * 2, 25, 'F')
-      
+      doc.rect(margin, currentY, pageWidth - margin * 2, cardHeight, 'F')
+
       // Vertical line for timeline
       doc.setDrawColor(230, 230, 230)
-      doc.line(margin + 5, currentY, margin + 5, currentY + 25)
+      doc.line(margin + 5, currentY, margin + 5, currentY + cardHeight)
 
       // Event Title and Date
       doc.setFont('helvetica', 'bold')
@@ -414,7 +435,17 @@ export const generateMachineHistoryPDF = async (machine: any, events: any[], per
         doc.text('PENDENTE', pageWidth - margin - doc.getTextWidth('PENDENTE') - 2, currentY + 20)
       }
 
-      currentY += 28
+      if (cycle && cycle.valid_cost != null) {
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(8)
+        doc.setTextColor(40, 40, 40)
+        const costLabel = cycle.end_event_id ? 'Custo final desta alocação' : 'Custo estimado desta alocação (em aberto)'
+        const creditLabel = cycle.credit_amount ? `  •  Crédito por manutenção: ${formatCurrency(cycle.credit_amount)}` : ''
+        doc.text(`${costLabel}: ${formatCurrency(cycle.valid_cost)}${creditLabel}`, margin + 10, currentY + 26)
+        doc.setFont('helvetica', 'normal')
+      }
+
+      currentY += cardHeight + 3
     })
   }
 
@@ -664,6 +695,8 @@ export const generateAllocationCreditsPDF = async (
     total_days?: number
     valid_days?: number
     invalid_days?: number
+    valid_cost?: number | null
+    credit_amount?: number | null
   }>
 ) => {
   const doc = new jsPDF()
@@ -947,9 +980,12 @@ export const generateAllocationCreditsPDF = async (
 
     const { events: timelineEvents, hiddenCount: hiddenMaintenanceCount } = buildTimelineEvents(a)
 
-    // Coluna esquerda: identificação + dias + barra de progressão. Coluna direita: só a lista de eventos
-    // (pode crescer bastante quando há muitas manutenções, sem "esticar" o conteúdo da esquerda).
-    const leftColumnH = daysBoxOffsetY + boxH + 6 + timelineBlockH + 6
+    const hasCost = a.valid_cost != null
+    const costLineH = hasCost ? 6 : 0
+
+    // Coluna esquerda: identificação + dias + custo + barra de progressão. Coluna direita: só a lista de
+    // eventos (pode crescer bastante quando há muitas manutenções, sem "esticar" o conteúdo da esquerda).
+    const leftColumnH = daysBoxOffsetY + boxH + costLineH + 6 + timelineBlockH + 6
     const rightColumnH = 7 + timelineEvents.length * eventRowH + (hiddenMaintenanceCount > 0 ? 6 : 0) + 6
 
     const cardHeight = Math.max(40, leftColumnH, rightColumnH)
@@ -1003,7 +1039,17 @@ export const generateAllocationCreditsPDF = async (
 
     drawEventTimelineList(rightPanelX, cardY + 7, rightPanelWidth, timelineEvents, hiddenMaintenanceCount)
 
-    const timelineY = cardY + daysBoxOffsetY + boxH + 6
+    if (hasCost) {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(40, 40, 40)
+      const costLabel = `Custo: ${formatCurrency(a.valid_cost)}`
+      const creditLabel = a.credit_amount ? `  •  Crédito por manutenção: ${formatCurrency(a.credit_amount)}` : ''
+      doc.text(costLabel + creditLabel, leftX, cardY + daysBoxOffsetY + boxH + 4)
+      doc.setFont('helvetica', 'normal')
+    }
+
+    const timelineY = cardY + daysBoxOffsetY + boxH + costLineH + 6
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7)
     doc.setTextColor(120, 120, 120)
@@ -1049,23 +1095,25 @@ export const generateBackchargesPDF = async (backcharges: any[], periodLabel: st
       .filter(Boolean)
       .join(', ') || '—'
     const description = b.downtime_description || '—'
-    return [date, machine, site, subs, description]
+    const allocationCost = b.allocation_cost != null ? formatCurrency(b.allocation_cost) : '—'
+    return [date, machine, site, subs, description, allocationCost]
   })
 
   autoTable(doc, {
     startY: 58,
-    head: [['Data', 'Máquina', 'Obra', 'Subcontratados', 'Descrição']],
+    head: [['Data', 'Máquina', 'Obra', 'Subcontratados', 'Descrição', 'Custo da Alocação']],
     body: rows,
     margin: { left: margin, right: margin },
     styles: { fontSize: 8.5, cellPadding: 3 },
     headStyles: { fillColor: [245, 158, 11], textColor: 255, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [255, 251, 235] },
     columnStyles: {
-      0: { cellWidth: 22 },
-      1: { cellWidth: 22 },
-      2: { cellWidth: 38 },
-      3: { cellWidth: 45 },
+      0: { cellWidth: 20 },
+      1: { cellWidth: 20 },
+      2: { cellWidth: 34 },
+      3: { cellWidth: 38 },
       4: { cellWidth: 'auto' },
+      5: { cellWidth: 26 },
     },
   })
 
@@ -1183,6 +1231,16 @@ export const generateEventsBySitePDF = async (sites: { site: any; events: any[] 
       }
 
       currentY += 7
+
+      if (event.event_type === 'start_allocation' && event.allocation_cost != null) {
+        addPageIfNeeded(6)
+        doc.setFont('helvetica', 'italic')
+        doc.setFontSize(7.5)
+        doc.setTextColor(90, 90, 90)
+        doc.text(`Custo da alocação: ${formatCurrency(event.allocation_cost)}`, margin + 8, currentY + 1)
+        doc.setFont('helvetica', 'normal')
+        currentY += 5
+      }
     }
 
     currentY += 6

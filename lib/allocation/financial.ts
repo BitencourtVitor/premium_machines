@@ -1,5 +1,5 @@
 import { supabaseServer } from '../supabase-server'
-import { AllocationDayBreakdown, AllocationDaysCalculation, MaintenancePeriod } from './types'
+import { AllocationDayBreakdown, AllocationDaysCalculation, BlockRates, MaintenancePeriod } from './types'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
@@ -94,6 +94,138 @@ export function overlapDays(
 }
 
 /**
+ * Menor custo possível pra cobrir N dias, combinando blocos de 4-semanas (28 dias) / semana /
+ * dia soltos. Não é decomposição gulosa: testa todas as combinações razoáveis e escolhe a de
+ * menor custo, porque o preço do fornecedor tem pontos em que subir de tier empata ou fica mais
+ * barato que somar o tier menor (ex.: 2 semanas pode custar o mesmo que 4 semanas inteiras). Em
+ * empate, prioriza o bloco maior primeiro (ordem dos loops), por refletir melhor o que o
+ * fornecedor de fato fatura.
+ */
+export function minimizeBlockCost(
+  days: number,
+  rates: BlockRates
+): { cost: number; breakdown: { fourWeekBlocks: number; weeks: number; days: number } } | null {
+  if (days <= 0) {
+    return { cost: 0, breakdown: { fourWeekBlocks: 0, weeks: 0, days: 0 } }
+  }
+  if (rates.daily == null && rates.weekly == null && rates.fourWeek == null) {
+    return null
+  }
+
+  const maxFourWeekBlocks = rates.fourWeek != null ? Math.ceil(days / 28) : 0
+  let best: { cost: number; breakdown: { fourWeekBlocks: number; weeks: number; days: number } } | null = null
+
+  for (let a = maxFourWeekBlocks; a >= 0; a--) {
+    const afterFourWeeks = Math.max(0, days - a * 28)
+    const maxWeeks = rates.weekly != null ? Math.ceil(afterFourWeeks / 7) : 0
+
+    for (let b = maxWeeks; b >= 0; b--) {
+      const afterWeeks = Math.max(0, afterFourWeeks - b * 7)
+      if (afterWeeks > 0 && rates.daily == null) continue
+
+      const c = afterWeeks
+      const cost = a * (rates.fourWeek ?? 0) + b * (rates.weekly ?? 0) + c * (rates.daily ?? 0)
+
+      if (best === null || cost < best.cost) {
+        best = { cost, breakdown: { fourWeekBlocks: a, weeks: b, days: c } }
+      }
+    }
+  }
+
+  return best
+}
+
+/**
+ * Busca a taxa de (fornecedor, categoria) vigente numa data — a linha com o effective_from
+ * mais recente que seja <= asOfDate. Preserva histórico: reajustes futuros do fornecedor não
+ * alteram o custo de alocações já calculadas com uma data anterior ao reajuste.
+ */
+export async function getSupplierMachineTypeRate(
+  supplierId: string,
+  machineTypeId: string,
+  asOfDate: string
+): Promise<BlockRates | null> {
+  const { data } = await supabaseServer
+    .from('supplier_machine_type_rates')
+    .select('daily_rate, weekly_rate, four_week_rate, override_daily_rate, override_weekly_rate, override_four_week_rate')
+    .eq('supplier_id', supplierId)
+    .eq('machine_type_id', machineTypeId)
+    .lte('effective_from', asOfDate.split('T')[0])
+    .order('effective_from', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!data) return null
+
+  return {
+    daily: data.override_daily_rate ?? data.daily_rate ?? null,
+    weekly: data.override_weekly_rate ?? data.weekly_rate ?? null,
+    fourWeek: data.override_four_week_rate ?? data.four_week_rate ?? null,
+  }
+}
+
+/**
+ * Custo de uma alocação: tenta a tabela de preço por categoria primeiro (fornecedor +
+ * machine_type), cai pro rate manual da própria máquina se não achar (monthly_rate é tratado
+ * como o valor de 4-semanas, que é como a máquina já grava esse campo hoje). Máquina própria
+ * (owned) ou sem nenhuma taxa disponível não tem conceito de custo — cobrança só se aplica a
+ * máquinas alugadas.
+ */
+async function calculateAllocationCosts(
+  machineId: string,
+  asOfDate: string,
+  validDays: number,
+  totalDays: number
+): Promise<{
+  valid_cost: number | null
+  gross_cost: number | null
+  credit_amount: number | null
+  rate_source: 'category' | 'machine' | 'none'
+}> {
+  const none = { valid_cost: null, gross_cost: null, credit_amount: null, rate_source: 'none' as const }
+
+  const { data: machine } = await supabaseServer
+    .from('machines')
+    .select('ownership_type, supplier_id, machine_type_id, daily_rate, weekly_rate, monthly_rate')
+    .eq('id', machineId)
+    .single()
+
+  if (!machine || machine.ownership_type !== 'rented') {
+    return none
+  }
+
+  let rates: BlockRates | null = null
+  let rate_source: 'category' | 'machine' | 'none' = 'none'
+
+  if (machine.supplier_id && machine.machine_type_id) {
+    rates = await getSupplierMachineTypeRate(machine.supplier_id, machine.machine_type_id, asOfDate)
+    if (rates) rate_source = 'category'
+  }
+
+  if (!rates && (machine.daily_rate || machine.weekly_rate || machine.monthly_rate)) {
+    rates = {
+      daily: machine.daily_rate ? parseFloat(machine.daily_rate) : null,
+      weekly: machine.weekly_rate ? parseFloat(machine.weekly_rate) : null,
+      fourWeek: machine.monthly_rate ? parseFloat(machine.monthly_rate) : null,
+    }
+    rate_source = 'machine'
+  }
+
+  if (!rates) {
+    return none
+  }
+
+  const validResult = minimizeBlockCost(validDays, rates)
+  const grossResult = minimizeBlockCost(totalDays, rates)
+
+  const valid_cost = validResult?.cost ?? null
+  const gross_cost = grossResult?.cost ?? null
+  const credit_amount = valid_cost != null && gross_cost != null ? gross_cost - valid_cost : null
+
+  return { valid_cost, gross_cost, credit_amount, rate_source }
+}
+
+/**
  * Quebra de dias válidos (cobrados) vs. inválidos (crédito por manutenção, dia sem uso) de
  * UMA alocação específica (par start_allocation/end_allocation), não de um período genérico.
  */
@@ -119,6 +251,13 @@ export async function calculateAllocationDayBreakdown(
   const invalid_days = totalOverlapDays
   const valid_days = Math.max(0, total_days - invalid_days)
 
+  const { valid_cost, gross_cost, credit_amount, rate_source } = await calculateAllocationCosts(
+    machineId,
+    startDate,
+    valid_days,
+    total_days
+  )
+
   return {
     start_date: startDate,
     end_date: endDate,
@@ -126,6 +265,10 @@ export async function calculateAllocationDayBreakdown(
     valid_days,
     invalid_days,
     maintenance_periods: overlappingPeriods,
+    valid_cost,
+    gross_cost,
+    credit_amount,
+    rate_source,
   }
 }
 

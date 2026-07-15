@@ -1,6 +1,7 @@
 import mapboxgl from 'mapbox-gl'
 import { Site } from './types'
 import { MACHINE_STATUS_LABELS, getMachineStatusLabel } from '@/lib/permissions'
+import { formatCurrency } from '@/lib/formatCurrency'
 
 // Função para obter cores adaptadas ao tema
 export const getThemeColors = (colorType: 'neutral' | 'blue' | 'red' | 'green' | 'yellow' | 'orange' | 'purple' | 'pink' | 'indigo', isDark: boolean) => {
@@ -400,21 +401,28 @@ export const createSitePanel = (site: Site, currentIsDark: boolean) => {
                   statusColor = `background: ${currentIsDark ? '#312e81' : '#e0e7ff'}; color: ${currentIsDark ? '#a5b4fc' : '#3730a3'}; border: 1px solid ${currentIsDark ? '#4338ca' : '#c7d2fe'};`;
                 }
 
+                const costLine = machine.valid_cost != null
+                  ? `<div style="font-size: 10px; color: ${currentIsDark ? '#9ca3af' : '#6b7280'}; margin-top: 2px;">Custo est.: ${formatCurrency(machine.valid_cost)}</div>`
+                  : ''
+
                 return `
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px; background: ${currentIsDark ? '#374151' : '#f9fafb'}; border-radius: 4px;">
-                  <span style="font-size: 12px; font-weight: 500; color: ${currentIsDark ? 'white' : '#111827'};">
-                    ${machine.unit_number}
-                  </span>
-                  <span style="
-                    font-size: 10px; 
-                    padding: 2px 8px; 
-                    border-radius: 9999px; 
-                    font-weight: 600;
-                    text-transform: uppercase;
-                    ${statusColor}
-                  ">
-                    ${label}
-                  </span>
+                <div style="display: flex; flex-direction: column; padding: 6px; background: ${currentIsDark ? '#374151' : '#f9fafb'}; border-radius: 4px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-size: 12px; font-weight: 500; color: ${currentIsDark ? 'white' : '#111827'};">
+                      ${machine.unit_number}
+                    </span>
+                    <span style="
+                      font-size: 10px;
+                      padding: 2px 8px;
+                      border-radius: 9999px;
+                      font-weight: 600;
+                      text-transform: uppercase;
+                      ${statusColor}
+                    ">
+                      ${label}
+                    </span>
+                  </div>
+                  ${costLine}
                 </div>`;
               }).join('')}
           </div>

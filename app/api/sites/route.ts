@@ -73,7 +73,11 @@ export async function GET(request: NextRequest) {
                 previous_site_id: alloc.previous_site_id,
                 origin_site_id: alloc.origin_site_id,
                 destination_site_id: alloc.destination_site_id,
-                physical_site_id: alloc.physical_site_id
+                physical_site_id: alloc.physical_site_id,
+                valid_cost: alloc.valid_cost,
+                gross_cost: alloc.gross_cost,
+                credit_amount: alloc.credit_amount,
+                rate_source: alloc.rate_source
               })
             }
             if (alloc.destination_site_id === site.id) {
@@ -91,10 +95,14 @@ export async function GET(request: NextRequest) {
                 previous_site_id: alloc.previous_site_id,
                 origin_site_id: alloc.origin_site_id,
                 destination_site_id: alloc.destination_site_id,
-                physical_site_id: alloc.physical_site_id
+                physical_site_id: alloc.physical_site_id,
+                valid_cost: alloc.valid_cost,
+                gross_cost: alloc.gross_cost,
+                credit_amount: alloc.credit_amount,
+                rate_source: alloc.rate_source
               })
             }
-          } 
+          }
           // Caso contrário, projetar apenas no physical_site_id
           else if (alloc.physical_site_id === site.id) {
             machines.push({
@@ -111,10 +119,14 @@ export async function GET(request: NextRequest) {
               previous_site_id: alloc.previous_site_id,
               origin_site_id: alloc.origin_site_id,
               destination_site_id: alloc.destination_site_id,
-              physical_site_id: alloc.physical_site_id
+              physical_site_id: alloc.physical_site_id,
+              valid_cost: alloc.valid_cost,
+              gross_cost: alloc.gross_cost,
+              credit_amount: alloc.credit_amount,
+              rate_source: alloc.rate_source
             })
           }
-          
+
           return machines
         })
 

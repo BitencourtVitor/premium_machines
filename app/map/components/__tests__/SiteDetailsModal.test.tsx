@@ -26,7 +26,13 @@ const mockAllocations = [
     machine_unit_number: 'M001',
     machine_name: 'Excavator',
     machine_type: 'Type 1',
-    machine_ownership: 'owned'
+    machine_ownership: 'owned',
+    // status + start_date são exigidos por getAllocationStatusToday() pra classificar a
+    // alocação como "Ativa" (um dos 3 status selecionados por padrão no filtro do modal).
+    // Sem eles, cai no branch "Encerrada" e a máquina some da lista renderizada.
+    status: 'allocated',
+    start_date: '2023-01-01',
+    allocation_start: '2023-01-01'
   }
 ]
 

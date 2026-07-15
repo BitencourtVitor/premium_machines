@@ -35,3 +35,9 @@ next-env.d.ts
 
 # Backlog (local only, nunca commitado)
 backlog/
+
+# graphify (local knowledge graph, nunca commitado)
+graphify-out/
+
+# Seeds locais com dados comerciais de fornecedores (preços reais) — nunca commitados
+database/seeds-local/

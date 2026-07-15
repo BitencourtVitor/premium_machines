@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase-server'
 import { calculateStateFromEvents } from '@/lib/allocation/stateCalculation'
 import { ActiveAllocation } from '@/lib/allocation/types'
+import { calculateAllocationDayBreakdown } from '@/lib/allocation/financial'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,6 +105,7 @@ export async function GET(request: NextRequest) {
           machine_unit_number: machine.unit_number,
           machine_description: machine.notas,
           machine_type: (machine.machine_type as any)?.nome || '',
+          ownership_type: machine.ownership_type,
           site_title: state.current_site_title || siteTitles.get(state.current_site_id || '') || 'Sem Localização',
           construction_type: state.construction_type,
           lot_building_number: state.lot_building_number,
@@ -112,10 +114,26 @@ export async function GET(request: NextRequest) {
           attached_extensions: state.attached_extensions,
           allocation_start: state.allocation_start,
           end_date: state.end_date,
-          days_remaining: daysRemaining
+          days_remaining: daysRemaining,
+          valid_cost: null as number | null,
+          credit_amount: null as number | null,
         })
       }
     }
+
+    await Promise.all(
+      allocations
+        .filter(a => a.ownership_type === 'rented' && a.allocation_start)
+        .map(async (a) => {
+          try {
+            const breakdown = await calculateAllocationDayBreakdown(a.machine_id, a.allocation_start, referenceDate.toISOString())
+            a.valid_cost = breakdown.valid_cost
+            a.credit_amount = breakdown.credit_amount
+          } catch (error) {
+            console.error(`Erro ao calcular custo da alocação da máquina ${a.machine_id}:`, error)
+          }
+        })
+    )
 
     return NextResponse.json({ success: true, allocations })
   } catch (error: any) {

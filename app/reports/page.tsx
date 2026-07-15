@@ -401,7 +401,7 @@ export default function ReportsPage() {
 
         if (data.success) {
           const periodLabel = allPeriod ? 'Atualmente' : `${dateFrom ? `De ${formatDateOnly(dateFrom)} ` : ''}Até ${formatDateOnly(dateTo)}`
-          await generateMachineHistoryPDF(data.machine, data.events, periodLabel)
+          await generateMachineHistoryPDF(data.machine, data.events, periodLabel, data.allocation_cycles)
         } else {
           alert('Erro ao gerar relatório: ' + data.message)
         }
@@ -537,7 +537,7 @@ export default function ReportsPage() {
         const data = await res.json()
 
         if (data.success) {
-          generateMachineHistoryExcel(data.machine, data.events)
+          generateMachineHistoryExcel(data.machine, data.events, data.allocation_cycles)
         } else {
           alert('Erro ao gerar relatório Excel: ' + data.message)
         }
