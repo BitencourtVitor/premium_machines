@@ -170,6 +170,13 @@ export async function getSupplierMachineTypeRate(
  * como o valor de 4-semanas, que é como a máquina já grava esse campo hoje). Máquina própria
  * (owned) ou sem nenhuma taxa disponível não tem conceito de custo — cobrança só se aplica a
  * máquinas alugadas.
+ *
+ * asOfDate usa o FIM da janela (hoje, se a alocação está em aberto; data de encerramento, se
+ * fechada) — não o início. Isso importa na prática: alocações reais frequentemente começam
+ * antes da data de vigência da lista de preço atual (não temos histórico de preço anterior a
+ * ela), e travar a busca no início faria essas alocações nunca encontrarem taxa nenhuma, mesmo
+ * estando ativas hoje sob o preço vigente. Travar no fim reflete melhor "quanto custaria pra
+ * manter isso agora" — o que é exatamente o que uma estimativa em aberto precisa responder.
  */
 async function calculateAllocationCosts(
   machineId: string,
@@ -253,7 +260,7 @@ export async function calculateAllocationDayBreakdown(
 
   const { valid_cost, gross_cost, credit_amount, rate_source } = await calculateAllocationCosts(
     machineId,
-    startDate,
+    endDate,
     valid_days,
     total_days
   )
