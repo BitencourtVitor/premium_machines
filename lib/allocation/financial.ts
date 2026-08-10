@@ -144,10 +144,10 @@ export async function getSupplierMachineTypeRate(
   supplierId: string,
   machineTypeId: string,
   asOfDate: string
-): Promise<BlockRates | null> {
+): Promise<(BlockRates & { effectiveFrom: string }) | null> {
   const { data } = await supabaseServer
     .from('supplier_machine_type_rates')
-    .select('daily_rate, weekly_rate, four_week_rate, override_daily_rate, override_weekly_rate, override_four_week_rate')
+    .select('daily_rate, weekly_rate, four_week_rate, override_daily_rate, override_weekly_rate, override_four_week_rate, effective_from')
     .eq('supplier_id', supplierId)
     .eq('machine_type_id', machineTypeId)
     .lte('effective_from', asOfDate.split('T')[0])
@@ -161,6 +161,7 @@ export async function getSupplierMachineTypeRate(
     daily: data.override_daily_rate ?? data.daily_rate ?? null,
     weekly: data.override_weekly_rate ?? data.weekly_rate ?? null,
     fourWeek: data.override_four_week_rate ?? data.four_week_rate ?? null,
+    effectiveFrom: data.effective_from,
   }
 }
 
@@ -181,8 +182,9 @@ export async function getSupplierMachineTypeRate(
 async function calculateAllocationCosts(
   machineId: string,
   asOfDate: string,
-  validDays: number,
-  totalDays: number
+  startDate: string,
+  endDate: string,
+  maintenancePeriods: Array<{ start_date: string; end_date: string | null; description: string }>
 ): Promise<{
   valid_cost: number | null
   gross_cost: number | null
@@ -201,7 +203,7 @@ async function calculateAllocationCosts(
     return none
   }
 
-  let rates: BlockRates | null = null
+  let rates: (BlockRates & { effectiveFrom?: string }) | null = null
   let rate_source: 'category' | 'machine' | 'none' = 'none'
 
   if (machine.supplier_id && machine.machine_type_id) {
@@ -222,8 +224,18 @@ async function calculateAllocationCosts(
     return none
   }
 
-  const validResult = minimizeBlockCost(validDays, rates)
-  const grossResult = minimizeBlockCost(totalDays, rates)
+  // A known supplier price must never be applied retroactively to days before
+  // its effective date. That made long ETS allocations look dramatically
+  // inflated when the first price list (2026-01-05) was applied to 2024/2025.
+  const pricingStart = rates.effectiveFrom && rates.effectiveFrom > startDate.split('T')[0]
+    ? `${rates.effectiveFrom}T00:00:00.000Z`
+    : startDate
+  const pricedTotalDays = Math.max(0, diffDays(endDate, pricingStart))
+  const pricedMaintenance = overlapDays(pricingStart, endDate, maintenancePeriods).totalOverlapDays
+  const pricedValidDays = Math.max(0, pricedTotalDays - pricedMaintenance)
+
+  const validResult = minimizeBlockCost(pricedValidDays, rates)
+  const grossResult = minimizeBlockCost(pricedTotalDays, rates)
 
   const valid_cost = validResult?.cost ?? null
   const gross_cost = grossResult?.cost ?? null
@@ -261,8 +273,9 @@ export async function calculateAllocationDayBreakdown(
   const { valid_cost, gross_cost, credit_amount, rate_source } = await calculateAllocationCosts(
     machineId,
     endDate,
-    valid_days,
-    total_days
+    startDate,
+    endDate,
+    periods
   )
 
   return {
