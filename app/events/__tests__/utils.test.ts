@@ -169,4 +169,36 @@ describe('filterMachinesForEvent', () => {
 
     expect(result.map(m => m.id)).toContain('4')
   })
+
+  it('should include an active extension for end_allocation even with no matching event in the (row-capped) events list', () => {
+    // Reproduz o caso real da T12: o evento que a alocou é antigo o suficiente pra ter caído
+    // fora do fetch de eventos (que tem um teto de linhas do banco), mas ela está de fato
+    // ativa segundo activeAllocations/status — isso sozinho já deve bastar pra aparecer.
+    const machinesWithExtension = [
+      ...machines,
+      { id: '5', name: 'Extension 2', extension_type: 'Truss Boom', status: 'allocated', current_site: { id: 'site1' } },
+    ]
+
+    const activeAllocationsWithExtension: ActiveAllocation[] = [
+      ...activeAllocations,
+      {
+        ...activeAllocations[0],
+        allocation_event_id: 'alloc3',
+        machine_id: '5',
+        machine_unit_number: 'T12',
+        site_id: 'site1',
+      },
+    ]
+
+    // Nenhum evento de '5' está presente em `events` (simula o corte de linhas do fetch)
+    const result = filterMachinesForEvent(
+      'end_allocation',
+      machinesWithExtension,
+      activeAllocationsWithExtension,
+      activeDowntimes,
+      events
+    )
+
+    expect(result.map(m => m.id)).toContain('5')
+  })
 })
