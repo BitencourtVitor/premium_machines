@@ -193,16 +193,20 @@ export const filterMachinesForEvent = (
       return baseFiltered.filter(m => {
         // Buscar eventos relevantes aprovados para esta máquina ou extensão
         // (uma extensão anexada aparece com extension_id === m.id, não machine_id === m.id)
+        // Observação: `events` vem de um fetch com limite de linhas do banco (bulk fetch),
+        // então uma máquina com o último evento muito antigo pode não aparecer aqui mesmo
+        // estando ativa de verdade — por isso a ausência de eventos NÃO decide sozinha,
+        // só serve pra pegar o caso "último evento já é um fim de alocação".
         const machineEvents = events
           .filter(e => (e.machine?.id === m.id || e.extension?.id === m.id) && e.status === 'approved')
           .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
 
-        if (machineEvents.length === 0) return false
+        if (machineEvents.length > 0) {
+          const lastEvent = machineEvents[0]
 
-        const lastEvent = machineEvents[0]
-        
-        // Se o evento mais recente já for um fim de alocação, não pode encerrar de novo
-        if (['end_allocation', 'extension_detach'].includes(lastEvent.event_type)) return false
+          // Se o evento mais recente já for um fim de alocação, não pode encerrar de novo
+          if (['end_allocation', 'extension_detach'].includes(lastEvent.event_type)) return false
+        }
 
         // Se ela está em alocações ativas, permite
         if (allocatedIds.includes(m.id)) return true
