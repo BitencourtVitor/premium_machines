@@ -191,9 +191,10 @@ export const filterMachinesForEvent = (
     case 'end_allocation':
       // Máquinas que podem ter sua alocação encerrada
       return baseFiltered.filter(m => {
-        // Buscar eventos relevantes aprovados para esta máquina
+        // Buscar eventos relevantes aprovados para esta máquina ou extensão
+        // (uma extensão anexada aparece com extension_id === m.id, não machine_id === m.id)
         const machineEvents = events
-          .filter(e => e.machine?.id === m.id && e.status === 'approved')
+          .filter(e => (e.machine?.id === m.id || e.extension?.id === m.id) && e.status === 'approved')
           .sort((a, b) => new Date(b.event_date).getTime() - new Date(a.event_date).getTime())
 
         if (machineEvents.length === 0) return false

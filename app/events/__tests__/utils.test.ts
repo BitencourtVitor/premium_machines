@@ -128,4 +128,45 @@ describe('filterMachinesForEvent', () => {
     const result = filterMachinesForEvent('refueling', machines, activeAllocations, activeDowntimes)
     expect(result).toEqual(machines)
   })
+
+  it('should include an attached extension for end_allocation (extension_id, not machine_id)', () => {
+    const machinesWithExtension = [
+      ...machines,
+      { id: '4', name: 'Extension 1', extension_type: 'Truss Boom' },
+    ]
+
+    const activeAllocationsWithExtension: ActiveAllocation[] = [
+      ...activeAllocations,
+      {
+        ...activeAllocations[0],
+        allocation_event_id: 'alloc2',
+        machine_id: '4',
+        machine_unit_number: 'T12',
+        site_id: 'site1',
+      },
+    ]
+
+    const eventsWithExtensionAttach = [
+      ...events,
+      {
+        id: 'evt2',
+        event_type: 'extension_attach',
+        status: 'approved',
+        event_date: '2023-01-02T00:00:00',
+        machine: { id: '1' },
+        extension: { id: '4' },
+        site: { id: 'site1', title: 'Site 1' }
+      }
+    ]
+
+    const result = filterMachinesForEvent(
+      'end_allocation',
+      machinesWithExtension,
+      activeAllocationsWithExtension,
+      activeDowntimes,
+      eventsWithExtensionAttach
+    )
+
+    expect(result.map(m => m.id)).toContain('4')
+  })
 })
