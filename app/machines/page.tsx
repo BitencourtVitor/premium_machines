@@ -313,6 +313,21 @@ export default function MachinesPage() {
 
   const handleDeleteMachine = (machine: Machine) => {
     setError(null)
+
+    // status vem calculado dos eventos em /api/machines: diferente de 'available' = alocação ativa
+    if (machine.status !== 'available') {
+      const where = machine.current_site ? ` em ${machine.current_site.title}` : ''
+      setConfirmModal({
+        isOpen: true,
+        title: 'Alocação em andamento',
+        message: `A máquina "${machine.unit_number}" tem uma alocação em andamento${where}. Encerre a alocação antes de excluir.`,
+        confirmButtonText: 'Encerrar alocação',
+        isDangerous: false,
+        onConfirm: () => router.push(`/events?end_allocation=${machine.id}`),
+      })
+      return
+    }
+
     setConfirmModal({
       isOpen: true,
       title: 'Excluir Máquina',
@@ -346,6 +361,16 @@ export default function MachinesPage() {
       }
     })
   }
+
+  // Volta da tela de Eventos depois de encerrar a alocação: /machines?delete=<id> reabre a confirmação
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('delete')
+    const machine = id && machines.find(m => m.id === id)
+    if (!machine) return
+    router.replace('/machines')
+    handleDeleteMachine(machine)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [machines])
 
   const handleEditMachine = (machine: Machine) => {
     setEditingMachine(machine)
