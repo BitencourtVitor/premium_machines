@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Header from '@/app/components/Header'
 import BottomNavigation from '@/app/components/BottomNavigation'
@@ -264,6 +264,19 @@ export default function EventsPage() {
     loadActiveAllocations()
   }, [user, sessionLoading, router, loadEvents, loadMachines, loadSites, loadSuppliers, loadExtensions, loadMachineTypes, loadActiveAllocations])
 
+  // Atalho vindo da exclusão de máquina: /events?end_allocation=<machineId> abre o Fim de Alocação
+  // já com a máquina escolhida e, ao salvar, volta para a confirmação de exclusão.
+  const deleteAfterEndRef = useRef<string | null>(null)
+  useEffect(() => {
+    const machineId = new URLSearchParams(window.location.search).get('end_allocation')
+    if (!machineId || machines.length === 0) return
+    deleteAfterEndRef.current = machineId
+    router.replace('/events')
+    setEditingEventId(null)
+    setNewEvent(prev => ({ ...prev, event_type: 'end_allocation', machine_id: machineId, event_date: getLocalDateTimeForInput() }))
+    setShowCreateModal(true)
+  }, [machines, router])
+
   const handleCreateEvent = async (files: File[] = []) => {
     // Basic safety check
     if (!newEvent.event_date) {
@@ -369,6 +382,10 @@ export default function EventsPage() {
           used_by: [],
           allocation_subcontractors: [],
         })
+        if (newEvent.event_type === 'end_allocation' && newEvent.machine_id === deleteAfterEndRef.current) {
+          router.push(`/machines?delete=${newEvent.machine_id}`)
+          return
+        }
         loadEvents()
         if (activeTab === 'allocations') loadActiveAllocations()
       } else {

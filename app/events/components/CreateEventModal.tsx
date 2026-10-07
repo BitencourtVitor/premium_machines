@@ -89,8 +89,8 @@ export default function CreateEventModal({
         }
       }
       fetchExistingFiles()
-    } else if (newEvent.machine_id && newEvent.event_type === 'downtime_start') {
-      // Direct open for downtime start
+    } else if (newEvent.machine_id && ['downtime_start', 'end_allocation'].includes(newEvent.event_type)) {
+      // Direct open quando o tipo e a máquina já vêm escolhidos
       setStep('form')
     } else if (newEvent.from_request_id) {
       // Abrir formulário diretamente se vier de uma solicitação
