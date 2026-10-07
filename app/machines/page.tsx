@@ -323,8 +323,10 @@ export default function MachinesPage() {
         setConfirmModal(prev => ({ ...prev, isLoading: true }))
         setError(null)
         try {
-          const response = await fetch(`/api/machines?id=${machine.id}`, {
+          const response = await fetch(`/api/machines/${machine.id}`, {
             method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentUserId: user?.id }),
           })
 
           const data = await response.json()

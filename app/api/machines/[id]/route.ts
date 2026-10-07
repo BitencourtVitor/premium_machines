@@ -3,6 +3,7 @@ import { supabaseServer } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 import { createAuditLog } from '@/lib/auditLog'
+import { getActiveAllocations } from '@/lib/allocation/queries'
 
 /**
  * GET /api/machines/[id]
@@ -140,14 +141,23 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Verificar se a máquina está alocada
     const { data: machine } = await supabaseServer
       .from('machines')
-      .select('current_site_id, status')
+      .select('*')
       .eq('id', params.id)
       .single()
 
-    if (machine && machine.current_site_id) {
+    if (!machine) {
+      return NextResponse.json(
+        { success: false, message: 'Máquina não encontrada' },
+        { status: 404 }
+      )
+    }
+
+    // O estado vem dos eventos: as colunas status/current_site_id gravadas podem estar defasadas
+    const activeAllocations = await getActiveAllocations()
+
+    if (activeAllocations.some(a => a.machine_id === params.id)) {
       return NextResponse.json(
         { success: false, message: 'Não é possível excluir uma máquina alocada. Finalize a alocação primeiro.' },
         { status: 400 }
